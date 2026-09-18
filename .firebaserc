@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "my-project-1542101276805"
+  },
+  "targets": {
+    "my-project-1542101276805": {
+      "hosting": {
+        "marketing": [
+          "my-project-1542101276805"
+        ],
+        "app": [
+          "squad-hq"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

@@ -8,7 +8,9 @@ abstract interface class AuthRepository {
   /// itself arrives later via [authStateChanges], not this call's result.
   Future<Either<Failure, Unit>> signInWithFacebook();
 
-  Future<Either<Failure, AppUser>> signInWithGoogle();
+  /// Launches Google's browser sign-in; success/failure of the sign-in
+  /// itself arrives later via [authStateChanges], not this call's result.
+  Future<Either<Failure, Unit>> signInWithGoogle();
 
   Future<Either<Failure, AppUser>> completeOnboarding({
     required String userId,

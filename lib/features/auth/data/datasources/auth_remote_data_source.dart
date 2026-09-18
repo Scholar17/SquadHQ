@@ -1,4 +1,4 @@
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 
 import '../../../../core/error/exceptions.dart';
@@ -12,7 +12,13 @@ abstract interface class AuthRemoteDataSource {
   /// the browser-based OAuth flow instead.
   Future<void> signInWithFacebook();
 
-  Future<AppUserModel> signInWithGoogle();
+  /// Launches Google's browser sign-in the same way [signInWithFacebook]
+  /// does. The native Credential Manager flow (`google_sign_in` package) was
+  /// dropped after it consistently failed with a Play Services-side
+  /// "28444: Developer console is not set up correctly" error, reproduced
+  /// across two devices and two separate Google Cloud projects with fresh
+  /// OAuth clients — pointing to a Play Services bug, not a config issue.
+  Future<void> signInWithGoogle();
 
   Future<AppUserModel> completeOnboarding({
     required String userId,
@@ -32,31 +38,35 @@ abstract interface class AuthRemoteDataSource {
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
-  AuthRemoteDataSourceImpl({
-    required SupabaseClient supabaseClient,
-    required String googleWebClientId,
-    required String googleIosClientId,
-    GoogleSignIn? googleSignIn,
-  })  : _supabase = supabaseClient,
-        _webClientId = googleWebClientId,
-        _iosClientId = googleIosClientId,
-        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+  AuthRemoteDataSourceImpl({required SupabaseClient supabaseClient})
+      : _supabase = supabaseClient;
 
   final SupabaseClient _supabase;
-  final GoogleSignIn _googleSignIn;
-  final String _webClientId;
-  final String _iosClientId;
 
-  /// Registered as a redirect URL in the Supabase dashboard and as an
-  /// intent-filter/URL scheme on Android/iOS.
-  static const _facebookRedirectUrl = 'squadhq://login-callback';
+  /// `squadhq://login-callback` is registered as an intent-filter/URL scheme
+  /// on Android/iOS and works there via an OS-level deep link. A browser has
+  /// no such mechanism — passing that same custom scheme to Google/Facebook
+  /// on web gets the request rejected outright.
+  ///
+  /// On web this must NOT be left `null`: gotrue omits an absent redirectTo
+  /// from the request entirely, so Supabase falls back to the project's
+  /// Site URL setting — which is `squadhq://login-callback` here (a holdover
+  /// from mobile-only setup), reproducing the exact same broken redirect.
+  /// Using the page's own live origin instead means it's always correct
+  /// regardless of what Site URL happens to be configured to, and adapts
+  /// automatically across dev ports / a future production domain — it just
+  /// needs to be listed in Supabase Dashboard → Authentication → URL
+  /// Configuration → Redirect URLs (e.g. `http://localhost:<port>` for
+  /// local dev).
+  static String? get _oauthRedirectUrl =>
+      kIsWeb ? Uri.base.origin : 'squadhq://login-callback';
 
   @override
   Future<void> signInWithFacebook() async {
     try {
       final launched = await _supabase.auth.signInWithOAuth(
         OAuthProvider.facebook,
-        redirectTo: _facebookRedirectUrl,
+        redirectTo: _oauthRedirectUrl,
         // Without this, Android's App Links hands facebook.com straight to
         // the installed Facebook app instead of a browser (no chooser),
         // which isn't the OAuth flow we've configured.
@@ -73,32 +83,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<AppUserModel> signInWithGoogle() async {
+  Future<void> signInWithGoogle() async {
     try {
-      await _googleSignIn.initialize(
-        serverClientId: _webClientId,
-        clientId: _iosClientId,
+      final launched = await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: _oauthRedirectUrl,
+        authScreenLaunchMode: LaunchMode.inAppBrowserView,
+        // Without this, Google silently reuses whichever account is
+        // already signed into the device's browser instead of letting the
+        // user pick, since the OAuth request otherwise looks like a normal
+        // SSO continuation.
+        queryParams: const {'prompt': 'select_account'},
       );
-      final account = await _googleSignIn.authenticate();
-      final idToken = account.authentication.idToken;
-      if (idToken == null) {
-        throw const AuthException('Google sign-in did not return an ID token.');
+      if (!launched) {
+        throw const AuthException('Could not open Google sign-in.');
       }
-      final authorization = await account.authorizationClient
-              .authorizationForScopes(const ['email', 'profile']) ??
-          await account.authorizationClient
-              .authorizeScopes(const ['email', 'profile']);
-      final response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: authorization.accessToken,
-      );
-      return await _loadOrCreateProfile(response.user);
-    } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        throw const AuthException('Google sign-in was cancelled.');
-      }
-      throw AuthException('Google sign-in failed: ${e.description ?? e.code}');
     } on AuthException {
       rethrow;
     } catch (e) {
@@ -134,10 +133,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
-      await Future.wait([
-        _supabase.auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
+      await _supabase.auth.signOut();
     } catch (e) {
       throw AuthException('Sign out failed: $e');
     }

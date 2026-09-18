@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Squad Hq</string>
+		<string>Squad HQ</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -30,6 +30,12 @@
 				<key>CFBundleURLSchemes</key>
 				<array>
 					<string>squadhq</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.66031846582-j28tgei4n7kuu4bcd9pj6nl5156ucfg1</string>
 				</array>
 			</dict>
 		</array>

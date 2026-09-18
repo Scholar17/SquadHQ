@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../team_membership/presentation/pages/team_membership_page.dart';
 import '../../domain/entities/app_user.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -163,6 +164,44 @@ class ProfilePage extends StatelessWidget {
                       showTopBorder: true,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'SQUAD',
+                style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+              ),
+              const SizedBox(height: 10),
+              Material(
+                color: AppColors.neutral100,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TeamMembershipPage(),
+                    ),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Team',
+                          style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.text.withValues(alpha: 0.4),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 28),

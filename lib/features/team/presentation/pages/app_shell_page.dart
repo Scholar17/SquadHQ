@@ -5,6 +5,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
+import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
+import '../../../team_membership/presentation/bloc/team_membership_event.dart';
 import '../bloc/team_bloc.dart';
 import '../bloc/team_event.dart';
 import 'dashboard_page.dart';
@@ -33,6 +35,16 @@ class _AppShellPageState extends State<AppShellPage> {
     (icon: Icons.account_balance_wallet_rounded, label: 'Wallet'),
     (icon: Icons.groups_rounded, label: 'Squad'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // TeamMembershipBloc is a singleton provided once at the app root (see
+    // app.dart), so this refreshes whoever's actually signed in rather than
+    // trusting whatever it last loaded — matters after sign-out/sign-in as
+    // a different profile, since the bloc instance itself doesn't change.
+    context.read<TeamMembershipBloc>().add(const TeamMembershipStarted());
+  }
 
   @override
   Widget build(BuildContext context) {

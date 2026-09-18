@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">squad_hq</string>
+    <string name="app_name">Squad HQ</string>
 
     <!-- facebook_app_id, fb_login_protocol_scheme and facebook_client_token are
          generated at build time (see android/app/build.gradle.kts) from the

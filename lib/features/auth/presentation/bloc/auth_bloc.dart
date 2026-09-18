@@ -68,13 +68,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final fallback = state;
     emit(AuthLoading(fallback));
     final result = await _signInWithGoogle(const NoParams());
+    // Google goes through a browser redirect, same as Facebook: this call
+    // only launches it. On success, stay in AuthLoading — _onUserChanged
+    // resolves the real outcome once the redirect completes and the
+    // session stream fires.
     result.fold(
       (failure) => emit(AuthFailure(failure.message, fallback)),
-      (user) => emit(
-        user.hasCompletedOnboarding
-            ? AuthAuthenticated(user)
-            : AuthNeedsOnboarding(user),
-      ),
+      (_) {},
     );
   }
 

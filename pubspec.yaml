@@ -40,9 +40,6 @@ dependencies:
   get_it: ^9.2.1
   google_fonts: ^8.2.1
   dartz: ^0.10.1
-  google_sign_in: ^7.2.0
-  flutter_dotenv: ^6.0.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -84,7 +81,6 @@ flutter:
   uses-material-design: true
   assets:
      - assets/images/pitch_bg.png
-     - .env
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
