@@ -70,6 +70,49 @@ void main() {
     expect(find.text('3 unpaid'), findsOneWidget);
   });
 
+  testWidgets('Add bill splits a new bill equally across the roster', (tester) async {
+    await pumpTeam(tester, const WalletPage());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('3 unpaid'), findsOneWidget);
+
+    await tester.tap(find.text('+ Add bill'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Split a bill'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Rent fee'), '900');
+    await tester.enterText(find.widgetWithText(TextField, 'Water fee'), '90');
+    await tester.pump();
+
+    // 9 players, ฿990 total — an even ฿110 each.
+    expect(find.text('฿990'), findsWidgets);
+
+    await tester.ensureVisible(find.text('Split ฿990'));
+    await tester.tap(find.text('Split ฿990'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Split a bill'), findsNothing);
+    expect(find.text('9 unpaid'), findsOneWidget);
+  });
+
+  testWidgets('Add bill lets a manager exclude a player from the split', (tester) async {
+    await pumpTeam(tester, const WalletPage());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('+ Add bill'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('9 of 9'), findsOneWidget);
+
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+
+    expect(find.text('8 of 9'), findsOneWidget);
+  });
+
   testWidgets('Squad tab lists the roster and opens a player card', (tester) async {
     await pumpTeam(tester, const SquadPage(user: user));
     await tester.pump();

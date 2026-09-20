@@ -47,3 +47,27 @@ final class TeamMatchDetailsUpdated extends TeamEvent {
   @override
   List<Object?> get props => [opponent, kickoffLabel, venueLine, feePerPlayer, kit];
 }
+
+/// Manager-only: a new bill (rent, water, extras) split across the roster.
+/// [shares] is the final per-member charge — already resolved for any
+/// exceptions and any player covering someone else's share — keyed by
+/// [SquadMember.id].
+final class TeamBillSplit extends TeamEvent {
+  const TeamBillSplit({
+    required this.rentFee,
+    required this.waterFee,
+    required this.additionalCost,
+    required this.additionalLabel,
+    required this.shares,
+  });
+
+  final double rentFee;
+  final double waterFee;
+  final double additionalCost;
+  final String additionalLabel;
+  final Map<String, double> shares;
+
+  @override
+  List<Object?> get props =>
+      [rentFee, waterFee, additionalCost, additionalLabel, shares];
+}

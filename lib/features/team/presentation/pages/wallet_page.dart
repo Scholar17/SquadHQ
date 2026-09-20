@@ -6,6 +6,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team_snapshot.dart';
 import '../bloc/team_bloc.dart';
 import '../bloc/team_state.dart';
+import '../widgets/add_bill_sheet.dart';
 import '../widgets/pay_qr_sheet.dart';
 
 /// Team balance, match fees, and the Thai QR payment flow.
@@ -77,6 +78,18 @@ class WalletPage extends StatelessWidget {
                           weight: FontWeight.w600,
                           color: AppColors.accent700,
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton(
+                        onPressed: () => showAddBillSheet(context, roster: snapshot.roster),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent700,
+                          side: BorderSide(color: AppColors.accent700.withValues(alpha: 0.35)),
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          minimumSize: const Size(0, 30),
+                        ),
+                        child: Text('+ Add bill', style: AppTextStyles.heading(size: 12, color: AppColors.accent700)),
                       ),
                     ],
                   ),

@@ -188,6 +188,19 @@ class SquadMember extends Equatable {
   final double amountOwed;
   final PlayerCard card;
 
+  SquadMember copyWith({double? amountOwed}) => SquadMember(
+        id: id,
+        name: name,
+        position: position,
+        number: number,
+        ovr: ovr,
+        joinedYear: joinedYear,
+        seasonLine: seasonLine,
+        rsvpStatus: rsvpStatus,
+        amountOwed: amountOwed ?? this.amountOwed,
+        card: card,
+      );
+
   String get statusLabel => switch (rsvpStatus) {
         RsvpStatus.yes => 'Confirmed',
         RsvpStatus.maybe => 'Maybe',
@@ -266,17 +279,25 @@ class TeamSnapshot extends Equatable {
   List<SquadMember> get owing =>
       roster.where((m) => m.amountOwed > 0).toList(growable: false);
 
-  TeamSnapshot copyWith({UpcomingMatch? match}) => TeamSnapshot(
+  TeamSnapshot copyWith({
+    UpcomingMatch? match,
+    List<SquadMember>? roster,
+    String? teamBalance,
+    String? monthOut,
+    String? monthNet,
+    List<LedgerEntry>? ledger,
+  }) =>
+      TeamSnapshot(
         team: team,
         match: match ?? this.match,
         needsYou: needsYou,
         lastResult: lastResult,
-        roster: roster,
-        teamBalance: teamBalance,
+        roster: roster ?? this.roster,
+        teamBalance: teamBalance ?? this.teamBalance,
         monthIn: monthIn,
-        monthOut: monthOut,
-        monthNet: monthNet,
-        ledger: ledger,
+        monthOut: monthOut ?? this.monthOut,
+        monthNet: monthNet ?? this.monthNet,
+        ledger: ledger ?? this.ledger,
       );
 
   @override
