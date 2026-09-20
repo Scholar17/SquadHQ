@@ -56,6 +56,30 @@ class UpcomingMatch extends Equatable {
   final String hubLine1;
   final String hubLine2;
 
+  UpcomingMatch copyWith({
+    String? opponent,
+    String? kickoffLabel,
+    String? venueLine,
+    String? feePerPlayer,
+    String? kit,
+    String? hubLine1,
+    String? hubLine2,
+  }) =>
+      UpcomingMatch(
+        opponent: opponent ?? this.opponent,
+        kickoffLabel: kickoffLabel ?? this.kickoffLabel,
+        countdownLabel: countdownLabel,
+        venueLine: venueLine ?? this.venueLine,
+        confirmedOf: confirmedOf,
+        feePerPlayer: feePerPlayer ?? this.feePerPlayer,
+        kit: kit ?? this.kit,
+        temperatureC: temperatureC,
+        rainChancePercent: rainChancePercent,
+        rsvpClosesLabel: rsvpClosesLabel,
+        hubLine1: hubLine1 ?? this.hubLine1,
+        hubLine2: hubLine2 ?? this.hubLine2,
+      );
+
   @override
   List<Object?> get props => [
         opponent,
@@ -241,6 +265,19 @@ class TeamSnapshot extends Equatable {
 
   List<SquadMember> get owing =>
       roster.where((m) => m.amountOwed > 0).toList(growable: false);
+
+  TeamSnapshot copyWith({UpcomingMatch? match}) => TeamSnapshot(
+        team: team,
+        match: match ?? this.match,
+        needsYou: needsYou,
+        lastResult: lastResult,
+        roster: roster,
+        teamBalance: teamBalance,
+        monthIn: monthIn,
+        monthOut: monthOut,
+        monthNet: monthNet,
+        ledger: ledger,
+      );
 
   @override
   List<Object?> get props => [

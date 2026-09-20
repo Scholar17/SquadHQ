@@ -27,3 +27,23 @@ final class TeamMyRsvpChanged extends TeamEvent {
   @override
   List<Object?> get props => [status];
 }
+
+/// Manager-only edit from the matchday hub's "Edit details" button.
+final class TeamMatchDetailsUpdated extends TeamEvent {
+  const TeamMatchDetailsUpdated({
+    required this.opponent,
+    required this.kickoffLabel,
+    required this.venueLine,
+    required this.feePerPlayer,
+    required this.kit,
+  });
+
+  final String opponent;
+  final String kickoffLabel;
+  final String venueLine;
+  final String feePerPlayer;
+  final String kit;
+
+  @override
+  List<Object?> get props => [opponent, kickoffLabel, venueLine, feePerPlayer, kit];
+}

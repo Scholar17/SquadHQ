@@ -7,6 +7,7 @@ import '../../domain/entities/team_snapshot.dart';
 import '../bloc/team_bloc.dart';
 import '../bloc/team_event.dart';
 import '../bloc/team_state.dart';
+import '../widgets/edit_match_details_sheet.dart';
 
 /// The matchday hub — RSVP, squad list, nudges. Reached from Home's
 /// "Open matchday" / "vs {opponent}" card, not parked behind its own tab
@@ -42,7 +43,7 @@ class MatchPage extends StatelessWidget {
                   hubLine1: match.hubLine1,
                   hubLine2: match.hubLine2,
                   isManager: state.isManager,
-                  onEdit: () => _snack(context, 'Edit match'),
+                  onEdit: () => showEditMatchDetailsSheet(context, match: match),
                 ),
                 const SizedBox(height: 16),
                 _RsvpCard(

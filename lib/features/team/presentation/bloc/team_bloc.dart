@@ -10,6 +10,7 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
     on<TeamStarted>(_onStarted);
     on<TeamRoleToggled>(_onRoleToggled);
     on<TeamMyRsvpChanged>(_onMyRsvpChanged);
+    on<TeamMatchDetailsUpdated>(_onMatchDetailsUpdated);
   }
 
   final TeamRepository _repository;
@@ -45,5 +46,30 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
     final current = state;
     if (current is! TeamLoaded) return;
     emit(current.copyWith(myRsvp: event.status));
+  }
+
+  void _onMatchDetailsUpdated(
+    TeamMatchDetailsUpdated event,
+    Emitter<TeamState> emit,
+  ) {
+    final current = state;
+    if (current is! TeamLoaded) return;
+    final match = current.snapshot.match.copyWith(
+      opponent: event.opponent,
+      kickoffLabel: event.kickoffLabel,
+      venueLine: event.venueLine,
+      feePerPlayer: event.feePerPlayer,
+      kit: event.kit,
+      hubLine1: 'Kickoff ${event.kickoffLabel} at ${event.venueLine}.',
+      hubLine2:
+          'RSVP ${current.snapshot.match.rsvpClosesLabel.toLowerCase()} — ${current.snapshot.match.confirmedOf} confirmed so far.',
+    );
+    emit(
+      TeamLoaded(
+        snapshot: current.snapshot.copyWith(match: match),
+        role: current.role,
+        myRsvp: current.myRsvp,
+      ),
+    );
   }
 }
