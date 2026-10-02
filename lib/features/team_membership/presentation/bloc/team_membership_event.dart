@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../domain/entities/team.dart';
+
 sealed class TeamMembershipEvent extends Equatable {
   const TeamMembershipEvent();
 
@@ -13,12 +15,18 @@ final class TeamMembershipStarted extends TeamMembershipEvent {
 }
 
 final class TeamCreateRequested extends TeamMembershipEvent {
-  const TeamCreateRequested(this.name);
+  const TeamCreateRequested(
+    this.name, {
+    this.kind = GroupKind.team,
+    this.currency = GroupCurrency.thb,
+  });
 
   final String name;
+  final GroupKind kind;
+  final GroupCurrency currency;
 
   @override
-  List<Object?> get props => [name];
+  List<Object?> get props => [name, kind, currency];
 }
 
 final class TeamJoinRequested extends TeamMembershipEvent {
@@ -28,6 +36,16 @@ final class TeamJoinRequested extends TeamMembershipEvent {
 
   @override
   List<Object?> get props => [inviteCode];
+}
+
+final class TeamTimezoneChangeRequested extends TeamMembershipEvent {
+  const TeamTimezoneChangeRequested({required this.teamId, required this.timezone});
+
+  final String teamId;
+  final String timezone;
+
+  @override
+  List<Object?> get props => [teamId, timezone];
 }
 
 final class TeamSwitchRequested extends TeamMembershipEvent {

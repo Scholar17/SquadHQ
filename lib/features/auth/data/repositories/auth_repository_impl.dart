@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 
+import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/app_user.dart';
@@ -19,7 +20,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(AuthFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -31,7 +32,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(AuthFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -50,7 +51,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -62,7 +63,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } on AuthException catch (e) {
       return Left(AuthFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 

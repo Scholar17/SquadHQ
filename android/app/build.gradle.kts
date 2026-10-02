@@ -26,6 +26,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications (scheduled match reminders) needs
+        // java.time on older Android versions.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     // Required for defaultConfig.resValue(...) below (AGP 8+ gates it
@@ -79,6 +82,8 @@ dependencies {
     // TODO: Add the dependencies for Firebase products you want to use
     // When using the BoM, don't specify versions in Firebase dependencies
     // https://firebase.google.com/docs/android/setup#available-libraries
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

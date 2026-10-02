@@ -96,11 +96,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: AppColors.teamGold,
-                      backgroundImage: widget.user.avatarUrl != null
+                      // Foreground, so an expired photo link (Facebook's are signed and
+                      // expire) falls back to the initials underneath.
+                      foregroundImage: widget.user.avatarUrl != null
                           ? NetworkImage(widget.user.avatarUrl!)
                           : null,
-                      child: widget.user.avatarUrl == null
-                          ? Text(
+                      onForegroundImageError: widget.user.avatarUrl != null ? (_, _) {} : null,
+                      child: Text(
                               widget.user.name.isNotEmpty
                                   ? widget.user.name[0].toUpperCase()
                                   : '?',
@@ -108,8 +110,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 size: 16,
                                 color: AppColors.neutral800,
                               ),
-                            )
-                          : null,
+                            ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

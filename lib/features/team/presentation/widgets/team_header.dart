@@ -8,19 +8,20 @@ class TeamHeader extends StatelessWidget {
   const TeamHeader({
     super.key,
     required this.team,
-    required this.role,
+    this.role,
     required this.profileInitials,
     required this.onTeamTap,
-    required this.onRoleToggle,
+    this.onRoleToggle,
     required this.onBellTap,
     required this.onProfileTap,
   });
 
   final TeamInfo team;
-  final SquadRole role;
+  /// The Manager/Player view pill — null hides it (squads have no views).
+  final SquadRole? role;
   final String profileInitials;
   final VoidCallback onTeamTap;
-  final VoidCallback onRoleToggle;
+  final VoidCallback? onRoleToggle;
   final VoidCallback onBellTap;
   final VoidCallback onProfileTap;
 
@@ -86,8 +87,10 @@ class TeamHeader extends StatelessWidget {
               ),
             ),
           ),
-          _RolePill(role: role, onTap: onRoleToggle),
-          const SizedBox(width: 6),
+          if (role case final role?) ...[
+            _RolePill(role: role, onTap: onRoleToggle ?? () {}),
+            const SizedBox(width: 6),
+          ],
           _IconButton(onTap: onBellTap, badgeCount: team.alertCount),
           const SizedBox(width: 6),
           _ProfileAvatar(initials: profileInitials, onTap: onProfileTap),

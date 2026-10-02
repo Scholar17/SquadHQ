@@ -1,24 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/clock/clock_scope.dart';
+import '../../../../core/notifications/web_push_prompt.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
-import '../../../auth/presentation/pages/profile_page.dart';
 import '../../../match/domain/entities/match.dart' as match_entity;
+import '../../../match/domain/entities/match_history.dart';
 import '../../../match/presentation/bloc/match_bloc.dart';
-import '../../../match/presentation/bloc/match_event.dart';
+import '../../../match/presentation/bloc/match_history_bloc.dart';
+import '../../../match/presentation/match_formatting.dart';
+import '../../../match/presentation/pages/match_history_page.dart'
+    show MatchHistoryArgs, ResultScore;
+import '../../../match/presentation/pages/past_match_page.dart';
 import '../../../match/presentation/bloc/match_state.dart';
-import '../../../match/presentation/pages/match_list_page.dart';
 import '../../../match/presentation/widgets/create_match_sheet.dart';
 import '../../../match/presentation/widgets/upcoming_matches_section.dart';
+import '../../../notifications/presentation/bloc/notification_bloc.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
-import '../../../team_membership/presentation/pages/team_membership_page.dart';
-import '../../../team_membership/presentation/pages/team_roster_page.dart';
 import '../../../team_membership/presentation/widgets/team_switcher_sheet.dart';
+import '../../../wallet/presentation/wallet_formatting.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole, TeamInfo;
+import '../bloc/team_bloc.dart';
+import '../bloc/team_event.dart';
+import '../pending_actions.dart';
+import '../view_role.dart';
 import '../widgets/team_header.dart';
 
 /// The "Home" tab — the app's daily HQ. Team header and upcoming matches
@@ -34,12 +45,6 @@ class DashboardPage extends StatelessWidget {
   String get _profileInitials {
     final source = user.username ?? user.name;
     return source.isNotEmpty ? source[0].toUpperCase() : '?';
-  }
-
-  void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$feature is coming soon')));
   }
 
   /// Unwraps Submitting/Failure down to the settled Loaded state — those
@@ -77,11 +82,17 @@ class DashboardPage extends StatelessWidget {
     return initials.isEmpty ? '?' : initials;
   }
 
-  /// [TeamHeader] only distinguishes manager/player; super admin and admin
-  /// both read as "Manager" there, matching how [canCreateMatch] elsewhere
-  /// already treats anything above [membership.TeamRole.player] as one tier.
-  static SquadRole _squadRoleFor(membership.TeamRole role) =>
-      role == membership.TeamRole.player ? SquadRole.player : SquadRole.manager;
+  void _onRoleToggle(BuildContext context, membership.TeamRole role) {
+    if (role == membership.TeamRole.player) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Only team admins can switch to the Manager view')),
+        );
+      return;
+    }
+    context.read<TeamBloc>().add(const TeamRoleToggled());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,12 +100,7 @@ class DashboardPage extends StatelessWidget {
       backgroundColor: AppColors.bg,
       body: SafeArea(
         bottom: false,
-        child: BlocConsumer<TeamMembershipBloc, TeamMembershipState>(
-          listenWhen: (previous, current) =>
-              _activeTeam(previous)?.id != _activeTeam(current)?.id,
-          listener: (context, state) => context
-              .read<MatchBloc>()
-              .add(MatchTeamSelected(_activeTeam(state)?.id)),
+        child: BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
           builder: (context, membershipState) {
             final settled = _settle(membershipState);
             if (settled is! TeamMembershipLoaded) {
@@ -106,52 +112,63 @@ class DashboardPage extends StatelessWidget {
             if (active == null) {
               return _EmptyHome(
                 profileInitials: _profileInitials,
-                onProfileTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ProfilePage(user: user),
-                  ),
-                ),
-                onCreateOrJoin: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const TeamMembershipPage(),
-                  ),
-                ),
+                onProfileTap: () => context.push(AppRoutes.profile, extra: user),
+                onCreateOrJoin: () => context.push(AppRoutes.team),
               );
             }
-            final canCreateMatch = active.role != membership.TeamRole.player;
+            final teamState = context.watch<TeamBloc>().state;
+            final viewRole = viewRoleFor(active.role, teamState);
+            final canCreateMatch = viewRole == SquadRole.manager;
+            final pending = PendingActions.of(context, user.id);
             return BlocBuilder<MatchBloc, MatchState>(
               builder: (context, matchState) => _DashboardContent(
                 headerTeam: TeamInfo(
                   name: active.name,
                   meta: 'Invite code · ${active.inviteCode}',
                   initials: _initialsFor(active.name),
-                  alertCount: 0,
+                  alertCount: context.watch<NotificationBloc>().state.unreadCount,
                 ),
-                role: _squadRoleFor(active.role),
+                role: viewRole,
                 matches: _settledMatches(matchState),
                 canCreateMatch: canCreateMatch,
                 profileInitials: _profileInitials,
-                onAction: (label) => _showComingSoon(context, label),
+                onBellTap: () => context.push(
+                  AppRoutes.notifications,
+                  extra: NotificationsArgs(
+                    userId: user.id,
+                    adminViewIsManager:
+                        viewRoleFor(membership.TeamRole.admin, teamState) == SquadRole.manager,
+                  ),
+                ),
+                onMatchTap: (match) => context.push(
+                  AppRoutes.upcomingMatch,
+                  extra: UpcomingMatchArgs(
+                    matchId: match.id,
+                    teamName: active.name,
+                    userId: user.id,
+                    isManager: canCreateMatch,
+                  ),
+                ),
+                afterTheMatch: _AfterTheMatch(
+                  recaps: pending.recaps,
+                  teamId: active.id,
+                  teamName: active.name,
+                  userId: user.id,
+                  isManager: canCreateMatch,
+                ),
                 onTeamTap: () => showTeamSwitcherSheet(context),
-                onManageRoles: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => TeamRosterPage(team: active),
-                  ),
-                ),
+                onRoleToggle: () => _onRoleToggle(context, active.role),
                 onCreateMatch: () => showCreateMatchSheet(context, teamId: active.id),
-                onSeeAllMatches: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MatchListPage(
-                      activeTeamId: active.id,
-                      canCreateMatch: canCreateMatch,
-                    ),
+                onSeeAllMatches: () => context.push(
+                  AppRoutes.matches,
+                  extra: MatchListArgs(
+                    activeTeamId: active.id,
+                    teamName: active.name,
+                    userId: user.id,
+                    canCreateMatch: canCreateMatch,
                   ),
                 ),
-                onProfileTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ProfilePage(user: user),
-                  ),
-                ),
+                onProfileTap: () => context.push(AppRoutes.profile, extra: user),
               ),
             );
           },
@@ -276,9 +293,11 @@ class _DashboardContent extends StatelessWidget {
     required this.matches,
     required this.canCreateMatch,
     required this.profileInitials,
-    required this.onAction,
+    required this.onBellTap,
+    required this.onMatchTap,
+    required this.afterTheMatch,
     required this.onTeamTap,
-    required this.onManageRoles,
+    required this.onRoleToggle,
     required this.onCreateMatch,
     required this.onSeeAllMatches,
     required this.onProfileTap,
@@ -289,9 +308,11 @@ class _DashboardContent extends StatelessWidget {
   final List<match_entity.Match> matches;
   final bool canCreateMatch;
   final String profileInitials;
-  final ValueChanged<String> onAction;
+  final VoidCallback onBellTap;
+  final ValueChanged<match_entity.Match> onMatchTap;
+  final Widget afterTheMatch;
   final VoidCallback onTeamTap;
-  final VoidCallback onManageRoles;
+  final VoidCallback onRoleToggle;
   final VoidCallback onCreateMatch;
   final VoidCallback onSeeAllMatches;
   final VoidCallback onProfileTap;
@@ -306,8 +327,8 @@ class _DashboardContent extends StatelessWidget {
             role: role,
             profileInitials: profileInitials,
             onTeamTap: onTeamTap,
-            onRoleToggle: onManageRoles,
-            onBellTap: () => onAction('Notifications'),
+            onRoleToggle: onRoleToggle,
+            onBellTap: onBellTap,
             onProfileTap: onProfileTap,
           ),
         ),
@@ -315,14 +336,16 @@ class _DashboardContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           sliver: SliverList.list(
             children: [
+              const WebPushPrompt(),
               UpcomingMatchesSection(
                 matches: matches,
                 canCreateMatch: canCreateMatch,
                 onCreateMatch: onCreateMatch,
                 onSeeAll: onSeeAllMatches,
+                onMatchTap: onMatchTap,
               ),
               const SizedBox(height: 20),
-              const _ComingSoonCard(),
+              afterTheMatch,
             ],
           ),
         ),
@@ -331,37 +354,299 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-/// Same card styling as the prototype's "Last time out" recap, but honest
-/// about there being no wallet/voting/result data behind it yet.
-class _ComingSoonCard extends StatelessWidget {
-  const _ComingSoonCard();
+/// Home's "After the match" section: a recap per match that finished in
+/// the last week (kick-off + play time has passed) — result, Man of the
+/// Match vote, and the viewer's unpaid fee. Shows up to [previewCount],
+/// with "See all matches" (the match history) once there are more.
+class _AfterTheMatch extends StatelessWidget {
+  const _AfterTheMatch({
+    required this.recaps,
+    required this.teamId,
+    required this.teamName,
+    required this.userId,
+    required this.isManager,
+  });
+
+  static const previewCount = 3;
+
+  final List<MatchRecap> recaps;
+  final String teamId;
+  final String teamName;
+  final String userId;
+  final bool isManager;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'COMING SOON',
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+    final label = Text(
+      'AFTER THE MATCH',
+      style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+    );
+    if (recaps.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            label,
+            const SizedBox(height: 8),
+            Text(
+              'Once a match finishes, its result, the Man of the Match vote and '
+              'your match fee show up here.',
+              style: AppTextStyles.body(
+                size: 12.5,
+                weight: FontWeight.w500,
+                color: AppColors.text.withValues(alpha: 0.6),
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final history = context.watch<MatchHistoryBloc>().state.history ?? const MatchHistory();
+    final preview = recaps.take(previewCount);
+    // The count is what "See all" opens — the whole history, not just this
+    // week's recaps (falls back to those until the history has loaded).
+    final total = history.matches.length > recaps.length ? history.matches.length : recaps.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        label,
+        const SizedBox(height: 10),
+        for (final (index, recap) in preview.indexed) ...[
+          if (index > 0) const SizedBox(height: 10),
+          _RecapCard(
+            recap: recap,
+            history: history,
+            onOpen: () => Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PastMatchPage(
+                  matchId: recap.pastMatch.match.id,
+                  teamName: teamName,
+                  userId: userId,
+                  isManager: isManager,
+                ),
+              ),
+            ),
+            // Paying lives in the Wallet tab only.
+            onPay: () => context.go(AppRoutes.wallet),
+            canAddScore: isManager,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Match fees, MOTM voting and result recaps are on the way.',
-            style: AppTextStyles.body(
-              size: 12.5,
-              weight: FontWeight.w500,
-              color: AppColors.text.withValues(alpha: 0.6),
-              height: 1.5,
+        ],
+        if (recaps.length > previewCount) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: TextButton(
+              onPressed: () => context.push(
+                AppRoutes.matchHistory,
+                extra: MatchHistoryArgs(
+                  teamId: teamId,
+                  teamName: teamName,
+                  userId: userId,
+                  isManager: isManager,
+                ),
+              ),
+              child: Text(
+                'See all matches ($total)',
+                style: AppTextStyles.body(
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: AppColors.accent700,
+                ),
+              ),
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _RecapCard extends StatelessWidget {
+  const _RecapCard({
+    required this.recap,
+    required this.history,
+    required this.onOpen,
+    required this.onPay,
+    required this.canAddScore,
+  });
+
+  final MatchRecap recap;
+  final MatchHistory history;
+  final VoidCallback onOpen;
+  final VoidCallback onPay;
+  final bool canAddScore;
+
+  @override
+  Widget build(BuildContext context) {
+    final pastMatch = recap.pastMatch;
+    final match = pastMatch.match;
+    final owed = recap.owed;
+    final tally = pastMatch.motmTally;
+    final winnerIds = pastMatch.motmWinnerIds;
+    final winners = [
+      for (final member in history.members)
+        if (winnerIds.contains(member.profileId)) member.name,
+    ];
+    final now = ClockScope.now(context);
+    final decided = history.motmDecided(pastMatch, now);
+    final voters = history.motmVoters(pastMatch);
+    final votesCast =
+        voters.where((voter) => pastMatch.motmVotes.containsKey(voter.profileId)).length;
+    // Secret ballot until decided (everyone voted, or midnight after).
+    final motmText = !decided
+        ? 'Man of the Match voting open · $votesCast of ${voters.length} voted'
+        : winners.isEmpty
+            ? 'No Man of the Match — nobody voted'
+            : 'Man of the Match: ${winners.join(' & ')} '
+                '(${tally[winnerIds.first]} ${tally[winnerIds.first] == 1 ? 'vote' : 'votes'}'
+                '${winners.length > 1 ? ' each' : ''})';
+    final muted = AppTextStyles.body(
+      size: 12.5,
+      weight: FontWeight.w600,
+      color: AppColors.text.withValues(alpha: 0.6),
+    );
+    return Material(
+      color: AppColors.neutral100,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onOpen,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('vs ${match.opponent}', style: AppTextStyles.heading(size: 16)),
+                        const SizedBox(height: 2),
+                        Text(formatMatchDate(match.kickoffAt), style: muted),
+                      ],
+                    ),
+                  ),
+                  if (match.result != null)
+                    ResultScore(match: match)
+                  else if (canAddScore)
+                    _PillButton(label: 'Add score', onPressed: onOpen)
+                  else
+                    Text('No score yet', style: muted),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (recap.needsMotmVote)
+                _ActionRow(
+                  icon: Icons.emoji_events_rounded,
+                  iconColor: AppColors.teamGold,
+                  text: 'Vote for Man of the Match',
+                  highlight: true,
+                  action: _PillButton(label: 'Vote now', primary: true, onPressed: onOpen),
+                )
+              else
+                _ActionRow(
+                  icon: Icons.emoji_events_rounded,
+                  iconColor: AppColors.teamGold,
+                  text: motmText,
+                ),
+              if (owed != null) ...[
+                const SizedBox(height: 8),
+                _ActionRow(
+                  icon: Icons.payments_rounded,
+                  iconColor: AppColors.accent700,
+                  text: 'You owe ${formatBaht(owed.$2.roundedShare)} to ${owed.$2.bill.payerName}',
+                  highlight: true,
+                  action: _PillButton(label: 'Go to Wallet', primary: true, onPressed: onPay),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+    this.highlight = false,
+    this.action,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+  final bool highlight;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = this.action;
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 8, action == null ? 12 : 8, 8),
+      decoration: BoxDecoration(
+        color: highlight ? AppColors.accent100 : AppColors.neutral200,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body(
+                size: 12.5,
+                weight: FontWeight.w700,
+                color: highlight ? AppColors.accent900 : AppColors.text,
+              ),
+            ),
+          ),
+          ?action,
+        ],
+      ),
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  const _PillButton({required this.label, required this.onPressed, this.primary = false});
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: primary ? AppColors.neutral100 : AppColors.text,
+        backgroundColor: primary ? AppColors.accent : AppColors.neutral200,
+        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        minimumSize: const Size(0, 32),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.heading(
+          size: 12.5,
+          color: primary ? AppColors.neutral100 : AppColors.text,
+        ),
       ),
     );
   }

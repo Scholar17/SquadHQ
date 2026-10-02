@@ -7,7 +7,12 @@ class MatchModel extends Match {
     required super.opponent,
     required super.kickoffAt,
     super.venue,
-    super.feePerPlayer,
+    super.durationMinutes,
+    super.playersNeeded,
+    super.lastNudgedAt,
+    super.createdBy,
+    super.ourScore,
+    super.theirScore,
   });
 
   factory MatchModel.fromRow(Map<String, dynamic> row) => MatchModel(
@@ -16,6 +21,14 @@ class MatchModel extends Match {
         opponent: row['opponent'] as String,
         kickoffAt: DateTime.parse(row['kickoff_at'] as String),
         venue: row['venue'] as String?,
-        feePerPlayer: (row['fee_per_player'] as num?)?.toDouble(),
+        durationMinutes: row['duration_minutes'] as int? ?? Match.defaultDurationMinutes,
+        playersNeeded: row['players_needed'] as int?,
+        createdBy: row['created_by'] as String?,
+        lastNudgedAt: switch (row['last_nudged_at']) {
+          final String at => DateTime.parse(at),
+          _ => null,
+        },
+        ourScore: row['our_score'] as int?,
+        theirScore: row['their_score'] as int?,
       );
 }

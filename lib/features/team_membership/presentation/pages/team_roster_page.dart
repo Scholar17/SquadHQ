@@ -23,8 +23,7 @@ class TeamRosterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => sl<TeamRosterBloc>(param1: team.id)
-        ..add(const TeamRosterStarted()),
+      create: (_) => sl<TeamRosterBloc>(param1: team.id)..add(const TeamRosterStarted()),
       child: _TeamRosterView(team: team),
     );
   }
@@ -38,10 +37,10 @@ class _TeamRosterView extends StatelessWidget {
   bool get _isSuperAdmin => team.role == TeamRole.superAdmin;
 
   TeamRosterState _settle(TeamRosterState state) => switch (state) {
-        TeamRosterSubmitting(:final previous) => previous,
-        TeamRosterFailure(:final previous) => previous,
-        _ => state,
-      };
+    TeamRosterSubmitting(:final previous) => previous,
+    TeamRosterFailure(:final previous) => previous,
+    _ => state,
+  };
 
   Future<void> _confirmDeleteTeam(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -52,19 +51,13 @@ class _TeamRosterView extends StatelessWidget {
         title: Text('Delete ${team.name}?', style: AppTextStyles.heading(size: 20)),
         content: Text(
           'This removes the team and every member from it. This cannot be undone.',
-          style: AppTextStyles.body(
-            size: 13.5,
-            color: AppColors.text.withValues(alpha: 0.7),
-          ),
+          style: AppTextStyles.body(size: 13.5, color: AppColors.text.withValues(alpha: 0.7)),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(
-              'Cancel',
-              style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
-            ),
+            child: Text('Cancel', style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -120,8 +113,7 @@ class _TeamRosterView extends StatelessWidget {
                 children: [
                   Text(
                     'ROSTER',
-                    style:
-                        AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                    style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
                   ),
                   const SizedBox(height: 10),
                   for (final member in settled.members) ...[
@@ -129,12 +121,12 @@ class _TeamRosterView extends StatelessWidget {
                       member: member,
                       canManage: _isSuperAdmin && member.role != TeamRole.superAdmin,
                       isSubmitting: isSubmitting,
-                      onPromote: () => context
-                          .read<TeamRosterBloc>()
-                          .add(TeamRosterPromoteRequested(member.profileId)),
-                      onDemote: () => context
-                          .read<TeamRosterBloc>()
-                          .add(TeamRosterDemoteRequested(member.profileId)),
+                      onPromote: () => context.read<TeamRosterBloc>().add(
+                        TeamRosterPromoteRequested(member.profileId),
+                      ),
+                      onDemote: () => context.read<TeamRosterBloc>().add(
+                        TeamRosterDemoteRequested(member.profileId),
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -144,12 +136,9 @@ class _TeamRosterView extends StatelessWidget {
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton(
-                        onPressed:
-                            isSubmitting ? null : () => _confirmDeleteTeam(context),
+                        onPressed: isSubmitting ? null : () => _confirmDeleteTeam(context),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: AppColors.accent700.withValues(alpha: 0.4),
-                          ),
+                          side: BorderSide(color: AppColors.accent700.withValues(alpha: 0.4)),
                           shape: const StadiumBorder(),
                         ),
                         child: Text(
@@ -185,10 +174,10 @@ class _MemberRow extends StatelessWidget {
   final VoidCallback onDemote;
 
   static String _roleLabel(TeamRole role) => switch (role) {
-        TeamRole.superAdmin => 'SUPER ADMIN',
-        TeamRole.admin => 'ADMIN',
-        TeamRole.player => 'PLAYER',
-      };
+    TeamRole.superAdmin => 'SUPER ADMIN',
+    TeamRole.admin => 'ADMIN',
+    TeamRole.player => 'PLAYER',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -204,14 +193,13 @@ class _MemberRow extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundColor: AppColors.teamGold,
-            backgroundImage:
-                member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
-            child: member.avatarUrl == null
-                ? Text(
-                    member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                    style: AppTextStyles.heading(size: 14, color: AppColors.neutral800),
-                  )
-                : null,
+            // Foreground, so an expired photo link falls back to the initials.
+            foregroundImage: member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
+            onForegroundImageError: member.avatarUrl != null ? (_, _) {} : null,
+            child: Text(
+              member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+              style: AppTextStyles.heading(size: 14, color: AppColors.neutral800),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

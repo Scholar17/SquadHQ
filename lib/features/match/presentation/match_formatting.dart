@@ -19,3 +19,10 @@ String formatMatchTime(DateTime kickoffAt) {
 
 String formatMatchDateTime(DateTime kickoffAt) =>
     '${formatMatchDate(kickoffAt)} · ${formatMatchTime(kickoffAt)}';
+
+/// Play time, e.g. "1 hr", "1.5 hr", "45 min".
+String formatPlayTime(int minutes) {
+  if (minutes < 60) return '$minutes min';
+  final hours = minutes / 60;
+  return hours == hours.roundToDouble() ? '${hours.toInt()} hr' : '${hours.toStringAsFixed(1)} hr';
+}

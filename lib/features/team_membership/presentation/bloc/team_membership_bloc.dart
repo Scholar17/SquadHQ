@@ -4,6 +4,7 @@ import '../../../../core/usecases/usecase.dart';
 import '../../domain/usecases/create_team.dart';
 import '../../domain/usecases/get_my_teams.dart';
 import '../../domain/usecases/join_team.dart';
+import '../../domain/usecases/set_team_timezone.dart';
 import '../../domain/usecases/switch_active_team.dart';
 import 'team_membership_event.dart';
 import 'team_membership_state.dart';
@@ -15,7 +16,9 @@ class TeamMembershipBloc
     required JoinTeam joinTeam,
     required GetMyTeams getMyTeams,
     required SwitchActiveTeam switchActiveTeam,
-  })  : _createTeam = createTeam,
+    required SetTeamTimezone setTeamTimezone,
+  })  : _setTeamTimezone = setTeamTimezone,
+        _createTeam = createTeam,
         _joinTeam = joinTeam,
         _getMyTeams = getMyTeams,
         _switchActiveTeam = switchActiveTeam,
@@ -24,12 +27,14 @@ class TeamMembershipBloc
     on<TeamCreateRequested>(_onCreateRequested);
     on<TeamJoinRequested>(_onJoinRequested);
     on<TeamSwitchRequested>(_onSwitchRequested);
+    on<TeamTimezoneChangeRequested>(_onTimezoneChangeRequested);
   }
 
   final CreateTeam _createTeam;
   final JoinTeam _joinTeam;
   final GetMyTeams _getMyTeams;
   final SwitchActiveTeam _switchActiveTeam;
+  final SetTeamTimezone _setTeamTimezone;
 
   Future<void> _reload(Emitter<TeamMembershipState> emit) async {
     final result = await _getMyTeams(const NoParams());
@@ -55,7 +60,9 @@ class TeamMembershipBloc
   ) async {
     final fallback = state;
     emit(TeamMembershipSubmitting(fallback));
-    final result = await _createTeam(event.name);
+    final result = await _createTeam(
+      CreateTeamParams(name: event.name, kind: event.kind, currency: event.currency),
+    );
     await result.fold(
       (failure) async => emit(TeamMembershipFailure(failure.message, fallback)),
       (_) => _reload(emit),
@@ -82,6 +89,21 @@ class TeamMembershipBloc
     final fallback = state;
     emit(TeamMembershipSubmitting(fallback));
     final result = await _switchActiveTeam(event.teamId);
+    await result.fold(
+      (failure) async => emit(TeamMembershipFailure(failure.message, fallback)),
+      (_) => _reload(emit),
+    );
+  }
+
+  Future<void> _onTimezoneChangeRequested(
+    TeamTimezoneChangeRequested event,
+    Emitter<TeamMembershipState> emit,
+  ) async {
+    final fallback = state;
+    emit(TeamMembershipSubmitting(fallback));
+    final result = await _setTeamTimezone(
+      SetTeamTimezoneParams(teamId: event.teamId, timezone: event.timezone),
+    );
     await result.fold(
       (failure) async => emit(TeamMembershipFailure(failure.message, fallback)),
       (_) => _reload(emit),

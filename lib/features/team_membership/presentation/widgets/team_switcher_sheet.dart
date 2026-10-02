@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team.dart';
 import '../bloc/team_membership_bloc.dart';
 import '../bloc/team_membership_event.dart';
 import '../bloc/team_membership_state.dart';
-import '../pages/team_membership_page.dart';
 
 /// Opened from the Home header's team name — lets the profile jump between
 /// its teams (up to 3), or head to [TeamMembershipPage] to create/join one.
@@ -42,7 +43,7 @@ class _TeamSwitcherSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your teams', style: AppTextStyles.heading(size: 18)),
+            Text('Your groups', style: AppTextStyles.heading(size: 18)),
             const SizedBox(height: 14),
             BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
               builder: (context, state) {
@@ -82,14 +83,10 @@ class _TeamSwitcherSheet extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const TeamMembershipPage(),
-                  ),
-                );
+                context.push(AppRoutes.team);
               },
               child: Text(
-                '+ Create or join a team',
+                '+ Create or join a group',
                 style: AppTextStyles.heading(size: 13, color: AppColors.accent700),
               ),
             ),
@@ -127,10 +124,29 @@ class _TeamRow extends StatelessWidget {
           ),
           child: Row(
             children: [
+              Icon(
+                team.isSquad ? Icons.receipt_long_rounded : Icons.sports_soccer_rounded,
+                size: 20,
+                color: AppColors.text.withValues(alpha: 0.55),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  team.name,
-                  style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team.name,
+                      style: AppTextStyles.body(size: 14, weight: FontWeight.w700, height: 1.3),
+                    ),
+                    Text(
+                      team.isSquad ? 'Squad' : 'Football team',
+                      style: AppTextStyles.body(
+                        size: 11.5,
+                        color: AppColors.text.withValues(alpha: 0.55),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (team.isActive)

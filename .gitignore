@@ -61,3 +61,6 @@ ios/Runner/GoogleService-Info.plist
 
 # Supabase SQL
 supabase/sql/
+
+# Claude Code worktrees (separate checkouts; never commit)
+.claude/worktrees/

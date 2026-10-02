@@ -12,17 +12,19 @@ class CreateMatchParams extends Equatable {
     required this.opponent,
     required this.kickoffAt,
     this.venue,
-    this.feePerPlayer,
+    required this.durationMinutes,
+    this.playersNeeded,
   });
 
   final String teamId;
   final String opponent;
   final DateTime kickoffAt;
   final String? venue;
-  final double? feePerPlayer;
+  final int durationMinutes;
+  final int? playersNeeded;
 
   @override
-  List<Object?> get props => [teamId, opponent, kickoffAt, venue, feePerPlayer];
+  List<Object?> get props => [teamId, opponent, kickoffAt, venue, durationMinutes, playersNeeded];
 }
 
 class CreateMatch implements UseCase<Match, CreateMatchParams> {
@@ -37,6 +39,7 @@ class CreateMatch implements UseCase<Match, CreateMatchParams> {
         opponent: params.opponent,
         kickoffAt: params.kickoffAt,
         venue: params.venue,
-        feePerPlayer: params.feePerPlayer,
+        durationMinutes: params.durationMinutes,
+        playersNeeded: params.playersNeeded,
       );
 }

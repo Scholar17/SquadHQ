@@ -1,3 +1,4 @@
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -6,7 +7,7 @@ import '../models/team_member_model.dart';
 import '../models/team_model.dart';
 
 abstract interface class TeamMembershipRemoteDataSource {
-  Future<TeamModel> createTeam(String name);
+  Future<TeamModel> createTeam(String name, {GroupKind kind, GroupCurrency currency});
 
   Future<TeamModel> joinTeam(String inviteCode);
 
@@ -23,6 +24,8 @@ abstract interface class TeamMembershipRemoteDataSource {
   });
 
   Future<void> deleteTeam(String teamId);
+
+  Future<void> setTeamTimezone({required String teamId, required String timezone});
 }
 
 class TeamMembershipRemoteDataSourceImpl
@@ -33,10 +36,21 @@ class TeamMembershipRemoteDataSourceImpl
   final SupabaseClient _supabase;
 
   @override
-  Future<TeamModel> createTeam(String name) async {
+  Future<TeamModel> createTeam(
+    String name, {
+    GroupKind kind = GroupKind.team,
+    GroupCurrency currency = GroupCurrency.thb,
+  }) async {
     try {
-      final row = await _supabase
-          .rpc('create_team', params: {'p_name': name}) as Map<String, dynamic>;
+      final row = await _supabase.rpc(
+        'create_team',
+        params: {
+          'p_name': name,
+          'p_timezone': await _deviceTimezone(),
+          'p_kind': kind.name,
+          'p_currency': groupCurrencyToDb(currency),
+        },
+      ) as Map<String, dynamic>;
       return TeamModel.fromTeamRow(row, role: TeamRole.superAdmin, isActive: true);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
@@ -66,14 +80,26 @@ class TeamMembershipRemoteDataSourceImpl
           .select('active_team_id')
           .eq('id', userId)
           .single();
-      final activeTeamId = profileRow['active_team_id'] as String?;
+      var activeTeamId = profileRow['active_team_id'] as String?;
 
-      final rows = await _supabase
-          .from('team_members')
-          .select('role, teams(*)')
-          .eq('profile_id', userId);
-      return (rows as List<dynamic>)
-          .cast<Map<String, dynamic>>()
+      final rows = (await _supabase
+              .from('team_members')
+              .select('role, teams(*)')
+              .eq('profile_id', userId)
+              .order('joined_at'))
+          .cast<Map<String, dynamic>>();
+
+      // active_team_id can be null or stale while memberships remain —
+      // e.g. the active team was deleted (its FK sets null) — which would
+      // leave Home and Match with no team. Fall back to the earliest-joined
+      // team and save it, so every screen agrees.
+      final teamIds = [for (final row in rows) (row['teams'] as Map<String, dynamic>)['id']];
+      if (teamIds.isNotEmpty && !teamIds.contains(activeTeamId)) {
+        activeTeamId = teamIds.first as String;
+        await switchActiveTeam(activeTeamId);
+      }
+
+      return rows
           .map(
             (row) =>
                 TeamModel.fromMembershipRow(row, activeTeamId: activeTeamId),
@@ -137,6 +163,28 @@ class TeamMembershipRemoteDataSourceImpl
   Future<void> deleteTeam(String teamId) async {
     try {
       await _supabase.rpc('delete_team', params: {'p_team_id': teamId});
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  /// The phone's IANA time zone, for a new team's default — or null if the
+  /// platform can't say (`create_team` then falls back to Asia/Bangkok).
+  static Future<String?> _deviceTimezone() async {
+    try {
+      return (await FlutterTimezone.getLocalTimezone()).identifier;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> setTeamTimezone({required String teamId, required String timezone}) async {
+    try {
+      await _supabase.rpc('set_team_timezone', params: {
+        'p_team_id': teamId,
+        'p_timezone': timezone,
+      });
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

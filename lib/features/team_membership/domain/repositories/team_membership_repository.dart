@@ -6,7 +6,19 @@ import '../entities/team_member.dart';
 
 abstract interface class TeamMembershipRepository {
   /// Fails if the profile is already on 3 teams.
-  Future<Either<Failure, Team>> createTeam(String name);
+  /// The new team's time zone comes from the creator's phone.
+  Future<Either<Failure, Team>> createTeam(
+    String name, {
+    GroupKind kind = GroupKind.team,
+    GroupCurrency currency = GroupCurrency.thb,
+  });
+
+  /// Super admin only — see `set_team_timezone` in
+  /// supabase/sql/011_team_timezone.sql.
+  Future<Either<Failure, Unit>> setTeamTimezone({
+    required String teamId,
+    required String timezone,
+  });
 
   /// Fails if the profile is already on 3 teams, or already on this team.
   Future<Either<Failure, Team>> joinTeam(String inviteCode);

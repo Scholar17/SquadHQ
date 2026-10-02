@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 
+import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/app_user_model.dart';
 
@@ -78,7 +79,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException('Facebook sign-in failed: $e');
+      throw AuthException('Facebook sign-in failed: ${friendlyErrorMessage(e)}');
     }
   }
 
@@ -101,7 +102,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException('Google sign-in failed: $e');
+      throw AuthException('Google sign-in failed: ${friendlyErrorMessage(e)}');
     }
   }
 
@@ -135,13 +136,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await _supabase.auth.signOut();
     } catch (e) {
-      throw AuthException('Sign out failed: $e');
+      throw AuthException('Sign out failed: ${friendlyErrorMessage(e)}');
     }
   }
 
   @override
   Stream<AppUserModel?> get authStateChanges =>
-      _supabase.auth.onAuthStateChange.asyncMap((data) async {
+      _supabase.auth.onAuthStateChange
+          // A failed background session refresh (phone offline or asleep)
+          // arrives here as AuthRetryableFetchException. Supabase retries on
+          // its own, so it isn't worth surfacing — the user stays signed in.
+          .handleError((_) {}, test: (error) => isNetworkError(error as Object))
+          .asyncMap((data) async {
         final authUser = data.session?.user;
         if (authUser == null) return null;
         return _loadOrCreateProfile(authUser);

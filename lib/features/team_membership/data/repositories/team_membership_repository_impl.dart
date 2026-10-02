@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 
+import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/team.dart';
@@ -13,13 +14,17 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
   final TeamMembershipRemoteDataSource _remoteDataSource;
 
   @override
-  Future<Either<Failure, Team>> createTeam(String name) async {
+  Future<Either<Failure, Team>> createTeam(
+    String name, {
+    GroupKind kind = GroupKind.team,
+    GroupCurrency currency = GroupCurrency.thb,
+  }) async {
     try {
-      return Right(await _remoteDataSource.createTeam(name));
+      return Right(await _remoteDataSource.createTeam(name, kind: kind, currency: currency));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -30,7 +35,7 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -41,7 +46,7 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -53,7 +58,7 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -64,7 +69,7 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -84,7 +89,7 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 
@@ -96,7 +101,22 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
-      return Left(ServerFailure(e.toString()));
+      return Left(ServerFailure(friendlyErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> setTeamTimezone({
+    required String teamId,
+    required String timezone,
+  }) async {
+    try {
+      await _remoteDataSource.setTeamTimezone(teamId: teamId, timezone: timezone);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
 }

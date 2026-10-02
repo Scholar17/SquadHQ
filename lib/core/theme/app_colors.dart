@@ -10,6 +10,9 @@ abstract final class AppColors {
   static const accent2 = Color(0xFF7A8A5E);
   static const divider = Color(0x29201E1D); // #201e1d @ 16%
 
+  /// The unread dot on a notification.
+  static const unread = Color(0xFFD93A2E);
+
   /// Golden Goal FC's own brand colour — the team identity, not the
   /// product accent.
   static const teamGold = Color(0xFFD9A13C);

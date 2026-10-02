@@ -19,7 +19,12 @@ final class TeamMembershipLoaded extends TeamMembershipState {
 
   final List<Team> teams;
 
+  /// Per kind: up to 3 football teams and 3 squads.
   static const maxTeams = 3;
+
+  int countOf(GroupKind kind) => teams.where((team) => team.kind == kind).length;
+
+  bool isAtLimit(GroupKind kind) => countOf(kind) >= maxTeams;
 
   @override
   List<Object?> get props => [teams];

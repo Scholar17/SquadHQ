@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
-import '../../../auth/presentation/pages/profile_page.dart';
 import '../../domain/entities/team_snapshot.dart';
 import '../bloc/team_bloc.dart';
 import '../bloc/team_state.dart';
-import 'player_card_page.dart';
 
 /// Player cards, season stats, and your profile. Profile detail (contact,
 /// nationality, preferred positions, game reminders) is a later pass —
@@ -41,11 +41,7 @@ class SquadPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ProfilePage(user: user),
-                    ),
-                  ),
+                  onTap: () => context.push(AppRoutes.profile, extra: user),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
@@ -113,11 +109,7 @@ class SquadPage extends StatelessWidget {
                         _RosterRow(
                           member: roster[i],
                           showTopBorder: i > 0,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => PlayerCardPage(member: roster[i]),
-                            ),
-                          ),
+                          onTap: () => context.push(AppRoutes.teamPlayer, extra: roster[i]),
                         ),
                     ],
                   ),

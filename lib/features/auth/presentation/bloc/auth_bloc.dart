@@ -29,8 +29,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthOnboardingSubmitted>(_onOnboardingSubmitted);
     on<AuthSignedOutRequested>(_onSignedOut);
     on<AuthUserChanged>(_onUserChanged);
-    _authStateSubscription =
-        watchAuthState().listen((user) => add(AuthUserChanged(user)));
+    _authStateSubscription = watchAuthState().listen(
+      (user) => add(AuthUserChanged(user)),
+      // E.g. loading the profile failed while offline: keep the current
+      // state rather than crash or sign out — the next auth event (or
+      // reopening the app) tries again.
+      onError: (Object error) {},
+    );
   }
 
   final SignInWithFacebook _signInWithFacebook;

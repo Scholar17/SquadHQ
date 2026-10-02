@@ -6,7 +6,8 @@ import '../../domain/entities/match.dart' as match_entity;
 import 'match_row.dart';
 
 /// Home's "NEXT MATCHES" block — up to [previewCount] matches, with a
-/// "See all" button once there are more than that.
+/// "See all" button once there are more than that. Tapping a match opens
+/// its detail screen.
 class UpcomingMatchesSection extends StatelessWidget {
   const UpcomingMatchesSection({
     super.key,
@@ -14,14 +15,16 @@ class UpcomingMatchesSection extends StatelessWidget {
     required this.canCreateMatch,
     required this.onCreateMatch,
     required this.onSeeAll,
+    required this.onMatchTap,
   });
 
   final List<match_entity.Match> matches;
   final bool canCreateMatch;
   final VoidCallback? onCreateMatch;
   final VoidCallback onSeeAll;
+  final ValueChanged<match_entity.Match> onMatchTap;
 
-  static const previewCount = 2;
+  static const previewCount = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +62,15 @@ class UpcomingMatchesSection extends StatelessWidget {
           _EmptyState(canCreate: canCreateMatch)
         else ...[
           for (final match in preview) ...[
-            MatchRow(match: match),
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => onMatchTap(match),
+                child: MatchRow(match: match),
+              ),
+            ),
             const SizedBox(height: 10),
           ],
           if (matches.length > previewCount)

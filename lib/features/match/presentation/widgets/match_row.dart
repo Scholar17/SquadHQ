@@ -50,17 +50,6 @@ class MatchRow extends StatelessWidget {
               ],
             ),
           ),
-          if (match.feePerPlayer != null) ...[
-            const SizedBox(width: 8),
-            Text(
-              '฿${match.feePerPlayer!.toStringAsFixed(0)}',
-              style: AppTextStyles.body(
-                size: 13,
-                weight: FontWeight.w700,
-                color: AppColors.accent700,
-              ),
-            ),
-          ],
         ],
       ),
     );

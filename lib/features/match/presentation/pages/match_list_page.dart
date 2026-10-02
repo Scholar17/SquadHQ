@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/routing/app_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -10,17 +13,23 @@ import '../match_formatting.dart';
 import '../widgets/create_match_sheet.dart';
 import '../widgets/match_row.dart';
 
-/// Reached from Home's "See all matches" button. Reads the same ambient
-/// [MatchBloc] Home does — no separate fetch, it's already loaded every
-/// upcoming match for the active team, not just the two-item preview.
+/// Every upcoming match, grouped by date — reached from Home's "See all
+/// matches" and the Match tab's "See more". Reads the same ambient
+/// [MatchBloc] they do — no separate fetch, it's already loaded every
+/// upcoming match for the active team. Tapping a match opens its detail
+/// screen, where players RSVP.
 class MatchListPage extends StatelessWidget {
   const MatchListPage({
     super.key,
     required this.activeTeamId,
+    required this.teamName,
+    required this.userId,
     required this.canCreateMatch,
   });
 
   final String activeTeamId;
+  final String teamName;
+  final String userId;
   final bool canCreateMatch;
 
   /// Same one-pass unwrap used elsewhere for Submitting/Failure.
@@ -51,7 +60,7 @@ class MatchListPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Matches', style: AppTextStyles.heading(size: 16)),
+        title: Text('Upcoming matches', style: AppTextStyles.heading(size: 16)),
       ),
       body: SafeArea(
         child: BlocBuilder<MatchBloc, MatchState>(
@@ -85,7 +94,48 @@ class MatchListPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   for (final match in entry.value) ...[
-                    MatchRow(match: match),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(18),
+                            onTap: () => context.push(
+                              AppRoutes.upcomingMatch,
+                              extra: UpcomingMatchArgs(
+                                matchId: match.id,
+                                teamName: teamName,
+                                userId: userId,
+                                isManager: canCreateMatch,
+                              ),
+                            ),
+                            child: MatchRow(match: match),
+                          ),
+                        ),
+                        if (match.id == matches.first.id)
+                          Positioned(
+                            top: -7,
+                            right: 14,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                'NEXT',
+                                style: AppTextStyles.body(
+                                  size: 10,
+                                  weight: FontWeight.w800,
+                                  color: AppColors.neutral100,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 10),
                   ],
                   const SizedBox(height: 10),
