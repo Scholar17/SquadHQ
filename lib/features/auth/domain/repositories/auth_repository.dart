@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 
 import '../../../../core/error/failures.dart';
 import '../entities/app_user.dart';
+import '../usecases/update_profile.dart';
 
 abstract interface class AuthRepository {
   /// Launches Facebook's browser sign-in; success/failure of the sign-in
@@ -17,6 +18,13 @@ abstract interface class AuthRepository {
     required String phone,
     required String username,
   });
+
+  /// Saves your name, phone and/or profile photo; returns you as saved.
+  Future<Either<Failure, AppUser>> updateProfile(UpdateProfileParams params);
+
+  /// Deletes your account for good (photo and QR files, personal details,
+  /// login), keeping what others share with you; then signs out.
+  Future<Either<Failure, Unit>> deleteAccount();
 
   Future<Either<Failure, Unit>> signOut();
 

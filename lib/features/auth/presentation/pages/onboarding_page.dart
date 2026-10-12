@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/validators/onboarding_validators.dart';
@@ -106,7 +107,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               widget.user.name.isNotEmpty
                                   ? widget.user.name[0].toUpperCase()
                                   : '?',
-                              style: AppTextStyles.heading(
+                              style: AppTextStyles.title(
                                 size: 16,
                                 color: AppColors.neutral800,
                               ),
@@ -122,7 +123,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 ? 'FACEBOOK'
                                 : 'GOOGLE',
                             style: AppTextStyles.label(
-                              color: AppColors.text.withValues(alpha: 0.45),
+                              color: AppColors.textMuted,
                             ),
                           ),
                           const SizedBox(height: 5),
@@ -146,15 +147,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   'reaches you on matchday and how payment requests find you.',
                   style: AppTextStyles.body(
                     size: 13.5,
-                    color: AppColors.text.withValues(alpha: 0.62),
+                    color: AppColors.textSubtle,
                   ),
                 ),
                 const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: AppColors.neutral100,
-                    borderRadius: BorderRadius.circular(20),
+                    color: AppColors.card,
+                    borderRadius: AppRadius.lg,
                     border: Border.all(
                       color: AppColors.text.withValues(alpha: 0.1),
                     ),
@@ -165,7 +166,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       Text(
                         'MOBILE NUMBER',
                         style: AppTextStyles.label(
-                          color: AppColors.text.withValues(alpha: 0.5),
+                          color: AppColors.textMuted,
                         ),
                       ),
                       const SizedBox(height: 7),
@@ -177,7 +178,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: AppColors.bg,
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: AppRadius.pill,
                               border: Border.all(
                                 color: AppColors.text.withValues(alpha: 0.16),
                               ),
@@ -205,7 +206,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                   contentPadding:
                                       const EdgeInsets.symmetric(horizontal: 18),
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(999),
+                                    borderRadius: AppRadius.pill,
                                     borderSide: BorderSide(
                                       color:
                                           AppColors.text.withValues(alpha: 0.16),
@@ -231,7 +232,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       Text(
                         'USERNAME',
                         style: AppTextStyles.label(
-                          color: AppColors.text.withValues(alpha: 0.5),
+                          color: AppColors.textMuted,
                         ),
                       ),
                       const SizedBox(height: 7),
@@ -241,13 +242,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                           controller: _usernameController,
                           onChanged: _onUsernameChanged,
                           decoration: InputDecoration(
-                            hintText: '@yourname',
+                            hintText: 'yourname',
                             filled: true,
                             fillColor: AppColors.bg,
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 18),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: AppRadius.pill,
                               borderSide: BorderSide(
                                 color: AppColors.text.withValues(alpha: 0.16),
                               ),
@@ -279,7 +280,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         onPressed: isLoading ? null : () => _submit(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.bg,
+                          foregroundColor: AppColors.onDark,
                           disabledBackgroundColor:
                               AppColors.accent.withValues(alpha: 0.5),
                           shape: const StadiumBorder(),
@@ -291,14 +292,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 height: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  color: AppColors.bg,
+                                  color: AppColors.onDark,
                                 ),
                               )
                             : Text(
                                 'Finish setup',
-                                style: AppTextStyles.heading(
+                                style: AppTextStyles.title(
                                   size: 15,
-                                  color: AppColors.bg,
+                                  color: AppColors.onDark,
                                 ),
                               ),
                       ),

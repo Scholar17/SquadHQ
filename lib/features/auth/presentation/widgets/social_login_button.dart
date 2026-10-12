@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 
 class SocialLoginButton extends StatelessWidget {
   const SocialLoginButton({
@@ -21,13 +22,13 @@ class SocialLoginButton extends StatelessWidget {
         label: 'Continue with Facebook',
         onPressed: onPressed,
         backgroundColor: const Color(0xFF3B5998),
-        foregroundColor: AppColors.neutral100,
+        foregroundColor: AppColors.onDark,
         badge: Container(
           width: 24,
           height: 24,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(7),
+            borderRadius: AppRadius.xs,
           ),
           alignment: Alignment.center,
           child: const Text(
@@ -49,17 +50,17 @@ class SocialLoginButton extends StatelessWidget {
         key: key,
         label: 'Continue with Google',
         onPressed: onPressed,
-        backgroundColor: AppColors.neutral100,
+        backgroundColor: AppColors.card,
         foregroundColor: AppColors.text,
         badge: Container(
           width: 24,
           height: 24,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.neutral300,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: const Text(
+          child: Text(
             'G',
             style: TextStyle(
               color: AppColors.text,

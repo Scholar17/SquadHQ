@@ -5,6 +5,7 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/usecases/update_profile.dart';
 import '../datasources/auth_remote_data_source.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -48,6 +49,29 @@ class AuthRepositoryImpl implements AuthRepository {
         phone: phone,
         username: username,
       ));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(friendlyErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, AppUser>> updateProfile(UpdateProfileParams params) async {
+    try {
+      return Right(await _remoteDataSource.updateProfile(params));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(friendlyErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deleteAccount() async {
+    try {
+      await _remoteDataSource.deleteAccount();
+      return const Right(unit);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/app_user.dart';
@@ -27,6 +29,32 @@ final class AuthOnboardingSubmitted extends AuthEvent {
   List<Object?> get props => [phone, username];
 }
 
+/// Edit your profile: any of name, username, phone and photo (null =
+/// unchanged).
+final class AuthProfileUpdateRequested extends AuthEvent {
+  const AuthProfileUpdateRequested({
+    this.name,
+    this.username,
+    this.phone,
+    this.avatarBytes,
+    this.avatarExtension,
+  });
+
+  final String? name;
+  final String? username;
+  final String? phone;
+  final Uint8List? avatarBytes;
+  final String? avatarExtension;
+
+  @override
+  List<Object?> get props => [name, username, phone, avatarBytes, avatarExtension];
+}
+
+/// "Delete account", confirmed.
+final class AuthAccountDeletionRequested extends AuthEvent {
+  const AuthAccountDeletionRequested();
+}
+
 final class AuthSignedOutRequested extends AuthEvent {
   const AuthSignedOutRequested();
 }
@@ -40,4 +68,20 @@ final class AuthUserChanged extends AuthEvent {
 
   @override
   List<Object?> get props => [user];
+}
+
+/// Internal — [WatchAuthState]'s stream reported an error, e.g. the OAuth
+/// redirect came back with one.
+final class AuthStateErrored extends AuthEvent {
+  const AuthStateErrored(this.message);
+
+  final String message;
+
+  @override
+  List<Object?> get props => [message];
+}
+
+/// The app came back to the foreground — e.g. from the sign-in browser.
+final class AuthAppResumed extends AuthEvent {
+  const AuthAppResumed();
 }

@@ -1,9 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase show AuthException;
 
 import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../domain/usecases/update_profile.dart';
 import '../models/app_user_model.dart';
+
+/// Postgres' code for a unique index refusing a row — on profiles, a
+/// username someone already has (any case, 049_mentions.sql).
+const _uniqueViolation = '23505';
+
+const usernameTakenMessage = 'That username is taken. Try another one.';
 
 abstract interface class AuthRemoteDataSource {
   /// Launches Facebook's browser sign-in; the result arrives later through
@@ -27,14 +37,18 @@ abstract interface class AuthRemoteDataSource {
     required String username,
   });
 
+  Future<AppUserModel> updateProfile(UpdateProfileParams params);
+
+  Future<void> deleteAccount();
+
   Future<void> signOut();
 
   /// Emits the signed-in user (with its `profiles` row merged in) whenever
   /// the Supabase session changes, or `null` when signed out. Supabase
   /// restores a persisted session on [Supabase.initialize], so this also
   /// fires once at app start with whatever session survived the restart —
-  /// and it's how a Facebook OAuth redirect resolves, since
-  /// [signInWithFacebook] returns before that completes.
+  /// and it's how a browser OAuth redirect resolves, since the browser
+  /// sign-ins return before that completes.
   Stream<AppUserModel?> get authStateChanges;
 }
 
@@ -126,8 +140,92 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return AppUserModel.fromSupabase(authUser, profileRow: row);
     } on ServerException {
       rethrow;
+    } on PostgrestException catch (e) {
+      if (e.code == _uniqueViolation) throw const ServerException(usernameTakenMessage);
+      throw ServerException('Could not save your details: $e');
     } catch (e) {
       throw ServerException('Could not save your details: $e');
+    }
+  }
+
+  @override
+  Future<AppUserModel> updateProfile(UpdateProfileParams params) async {
+    try {
+      final changes = <String, Object?>{
+        if (params.name case final name?) 'name': name.trim(),
+        if (params.username case final username?) 'username': username.trim(),
+        if (params.phone case final phone?) 'phone': phone,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+      // A new photo: into the public avatars bucket (038), its link on the
+      // profile. A fresh file each time, so caches never show the old one.
+      if (params.avatarBytes case final bytes?) {
+        final extension = params.avatarExtension ?? 'jpg';
+        final path = '${params.userId}/${DateTime.now().millisecondsSinceEpoch}.$extension';
+        final bucket = _supabase.storage.from('avatars');
+        await bucket.uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: extension == 'png' ? 'image/png' : 'image/jpeg',
+          ),
+        );
+        changes['avatar_url'] = bucket.getPublicUrl(path);
+      }
+      final row = await _supabase
+          .from('profiles')
+          .update(changes)
+          .eq('id', params.userId)
+          .select()
+          .single();
+      final authUser = _supabase.auth.currentUser;
+      if (authUser == null) throw const ServerException('You were signed out.');
+      return AppUserModel.fromSupabase(authUser, profileRow: row);
+    } on ServerException {
+      rethrow;
+    } on PostgrestException catch (e) {
+      if (e.code == _uniqueViolation) throw const ServerException(usernameTakenMessage);
+      throw ServerException('Could not save your profile: ${friendlyErrorMessage(e)}');
+    } on StorageException catch (e) {
+      throw ServerException('Could not upload your photo: ${e.message}');
+    } catch (e) {
+      throw ServerException('Could not save your profile: ${friendlyErrorMessage(e)}');
+    }
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw const ServerException('You were signed out.');
+    // Your own image files first — best effort: a leftover file is
+    // unreachable once its link is gone from the profile.
+    try {
+      final row = await _supabase
+          .from('profiles')
+          .select('wallet_qr_path')
+          .eq('id', userId)
+          .maybeSingle();
+      if (row?['wallet_qr_path'] case final String qr) {
+        await _supabase.storage.from('wallet-qr').remove([qr]);
+      }
+      final avatars = _supabase.storage.from('avatars');
+      final files = await avatars.list(path: userId);
+      if (files.isNotEmpty) {
+        await avatars.remove([for (final f in files) '$userId/${f.name}']);
+      }
+    } catch (_) {
+      // Not worth stopping the deletion for.
+    }
+    try {
+      await _supabase.rpc('delete_my_account');
+    } on PostgrestException catch (e) {
+      throw ServerException('Could not delete your account: ${e.message}');
+    }
+    // The login no longer exists; drop the session on this device.
+    try {
+      await _supabase.auth.signOut();
+    } catch (_) {
+      await _supabase.auth.signOut(scope: SignOutScope.local);
     }
   }
 
@@ -147,6 +245,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           // arrives here as AuthRetryableFetchException. Supabase retries on
           // its own, so it isn't worth surfacing — the user stays signed in.
           .handleError((_) {}, test: (error) => isNetworkError(error as Object))
+          // An OAuth redirect that came back with an error (e.g. the
+          // Facebook app is misconfigured) arrives here too — as our own
+          // AuthException, so the sign-in screen can show its message.
+          .transform(
+            StreamTransformer<AuthState, AuthState>.fromHandlers(
+              handleError: (error, stackTrace, sink) => sink.addError(
+                error is supabase.AuthException
+                    ? AuthException('Sign-in failed: ${error.message}')
+                    : error,
+                stackTrace,
+              ),
+            ),
+          )
           .asyncMap((data) async {
         final authUser = data.session?.user;
         if (authUser == null) return null;
