@@ -15,9 +15,9 @@ class MatchdayBloc extends Bloc<MatchdayEvent, MatchdayState> {
     required GetMatchdayRoster getMatchdayRoster,
     required SetMatchRsvp setMatchRsvp,
     required TeamChanges teamChanges,
-  })  : _getMatchdayRoster = getMatchdayRoster,
-        _setMatchRsvp = setMatchRsvp,
-        super(const MatchdayLoading()) {
+  }) : _getMatchdayRoster = getMatchdayRoster,
+       _setMatchRsvp = setMatchRsvp,
+       super(const MatchdayLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {TeamTable.teamMembers, TeamTable.matchRsvps},
@@ -58,19 +58,14 @@ class MatchdayBloc extends Bloc<MatchdayEvent, MatchdayState> {
     await _reload(emit);
   }
 
-  Future<void> _onRsvpSubmitted(
-    MatchdayRsvpSubmitted event,
-    Emitter<MatchdayState> emit,
-  ) async {
+  Future<void> _onRsvpSubmitted(MatchdayRsvpSubmitted event, Emitter<MatchdayState> emit) async {
     // Unwrap a previous failure so Submitting/Failure never nest.
     final fallback = switch (state) {
       MatchdayFailure(:final previous) => previous,
       final settled => settled,
     };
     emit(MatchdaySubmitting(fallback));
-    final result = await _setMatchRsvp(
-      SetMatchRsvpParams(matchId: match.id, answer: event.answer),
-    );
+    final result = await _setMatchRsvp(SetMatchRsvpParams(matchId: match.id, answer: event.answer));
     await result.fold(
       (failure) async => emit(MatchdayFailure(failure.message, fallback)),
       (_) => _reload(emit),

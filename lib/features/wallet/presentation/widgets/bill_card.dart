@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../comments/domain/entities/match_topic.dart';
+import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/entities/bill_split.dart';
 import '../../domain/entities/team_wallet.dart';
@@ -45,10 +48,10 @@ class BillCard extends StatelessWidget {
     final myShare = split.shareFor(userId);
     final payers = split.shares.where((share) => !share.isPayer).length;
     return Material(
-      color: AppColors.neutral100,
-      borderRadius: BorderRadius.circular(20),
+      color: AppColors.card,
+      borderRadius: AppRadius.lg,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
         onTap: () => showBillDetailsSheet(
           context,
           matchId: match.id,
@@ -59,7 +62,7 @@ class BillCard extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.lg,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +77,7 @@ class BillCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: showMatch
                           ? AppTextStyles.body(size: 13.5, weight: FontWeight.w800)
-                          : AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                          : AppTextStyles.label(color: AppColors.textMuted),
                     ),
                   ),
                   if (canEdit)
@@ -102,7 +105,7 @@ class BillCard extends StatelessWidget {
                           style: AppTextStyles.body(
                             size: 12,
                             weight: FontWeight.w600,
-                            color: AppColors.text.withValues(alpha: 0.6),
+                            color: AppColors.textMuted,
                           ),
                         ),
                         const SizedBox(height: 3),
@@ -110,7 +113,7 @@ class BillCard extends StatelessWidget {
                           '${splitModeLabel(bill.splitMode)} · ${split.shares.length}',
                           style: AppTextStyles.body(
                             size: 11.5,
-                            color: AppColors.text.withValues(alpha: 0.5),
+                            color: AppColors.textMuted,
                           ),
                         ),
                       ],
@@ -121,13 +124,19 @@ class BillCard extends StatelessWidget {
               ),
               if (payers > 0) ...[
                 const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: split.paid.length / payers,
-                    minHeight: 6,
-                    backgroundColor: AppColors.neutral300,
-                    color: AppColors.accent2_700,
+                // Fills in on first show and slides when someone pays.
+                TweenAnimationBuilder<double>(
+                  tween: Tween(end: split.paid.length / payers),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => ClipRRect(
+                    borderRadius: AppRadius.pill,
+                    child: LinearProgressIndicator(
+                      value: value,
+                      minHeight: 6,
+                      backgroundColor: AppColors.neutral300,
+                      color: AppColors.accent2_700,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -136,7 +145,7 @@ class BillCard extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 11.5,
                     weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.55),
+                    color: AppColors.textMuted,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -150,7 +159,7 @@ class BillCard extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 11.5,
                     weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.55),
+                    color: AppColors.textMuted,
                   ),
                 ),
                 if ((isPayer || isManager) && split.unpaid.isNotEmpty) ...[
@@ -166,7 +175,7 @@ class BillCard extends StatelessWidget {
                       : 'No players in this split.',
                   style: AppTextStyles.body(
                     size: 11.5,
-                    color: AppColors.text.withValues(alpha: 0.55),
+                    color: AppColors.textMuted,
                   ),
                 ),
               ],
@@ -176,6 +185,17 @@ class BillCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 _MyShareStatus(paid: myShare.payment != null, amount: split.roundedShare),
               ],
+              const SizedBox(height: 10),
+              Divider(height: 1, color: AppColors.text.withValues(alpha: 0.08)),
+              const SizedBox(height: 4),
+              MatchCommentsButton(
+                thread: (matchId: match.id, topic: MatchTopic.bill),
+                teamId: match.teamId,
+                userId: userId,
+                canModerate: isManager,
+                subtitle: 'vs ${match.opponent} · ${formatMatchDate(match.kickoffAt)}',
+                embedded: true,
+              ),
             ],
           ),
         ),
@@ -198,7 +218,7 @@ class _MyShareStatus extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: paid ? AppColors.accent2_100 : AppColors.accent100,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.sm,
       ),
       child: Row(
         children: [
@@ -275,7 +295,7 @@ class AddBillCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
       ),
       child: Row(
         children: [
@@ -287,7 +307,7 @@ class AddBillCard extends StatelessWidget {
                   showMatch ? 'vs ${match.opponent}' : 'MATCH BILL',
                   style: showMatch
                       ? AppTextStyles.body(size: 13.5, weight: FontWeight.w800)
-                      : AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                      : AppTextStyles.label(color: AppColors.textMuted),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -296,7 +316,7 @@ class AddBillCard extends StatelessWidget {
                       : 'Paid for the pitch? Add the total cost to split it.',
                   style: AppTextStyles.body(
                     size: 12,
-                    color: AppColors.text.withValues(alpha: 0.6),
+                    color: AppColors.textMuted,
                   ),
                 ),
               ],
@@ -330,7 +350,7 @@ class _SmallButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 13),
         minimumSize: const Size(0, 30),
       ),
-      child: Text(label, style: AppTextStyles.heading(size: 12)),
+      child: Text(label, style: AppTextStyles.title(size: 12)),
     );
   }
 }

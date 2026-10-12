@@ -14,12 +14,16 @@ typedef PickedImage = ({Uint8List bytes, String fileExtension});
 const _allowedExtensions = {'jpg', 'jpeg', 'png', 'webp', 'heic'};
 
 /// Picks one image from the gallery (a QR code or payment slip
-/// screenshot), or null if the user backs out.
-Future<PickedImage?> pickWalletImage() async {
+/// screenshot), or null if the user backs out. A [slip] fits within
+/// 1280×2560 at JPEG quality 80: a phone screenshot keeps its full size and
+/// stays sharp, a camera photo shrinks to a few hundred KB. A QR code keeps
+/// more detail so banking apps can scan it.
+Future<PickedImage?> pickWalletImage({bool slip = false}) async {
   final file = await ImagePicker().pickImage(
     source: ImageSource.gallery,
-    maxWidth: 2000,
-    imageQuality: 90,
+    maxWidth: slip ? 1280 : 2000,
+    maxHeight: slip ? 2560 : null,
+    imageQuality: slip ? 80 : 90,
   );
   if (file == null) return null;
   final name = file.name.toLowerCase();

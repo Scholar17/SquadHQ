@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/entities/bill_split.dart';
 import '../../domain/entities/team_wallet.dart';
@@ -35,13 +37,16 @@ class WalletBillsPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('All bills', style: AppTextStyles.heading(size: 16)),
+        title: Text('All bills', style: AppTextStyles.title(size: 16)),
       ),
       body: BlocBuilder<WalletBloc, WalletState>(
         builder: (context, state) {
           final wallet = state.wallet;
           if (wallet == null) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+            return const SkeletonList(
+              item: BillCardSkeleton(),
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 32),
+            );
           }
           final bills = [...wallet.bills]
             ..sort((a, b) => b.$1.match.kickoffAt.compareTo(a.$1.match.kickoffAt));
@@ -49,7 +54,7 @@ class WalletBillsPage extends StatelessWidget {
             return Center(
               child: Text(
                 'No bills yet.',
-                style: AppTextStyles.body(size: 13.5, color: AppColors.text.withValues(alpha: 0.6)),
+                style: AppTextStyles.body(size: 13.5, color: AppColors.textMuted),
               ),
             );
           }
@@ -64,7 +69,7 @@ class WalletBillsPage extends StatelessWidget {
                     padding: EdgeInsets.only(top: index == 0 ? 8 : 18, bottom: 10),
                     child: Text(
                       _monthLabel(bill.$1.match.kickoffAt),
-                      style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                      style: AppTextStyles.label(color: AppColors.textMuted),
                     ),
                   )
                 else
@@ -116,15 +121,15 @@ class _BillRow extends StatelessWidget {
             ? ('You owe ${formatBaht(split.roundedShare)}', AppColors.accent700)
             : ('${split.unpaid.length} unpaid', AppColors.accent700);
     return Material(
-      color: AppColors.neutral100,
-      borderRadius: BorderRadius.circular(18),
+      color: AppColors.card,
+      borderRadius: AppRadius.lg,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lg,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadius.lg,
             border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
           ),
           child: Row(
@@ -134,7 +139,7 @@ class _BillRow extends StatelessWidget {
                 height: 54,
                 decoration: BoxDecoration(
                   color: AppColors.neutral900,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: AppRadius.md,
                 ),
                 alignment: Alignment.center,
                 child: Column(
@@ -142,14 +147,14 @@ class _BillRow extends StatelessWidget {
                   children: [
                     Text(
                       '${local.day}',
-                      style: AppTextStyles.heading(size: 18, color: AppColors.teamGold),
+                      style: AppTextStyles.title(size: 18, color: AppColors.teamGold),
                     ),
                     Text(
                       monthNames[local.month - 1].toUpperCase(),
                       style: AppTextStyles.body(
                         size: 10,
                         weight: FontWeight.w700,
-                        color: AppColors.neutral100.withValues(alpha: 0.7),
+                        color: AppColors.onDark.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -163,7 +168,7 @@ class _BillRow extends StatelessWidget {
                     Text(
                       'vs ${match.opponent}',
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.heading(size: 15),
+                      style: AppTextStyles.title(size: 15),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -172,7 +177,7 @@ class _BillRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(
                         size: 12,
-                        color: AppColors.text.withValues(alpha: 0.55),
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -183,7 +188,7 @@ class _BillRow extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadius.pill,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

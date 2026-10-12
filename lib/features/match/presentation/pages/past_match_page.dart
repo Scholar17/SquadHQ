@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../comments/domain/entities/match_topic.dart';
+import '../../../comments/presentation/widgets/match_comments.dart';
+import '../../../player_rating/presentation/widgets/match_stats_card.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../../wallet/presentation/bloc/wallet_state.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
@@ -38,7 +42,7 @@ class PastMatchPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Match details', style: AppTextStyles.heading(size: 16)),
+        title: Text('Match details', style: AppTextStyles.title(size: 16)),
       ),
       body: BlocConsumer<MatchHistoryBloc, MatchHistoryState>(
         listenWhen: (previous, current) => current is MatchHistoryFailure,
@@ -79,7 +83,7 @@ class PastMatchPage extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 'WHO PLAYED · ${played.length}',
-                style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                style: AppTextStyles.label(color: AppColors.textMuted),
               ),
               const SizedBox(height: 10),
               if (played.isEmpty)
@@ -87,7 +91,7 @@ class PastMatchPage extends StatelessWidget {
                   'No one RSVP\'d "In" for this match.',
                   style: AppTextStyles.body(
                     size: 12.5,
-                    color: AppColors.text.withValues(alpha: 0.55),
+                    color: AppColors.textMuted,
                   ),
                 )
               else
@@ -101,14 +105,29 @@ class PastMatchPage extends StatelessWidget {
                         label: Text(
                           player.profileId == userId ? '${player.name} (you)' : player.name,
                         ),
-                        labelStyle: AppTextStyles.body(size: 12.5, weight: FontWeight.w700),
-                        backgroundColor: AppColors.neutral100,
+                        labelStyle: AppTextStyles.body(size: 12.5, weight: FontWeight.w700, color: AppColors.text),
+                        backgroundColor: AppColors.card,
                         side: BorderSide(color: AppColors.text.withValues(alpha: 0.1)),
                         shape: const StadiumBorder(),
                       ),
                   ],
                 ),
+              // Played and finished: log your goals / assists / saves.
+              if (pastMatch.playedIds.contains(userId) &&
+                  pastMatch.match.endsAt.isBefore(DateTime.now())) ...[
+                const SizedBox(height: 16),
+                MatchStatsCard(key: ValueKey('stats-$matchId'), matchId: matchId),
+              ],
               _PastMatchBill(matchId: matchId, userId: userId, isManager: isManager),
+              const SizedBox(height: 16),
+              MatchCommentsButton(
+                thread: (matchId: matchId, topic: MatchTopic.match),
+                teamId: pastMatch.match.teamId,
+                userId: userId,
+                canModerate: isManager,
+                subtitle:
+                    'vs ${pastMatch.match.opponent} · ${formatMatchDate(pastMatch.match.kickoffAt)}',
+              ),
             ],
           );
         },
@@ -132,12 +151,12 @@ class _ScoreHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final match = pastMatch.match;
     final result = match.result;
-    final muted = AppColors.neutral100.withValues(alpha: 0.62);
+    final muted = AppColors.onDarkMuted;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.neutral900,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xl,
       ),
       child: Column(
         children: [
@@ -153,7 +172,7 @@ class _ScoreHeader extends StatelessWidget {
                 child: Text(
                   teamName,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.heading(size: 15, color: AppColors.neutral100),
+                  style: AppTextStyles.title(size: 15, color: AppColors.onDark),
                 ),
               ),
               Padding(
@@ -169,7 +188,7 @@ class _ScoreHeader extends StatelessWidget {
                 child: Text(
                   match.opponent,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.heading(size: 15, color: AppColors.neutral100),
+                  style: AppTextStyles.title(size: 15, color: AppColors.onDark),
                 ),
               ),
             ],
@@ -187,7 +206,7 @@ class _ScoreHeader extends StatelessWidget {
                     MatchResult.draw => 'Draw',
                     MatchResult.loss => 'Loss',
                   },
-                  style: AppTextStyles.heading(size: 14, color: AppColors.neutral100),
+                  style: AppTextStyles.title(size: 14, color: AppColors.onDark),
                 ),
               ],
             )
@@ -201,7 +220,7 @@ class _ScoreHeader extends StatelessWidget {
             OutlinedButton(
               onPressed: () => _showScoreSheet(context, pastMatch, teamName),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.neutral100,
+                foregroundColor: AppColors.onDark,
                 side: const BorderSide(color: Color(0x47F9F4ED)),
                 shape: const StadiumBorder(),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -209,7 +228,7 @@ class _ScoreHeader extends StatelessWidget {
               ),
               child: Text(
                 result == null ? 'Add score' : 'Edit score',
-                style: AppTextStyles.heading(size: 12.5, color: AppColors.neutral100),
+                style: AppTextStyles.title(size: 12.5, color: AppColors.onDark),
               ),
             ),
           ],
@@ -224,7 +243,7 @@ Future<void> _showScoreSheet(BuildContext context, PastMatch pastMatch, String t
     context: context,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => BlocProvider.value(
       value: context.read<MatchHistoryBloc>(),
@@ -268,7 +287,7 @@ class _ScoreSheetState extends State<_ScoreSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Final score', style: AppTextStyles.heading(size: 18)),
+              Text('Final score', style: AppTextStyles.title(size: 18)),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -308,14 +327,14 @@ class _ScoreSheetState extends State<_ScoreSheet> {
                               ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.bg,
+                        foregroundColor: AppColors.onDark,
                         disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
                         shape: const StadiumBorder(),
                         elevation: 0,
                       ),
                       child: Text(
                         isSubmitting ? 'Saving…' : 'Save score',
-                        style: AppTextStyles.heading(size: 14, color: AppColors.bg),
+                        style: AppTextStyles.title(size: 14, color: AppColors.onDark),
                       ),
                     ),
                   );
@@ -429,7 +448,7 @@ class _MotmCardState extends State<_MotmCard> {
     final muted = AppTextStyles.body(
       size: 12,
       weight: FontWeight.w600,
-      color: AppColors.text.withValues(alpha: 0.55),
+      color: AppColors.textMuted,
     );
 
     final Widget body;
@@ -446,7 +465,7 @@ class _MotmCardState extends State<_MotmCard> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Who was the best player?', style: AppTextStyles.heading(size: 16)),
+          Text('Who was the best player?', style: AppTextStyles.title(size: 16)),
           const SizedBox(height: 10),
           for (final (index, candidate) in candidates.indexed) ...[
             if (index > 0) const SizedBox(height: 6),
@@ -506,7 +525,7 @@ class _MotmCardState extends State<_MotmCard> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: AppColors.neutral200,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xl,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,7 +537,7 @@ class _MotmCardState extends State<_MotmCard> {
               Expanded(
                 child: Text(
                   'MAN OF THE MATCH',
-                  style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.5)),
+                  style: AppTextStyles.label(color: AppColors.textMuted),
                 ),
               ),
               if (started)
@@ -527,7 +546,7 @@ class _MotmCardState extends State<_MotmCard> {
                   style: AppTextStyles.body(
                     size: 11,
                     weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.5),
+                    color: AppColors.textMuted,
                   ),
                 ),
             ],
@@ -584,8 +603,8 @@ class _MotmResults extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.neutral100,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.card,
+            borderRadius: AppRadius.md,
           ),
           child: Row(
             children: [
@@ -600,7 +619,7 @@ class _MotmResults extends StatelessWidget {
                   children: [
                     Text(
                       winners.map((winner) => winner.name).join(' & '),
-                      style: AppTextStyles.heading(size: 16),
+                      style: AppTextStyles.title(size: 16),
                     ),
                     Text(
                       winners.length > 1
@@ -609,7 +628,7 @@ class _MotmResults extends StatelessWidget {
                       style: AppTextStyles.body(
                         size: 12,
                         weight: FontWeight.w600,
-                        color: AppColors.text.withValues(alpha: 0.55),
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -645,7 +664,7 @@ class _Note extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AppColors.text.withValues(alpha: 0.5)),
+        Icon(icon, size: 16, color: AppColors.textMuted),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -653,7 +672,7 @@ class _Note extends StatelessWidget {
             style: AppTextStyles.body(
               size: 12.5,
               weight: FontWeight.w600,
-              color: AppColors.text.withValues(alpha: 0.65),
+              color: AppColors.textSubtle,
             ),
           ),
         ),
@@ -678,13 +697,13 @@ class _MotmOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.neutral100,
+      color: AppColors.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         side: selected ? const BorderSide(color: AppColors.accent, width: 2) : BorderSide.none,
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         onTap: enabled ? onTap : null,
         child: SizedBox(
           height: 48,
@@ -713,7 +732,7 @@ class _MotmOption extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? const Icon(Icons.check_rounded, size: 13, color: AppColors.neutral100)
+                    ? const Icon(Icons.check_rounded, size: 13, color: AppColors.onDark)
                     : null,
               ),
               const SizedBox(width: 14),
@@ -767,14 +786,14 @@ class _MotmResultRow extends StatelessWidget {
               style: AppTextStyles.body(
                 size: 12,
                 weight: FontWeight.w700,
-                color: AppColors.text.withValues(alpha: 0.6),
+                color: AppColors.textMuted,
               ),
             ),
           ],
         ),
         const SizedBox(height: 5),
         ClipRRect(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: AppRadius.pill,
           child: SizedBox(
             height: 8,
             child: ColoredBox(
@@ -809,8 +828,8 @@ class _MotmButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background = primary ? AppColors.accent : AppColors.neutral100;
-    final foreground = primary ? AppColors.neutral100 : AppColors.text;
+    final background = primary ? AppColors.accent : AppColors.card;
+    final foreground = primary ? AppColors.onDark : AppColors.text;
     return SizedBox(
       width: double.infinity,
       height: 42,
@@ -820,7 +839,7 @@ class _MotmButton extends StatelessWidget {
           foregroundColor: foreground,
           backgroundColor: background,
           disabledBackgroundColor: background.withValues(alpha: 0.45),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
         ),
         child: Text(
           label,

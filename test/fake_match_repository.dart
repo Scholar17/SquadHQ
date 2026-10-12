@@ -64,7 +64,7 @@ class FakeMatchRepository implements MatchRepository {
         id: 'match-1',
         teamId: teamId,
         opponent: 'Sundown United',
-        kickoffAt: DateTime(2026, 10, 3, 19),
+        kickoffAt: DateTime(2037, 10, 3, 19),
         venue: 'Lumpini Park Pitch 2',
         createdBy: userId,
       ),

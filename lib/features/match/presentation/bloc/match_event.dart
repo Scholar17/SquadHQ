@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 
 sealed class MatchEvent extends Equatable {
@@ -21,7 +23,13 @@ final class MatchTeamSelected extends MatchEvent {
 /// Reloads the current team's matches quietly (no spinner) — the shell's
 /// periodic refresh, so a match that kicks off leaves the upcoming list.
 final class MatchRefreshRequested extends MatchEvent {
-  const MatchRefreshRequested();
+  const MatchRefreshRequested({this.done});
+
+  /// Completed once the reload lands (or fails).
+  final Completer<void>? done;
+
+  @override
+  List<Object?> get props => [done];
 }
 
 final class MatchCreateRequested extends MatchEvent {

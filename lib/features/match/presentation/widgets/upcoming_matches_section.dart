@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/match.dart' as match_entity;
+import '../../domain/entities/matchday_player.dart' show RsvpAnswer;
 import 'match_row.dart';
 
 /// Home's "NEXT MATCHES" block — up to [previewCount] matches, with a
@@ -16,6 +18,7 @@ class UpcomingMatchesSection extends StatelessWidget {
     required this.onCreateMatch,
     required this.onSeeAll,
     required this.onMatchTap,
+    this.myRsvps = const {},
   });
 
   final List<match_entity.Match> matches;
@@ -23,6 +26,10 @@ class UpcomingMatchesSection extends StatelessWidget {
   final VoidCallback? onCreateMatch;
   final VoidCallback onSeeAll;
   final ValueChanged<match_entity.Match> onMatchTap;
+
+  /// The viewer's RSVP per match id — a match with an entry shows it (a
+  /// null value meaning "not voted yet"); one without shows nothing.
+  final Map<String, RsvpAnswer?> myRsvps;
 
   static const previewCount = 3;
 
@@ -37,7 +44,7 @@ class UpcomingMatchesSection extends StatelessWidget {
             Expanded(
               child: Text(
                 'NEXT MATCHES',
-                style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                style: AppTextStyles.label(color: AppColors.textMuted),
               ),
             ),
             if (canCreateMatch)
@@ -45,14 +52,14 @@ class UpcomingMatchesSection extends StatelessWidget {
                 onPressed: onCreateMatch,
                 style: TextButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.bg,
+                  foregroundColor: AppColors.onDark,
                   shape: const StadiumBorder(),
                   padding: const EdgeInsets.symmetric(horizontal: 15),
                   minimumSize: const Size(0, 32),
                 ),
                 child: Text(
                   '+ New match',
-                  style: AppTextStyles.heading(size: 12, color: AppColors.bg),
+                  style: AppTextStyles.title(size: 12, color: AppColors.onDark),
                 ),
               ),
           ],
@@ -64,11 +71,15 @@ class UpcomingMatchesSection extends StatelessWidget {
           for (final match in preview) ...[
             Material(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: AppRadius.lg,
               child: InkWell(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: AppRadius.lg,
                 onTap: () => onMatchTap(match),
-                child: MatchRow(match: match),
+                child: MatchRow(
+                  match: match,
+                  showMyRsvp: myRsvps.containsKey(match.id),
+                  myRsvp: myRsvps[match.id],
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -103,14 +114,14 @@ class _EmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.neutral100,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.card,
+        borderRadius: AppRadius.lg,
         border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('No upcoming match', style: AppTextStyles.heading(size: 16)),
+          Text('No upcoming match', style: AppTextStyles.title(size: 16)),
           const SizedBox(height: 6),
           Text(
             canCreate
@@ -118,7 +129,7 @@ class _EmptyState extends StatelessWidget {
                 : "Your team's admin hasn't scheduled one yet.",
             style: AppTextStyles.body(
               size: 12.5,
-              color: AppColors.text.withValues(alpha: 0.55),
+              color: AppColors.textMuted,
             ),
           ),
         ],

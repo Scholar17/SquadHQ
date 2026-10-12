@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../bloc/wallet_bloc.dart';
@@ -19,7 +20,7 @@ Future<void> showRemindUnpaidSheet(BuildContext context, {required String matchI
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => _RemindUnpaidSheet(matchId: matchId),
   );
@@ -79,14 +80,14 @@ class _RemindUnpaidSheetState extends State<_RemindUnpaidSheet> {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
             children: [
-              Text('Remind unpaid', style: AppTextStyles.heading(size: 18)),
+              Text('Remind unpaid', style: AppTextStyles.title(size: 18)),
               const SizedBox(height: 4),
               Text(
                 'vs ${walletMatch.match.opponent} · ${formatBaht(split.roundedShare)} each · '
                 'once a day per player',
                 style: AppTextStyles.body(
                   size: 12.5,
-                  color: AppColors.text.withValues(alpha: 0.6),
+                  color: AppColors.textMuted,
                 ),
               ),
               const SizedBox(height: 16),
@@ -100,11 +101,11 @@ class _RemindUnpaidSheetState extends State<_RemindUnpaidSheet> {
                     remindable.isEmpty
                         ? 'Everyone was reminded today'
                         : 'Remind all unpaid (${remindable.length})',
-                    style: AppTextStyles.heading(size: 14, color: AppColors.bg),
+                    style: AppTextStyles.title(size: 14, color: AppColors.onDark),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.bg,
+                    foregroundColor: AppColors.onDark,
                     disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
                     shape: const StadiumBorder(),
                     elevation: 0,
@@ -114,15 +115,15 @@ class _RemindUnpaidSheetState extends State<_RemindUnpaidSheet> {
               const SizedBox(height: 18),
               Text(
                 'OR PICK PLAYERS',
-                style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                style: AppTextStyles.label(color: AppColors.textMuted),
               ),
               const SizedBox(height: 8),
               Material(
-                color: AppColors.neutral100,
+                color: AppColors.card,
                 clipBehavior: Clip.antiAlias,
                 shape: RoundedRectangleBorder(
                   side: BorderSide(color: AppColors.text.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.lg,
                 ),
                 child: Column(
                   children: [
@@ -147,7 +148,7 @@ class _RemindUnpaidSheetState extends State<_RemindUnpaidSheet> {
                                     'Reminded today at ${formatMatchTime(bill.remindedAt[id]!)}',
                                     style: AppTextStyles.body(
                                       size: 11.5,
-                                      color: AppColors.text.withValues(alpha: 0.5),
+                                      color: AppColors.textMuted,
                                     ),
                                   )
                                 : null,
@@ -172,7 +173,7 @@ class _RemindUnpaidSheetState extends State<_RemindUnpaidSheet> {
                   ),
                   child: Text(
                     _picked.isEmpty ? 'Pick players to remind' : 'Remind selected (${_picked.length})',
-                    style: AppTextStyles.heading(size: 14),
+                    style: AppTextStyles.title(size: 14),
                   ),
                 ),
               ),

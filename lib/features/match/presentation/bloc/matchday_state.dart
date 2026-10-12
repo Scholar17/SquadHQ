@@ -19,8 +19,7 @@ final class MatchdayLoaded extends MatchdayState {
 
   final List<MatchdayPlayer> players;
 
-  int countOf(RsvpAnswer? answer) =>
-      players.where((player) => player.answer == answer).length;
+  int countOf(RsvpAnswer? answer) => players.where((player) => player.answer == answer).length;
 
   @override
   List<Object?> get props => [players];

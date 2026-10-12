@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_history.dart';
@@ -62,7 +63,7 @@ class _MatchHistoryPageState extends State<MatchHistoryPage> {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Match history', style: AppTextStyles.heading(size: 16)),
+        title: Text('Match history', style: AppTextStyles.title(size: 16)),
       ),
       body: BlocConsumer<MatchHistoryBloc, MatchHistoryState>(
         listenWhen: (previous, current) => current is MatchHistoryFailure,
@@ -87,7 +88,7 @@ class _MatchHistoryPageState extends State<MatchHistoryPage> {
                   textAlign: TextAlign.center,
                   style: AppTextStyles.body(
                     size: 13.5,
-                    color: AppColors.text.withValues(alpha: 0.6),
+                    color: AppColors.textMuted,
                     height: 1.5,
                   ),
                 ),
@@ -111,7 +112,7 @@ class _MatchHistoryPageState extends State<MatchHistoryPage> {
                       padding: EdgeInsets.only(top: index == 0 ? 8 : 18, bottom: 10),
                       child: Text(
                         _monthLabel(pastMatch.match.kickoffAt),
-                        style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                        style: AppTextStyles.label(color: AppColors.textMuted),
                       ),
                     )
                   else
@@ -174,15 +175,15 @@ class _HistoryRow extends StatelessWidget {
     ];
     final details = [?match.venue, '${pastMatch.playedIds.length} played'].join(' · ');
     return Material(
-      color: AppColors.neutral100,
-      borderRadius: BorderRadius.circular(18),
+      color: AppColors.card,
+      borderRadius: AppRadius.lg,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.lg,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: AppRadius.lg,
             border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
           ),
           child: Row(
@@ -192,7 +193,7 @@ class _HistoryRow extends StatelessWidget {
                 height: 54,
                 decoration: BoxDecoration(
                   color: AppColors.neutral900,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: AppRadius.md,
                 ),
                 alignment: Alignment.center,
                 child: Column(
@@ -200,14 +201,14 @@ class _HistoryRow extends StatelessWidget {
                   children: [
                     Text(
                       '${local.day}',
-                      style: AppTextStyles.heading(size: 18, color: AppColors.teamGold),
+                      style: AppTextStyles.title(size: 18, color: AppColors.teamGold),
                     ),
                     Text(
                       monthNames[local.month - 1].toUpperCase(),
                       style: AppTextStyles.body(
                         size: 10,
                         weight: FontWeight.w700,
-                        color: AppColors.neutral100.withValues(alpha: 0.7),
+                        color: AppColors.onDark.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -221,7 +222,7 @@ class _HistoryRow extends StatelessWidget {
                     Text(
                       'vs ${match.opponent}',
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.heading(size: 15),
+                      style: AppTextStyles.title(size: 15),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -229,7 +230,7 @@ class _HistoryRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(
                         size: 12,
-                        color: AppColors.text.withValues(alpha: 0.55),
+                        color: AppColors.textMuted,
                       ),
                     ),
                     if (winners.isNotEmpty) ...[
@@ -264,7 +265,7 @@ class _HistoryRow extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 11.5,
                     weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.4),
+                    color: AppColors.textMuted,
                   ),
                 ),
               const SizedBox(width: 4),
@@ -292,7 +293,7 @@ class ResultScore extends StatelessWidget {
       children: [
         ResultBadge(result: result),
         const SizedBox(height: 4),
-        Text('${match.ourScore}–${match.theirScore}', style: AppTextStyles.heading(size: 14)),
+        Text('${match.ourScore}–${match.theirScore}', style: AppTextStyles.title(size: 14)),
       ],
     );
   }

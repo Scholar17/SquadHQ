@@ -6,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/money_input_formatter.dart';
+import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../domain/entities/bill_split.dart';
 import '../../domain/entities/team_wallet.dart';
 import '../../domain/usecases/get_my_wallet_qr.dart';
@@ -40,7 +43,9 @@ Future<void> showBillSheet(
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: const Text('Add your wallet QR in Profile first — teammates need it to pay you back.'),
+          content: const Text(
+            'Add your wallet QR in Profile first — teammates need it to pay you back.',
+          ),
           action: SnackBarAction(
             label: 'Profile',
             onPressed: () => GoRouter.of(context).push(AppRoutes.profile),
@@ -53,9 +58,7 @@ Future<void> showBillSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
     builder: (_) => _BillSheet(matchId: matchId, userId: userId),
   );
 }
@@ -92,17 +95,17 @@ class _BillSheetState extends State<_BillSheet> {
   bool get _isValid => _total != null && (_mode != SplitMode.custom || _picked.isNotEmpty);
 
   BillSplit get _preview => BillSplit.compute(
-        bill: MatchBill(
-          totalCost: _total ?? 0,
-          payerId: widget.userId,
-          payerName: '',
-          splitMode: _mode,
-          customMemberIds: _picked,
-          payments: _existing?.payments ?? const {},
-        ),
-        members: _wallet.members,
-        answers: _walletMatch?.answers ?? const {},
-      );
+    bill: MatchBill(
+      totalCost: _total ?? 0,
+      payerId: widget.userId,
+      payerName: '',
+      splitMode: _mode,
+      customMemberIds: _picked,
+      payments: _existing?.payments ?? const {},
+    ),
+    members: _wallet.members,
+    answers: _walletMatch?.answers ?? const {},
+  );
 
   @override
   void dispose() {
@@ -114,13 +117,13 @@ class _BillSheetState extends State<_BillSheet> {
     final total = _total;
     if (!_isValid || total == null) return;
     context.read<WalletBloc>().add(
-          WalletBillSaveRequested(
-            matchId: widget.matchId,
-            totalCost: total,
-            splitMode: _mode,
-            memberIds: _mode == SplitMode.custom ? {..._picked} : const {},
-          ),
-        );
+      WalletBillSaveRequested(
+        matchId: widget.matchId,
+        totalCost: total,
+        splitMode: _mode,
+        memberIds: _mode == SplitMode.custom ? {..._picked} : const {},
+      ),
+    );
   }
 
   @override
@@ -139,155 +142,136 @@ class _BillSheetState extends State<_BillSheet> {
         }
         Navigator.of(context).pop();
       },
-      child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(20),
+      child: StickyActionSheet(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        maxHeightFactor: 0.85,
+        children: [
+          Text(
+            _existing == null ? 'Add total cost' : 'Edit bill',
+            style: AppTextStyles.title(size: 18),
+          ),
+          if (match != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'vs ${match.opponent}',
+              style: AppTextStyles.body(
+                size: 13,
+                weight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 50,
+            child: TextField(
+              controller: _totalController,
+              onChanged: (_) => setState(() {}),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: const [MoneyInputFormatter()],
+              decoration: InputDecoration(
+                hintText: 'Total cost you paid',
+                prefixText: '฿ ',
+                filled: true,
+                fillColor: AppColors.card,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+                border: OutlineInputBorder(
+                  borderRadius: AppRadius.pill,
+                  borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('SPLIT BETWEEN', style: AppTextStyles.label(color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Text(
-                _existing == null ? 'Add total cost' : 'Edit bill',
-                style: AppTextStyles.heading(size: 18),
-              ),
-              if (match != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'vs ${match.opponent}',
-                  style: AppTextStyles.body(
-                    size: 13,
-                    weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.55),
+              for (final mode in SplitMode.values)
+                ChoiceChip(
+                  label: Text(splitModeLabel(mode)),
+                  selected: _mode == mode,
+                  onSelected: (_) => setState(() => _mode = mode),
+                  selectedColor: AppColors.neutral900,
+                  labelStyle: AppTextStyles.body(
+                    size: 12.5,
+                    weight: FontWeight.w700,
+                    color: _mode == mode ? AppColors.onDark : AppColors.text,
                   ),
+                  showCheckmark: false,
+                  shape: const StadiumBorder(),
                 ),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 50,
-                child: TextField(
-                  controller: _totalController,
-                  onChanged: (_) => setState(() {}),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-                  decoration: InputDecoration(
-                    hintText: 'Total cost you paid',
-                    prefixText: '฿ ',
-                    filled: true,
-                    fillColor: AppColors.neutral100,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
-                    ),
-                  ),
-                ),
+            ],
+          ),
+          if (_mode == SplitMode.custom) ...[
+            const SizedBox(height: 10),
+            // A Material (not a decorated Container) so the list tiles'
+            // tap ripples paint on it rather than underneath.
+            Material(
+              color: AppColors.card,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: AppColors.text.withValues(alpha: 0.1)),
+                borderRadius: AppRadius.lg,
               ),
-              const SizedBox(height: 18),
-              Text(
-                'SPLIT BETWEEN',
-                style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              child: Column(
                 children: [
-                  for (final mode in SplitMode.values)
-                    ChoiceChip(
-                      label: Text(splitModeLabel(mode)),
-                      selected: _mode == mode,
-                      onSelected: (_) => setState(() => _mode = mode),
-                      selectedColor: AppColors.neutral900,
-                      labelStyle: AppTextStyles.body(
-                        size: 12.5,
-                        weight: FontWeight.w700,
-                        color: _mode == mode ? AppColors.neutral100 : AppColors.text,
+                  for (final member in _wallet.members)
+                    CheckboxListTile(
+                      value: _picked.contains(member.profileId),
+                      onChanged: (checked) => setState(() {
+                        checked == true
+                            ? _picked.add(member.profileId)
+                            : _picked.remove(member.profileId);
+                      }),
+                      title: Text(
+                        member.profileId == widget.userId ? '${member.name} (you)' : member.name,
+                        style: AppTextStyles.body(size: 13, weight: FontWeight.w700),
                       ),
-                      showCheckmark: false,
-                      shape: const StadiumBorder(),
+                      activeColor: AppColors.accent,
+                      dense: true,
                     ),
                 ],
               ),
-              if (_mode == SplitMode.custom) ...[
-                const SizedBox(height: 10),
-                // A Material (not a decorated Container) so the list tiles'
-                // tap ripples paint on it rather than underneath.
-                Material(
-                  color: AppColors.neutral100,
-                  clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(color: AppColors.text.withValues(alpha: 0.1)),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    children: [
-                      for (final member in _wallet.members)
-                        CheckboxListTile(
-                          value: _picked.contains(member.profileId),
-                          onChanged: (checked) => setState(() {
-                            checked == true
-                                ? _picked.add(member.profileId)
-                                : _picked.remove(member.profileId);
-                          }),
-                          title: Text(
-                            member.profileId == widget.userId ? '${member.name} (you)' : member.name,
-                            style: AppTextStyles.body(size: 13, weight: FontWeight.w700),
-                          ),
-                          activeColor: AppColors.accent,
-                          dense: true,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              _SplitPreview(split: preview, mode: _mode, hasTotal: _total != null),
-              const SizedBox(height: 12),
-              Text(
-                "You'll be shown as the one who paid, with your wallet QR from "
-                'your profile. Only you can change this bill after saving.',
-                style: AppTextStyles.body(
-                  size: 11.5,
-                  color: AppColors.text.withValues(alpha: 0.55),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              BlocBuilder<WalletBloc, WalletState>(
-                builder: (context, state) {
-                  final isSubmitting = state is WalletSubmitting;
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting || !_isValid ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.bg,
-                        disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: AppColors.bg,
-                              ),
-                            )
-                          : Text(
-                              'Save bill',
-                              style: AppTextStyles.heading(size: 14, color: AppColors.bg),
-                            ),
-                    ),
-                  );
-                },
-              ),
-            ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text(
+            "You'll be shown as the one who paid, with your wallet QR from "
+            'your profile. Only you can change this bill after saving.',
+            style: AppTextStyles.body(size: 11.5, color: AppColors.textMuted, height: 1.5),
           ),
+        ],
+        // Each share updates as the total and split change, in view
+        // even with the player list open.
+        summary: _SplitPreview(split: preview, mode: _mode, hasTotal: _total != null),
+        action: BlocBuilder<WalletBloc, WalletState>(
+          builder: (context, state) {
+            final isSubmitting = state is WalletSubmitting;
+            return SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: isSubmitting || !_isValid ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onDark,
+                  disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                      )
+                    : Text('Save bill', style: AppTextStyles.title(size: 14, color: AppColors.onDark)),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -317,18 +301,15 @@ class _SplitPreview extends StatelessWidget {
       message = '';
     }
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
       child: message.isNotEmpty
           ? Text(
               message,
               style: AppTextStyles.body(
                 size: 12.5,
                 weight: FontWeight.w500,
-                color: AppColors.text.withValues(alpha: 0.6),
+                color: AppColors.textMuted,
               ),
             )
           : Row(
@@ -340,7 +321,7 @@ class _SplitPreview extends StatelessWidget {
                     style: AppTextStyles.body(
                       size: 12.5,
                       weight: FontWeight.w600,
-                      color: AppColors.text.withValues(alpha: 0.6),
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -374,7 +355,10 @@ class ShareAmount extends StatelessWidget {
       crossAxisAlignment: crossAxisAlignment,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(formatBaht(split.roundedShare), style: AppTextStyles.heading(size: size, color: color)),
+        Text(
+          formatBaht(split.roundedShare),
+          style: AppTextStyles.heading(size: size, color: color),
+        ),
         Text(
           'exact ${formatBahtExact(split.exactShare)}',
           style: AppTextStyles.body(

@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../domain/entities/match.dart' as match_entity;
 import '../bloc/match_bloc.dart';
 import '../bloc/match_event.dart';
@@ -18,9 +20,7 @@ Future<void> showCreateMatchSheet(BuildContext context, {required String teamId}
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
     builder: (_) => _MatchFormSheet(teamId: teamId),
   );
 }
@@ -33,9 +33,7 @@ Future<void> showEditMatchSheet(BuildContext context, {required match_entity.Mat
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
     builder: (_) => _MatchFormSheet(teamId: match.teamId, initial: match),
   );
 }
@@ -203,119 +201,108 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
           Navigator.of(context).pop();
         }
       },
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
-        // Scrolls when the keyboard leaves too little room.
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_isEditing ? 'Edit match' : 'New match', style: AppTextStyles.heading(size: 18)),
-              const SizedBox(height: 16),
-              _Field(controller: _opponentController, hintText: 'Opponent'),
-              const SizedBox(height: 10),
-              InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: _pickKickoff,
-                child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  alignment: Alignment.centerLeft,
-                  decoration: BoxDecoration(
-                    color: AppColors.neutral100,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: _kickoffAt != null && !_kickoffInFuture
-                          ? AppColors.accent700
-                          : AppColors.text.withValues(alpha: 0.16),
-                    ),
-                  ),
-                  child: Text(
-                    _kickoffAt == null ? 'Date & time' : formatMatchDateTime(_kickoffAt!),
-                    style: AppTextStyles.body(
-                      size: 14,
-                      weight: FontWeight.w600,
-                      color: _kickoffAt == null
-                          ? AppColors.text.withValues(alpha: 0.4)
-                          : AppColors.text,
-                    ),
-                  ),
+      // The fields scroll when the keyboard leaves too little room; the
+      // button stays pinned above it.
+      child: StickyActionSheet(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        children: [
+          Text(_isEditing ? 'Edit match' : 'New match', style: AppTextStyles.title(size: 18)),
+          const SizedBox(height: 16),
+          _Field(controller: _opponentController, hintText: 'Opponent'),
+          const SizedBox(height: 10),
+          InkWell(
+            borderRadius: AppRadius.pill,
+            onTap: _pickKickoff,
+            child: Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: AppRadius.pill,
+                border: Border.all(
+                  color: _kickoffAt != null && !_kickoffInFuture
+                      ? AppColors.accent700
+                      : AppColors.text.withValues(alpha: 0.16),
                 ),
               ),
-              if (_kickoffAt != null && !_kickoffInFuture)
-                Padding(
-                  padding: const EdgeInsets.only(left: 18, top: 4),
-                  child: Text(
-                    'Kick-off must be later than now — check AM / PM.',
-                    style: AppTextStyles.body(size: 11.5, color: AppColors.accent700),
-                  ),
+              child: Text(
+                _kickoffAt == null ? 'Date & time' : formatMatchDateTime(_kickoffAt!),
+                style: AppTextStyles.body(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: _kickoffAt == null ? AppColors.textMuted : AppColors.text,
                 ),
-              const SizedBox(height: 10),
-              _Field(controller: _venueController, hintText: 'Venue (optional)'),
-              const SizedBox(height: 10),
-              _StepperField(
-                label: 'Play time',
-                unit: 'hr',
-                controller: _playTimeController,
-                decimal: true,
-                isValid: _playHours != null,
-                errorText: 'Enter between 0.25 and 12 hours',
-                minusTooltip: 'Half an hour less',
-                plusTooltip: 'Half an hour more',
-                onChanged: () => setState(() {}),
-                onMinus: () => _stepPlayTime(-_stepHours),
-                onPlus: () => _stepPlayTime(_stepHours),
               ),
-              const SizedBox(height: 10),
-              _StepperField(
-                label: 'Players needed',
-                unit: '',
-                hintText: 'optional',
-                controller: _playersNeededController,
-                isValid: _playersNeededValid,
-                errorText: 'Enter between $_minPlayers and $_maxPlayers players, or leave it blank',
-                minusTooltip: 'One player fewer',
-                plusTooltip: 'One player more',
-                onChanged: () => setState(() {}),
-                onMinus: () => _stepPlayers(-1),
-                onPlus: () => _stepPlayers(1),
-              ),
-              const SizedBox(height: 18),
-              BlocBuilder<MatchBloc, MatchState>(
-                builder: (context, state) {
-                  final isSubmitting = state is MatchSubmitting;
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.bg,
-                        disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: AppColors.bg,
-                              ),
-                            )
-                          : Text(
-                              _isEditing ? 'Save changes' : 'Create match',
-                              style: AppTextStyles.heading(size: 14, color: AppColors.bg),
-                            ),
-                    ),
-                  );
-                },
-              ),
-            ],
+            ),
           ),
+          if (_kickoffAt != null && !_kickoffInFuture)
+            Padding(
+              padding: const EdgeInsets.only(left: 18, top: 4),
+              child: Text(
+                'Kick-off must be later than now — check AM / PM.',
+                style: AppTextStyles.body(size: 11.5, color: AppColors.accent700),
+              ),
+            ),
+          const SizedBox(height: 10),
+          _Field(controller: _venueController, hintText: 'Venue (optional)'),
+          const SizedBox(height: 10),
+          _StepperField(
+            label: 'Play time',
+            unit: 'hr',
+            controller: _playTimeController,
+            decimal: true,
+            isValid: _playHours != null,
+            errorText: 'Enter between 0.25 and 12 hours',
+            minusTooltip: 'Half an hour less',
+            plusTooltip: 'Half an hour more',
+            onChanged: () => setState(() {}),
+            onMinus: () => _stepPlayTime(-_stepHours),
+            onPlus: () => _stepPlayTime(_stepHours),
+          ),
+          const SizedBox(height: 10),
+          _StepperField(
+            label: 'Players needed',
+            unit: '',
+            hintText: 'optional',
+            controller: _playersNeededController,
+            isValid: _playersNeededValid,
+            errorText: 'Enter between $_minPlayers and $_maxPlayers players, or leave it blank',
+            minusTooltip: 'One player fewer',
+            plusTooltip: 'One player more',
+            onChanged: () => setState(() {}),
+            onMinus: () => _stepPlayers(-1),
+            onPlus: () => _stepPlayers(1),
+          ),
+        ],
+        action: BlocBuilder<MatchBloc, MatchState>(
+          builder: (context, state) {
+            final isSubmitting = state is MatchSubmitting;
+            return SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: isSubmitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onDark,
+                  disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                      )
+                    : Text(
+                        _isEditing ? 'Save changes' : 'Create match',
+                        style: AppTextStyles.title(size: 14, color: AppColors.onDark),
+                      ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -337,10 +324,10 @@ class _Field extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hintText,
           filled: true,
-          fillColor: AppColors.neutral100,
+          fillColor: AppColors.card,
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: AppRadius.pill,
             borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
           ),
         ),
@@ -389,8 +376,8 @@ class _StepperField extends StatelessWidget {
           height: 50,
           padding: const EdgeInsets.only(left: 18, right: 4),
           decoration: BoxDecoration(
-            color: AppColors.neutral100,
-            borderRadius: BorderRadius.circular(999),
+            color: AppColors.card,
+            borderRadius: AppRadius.pill,
             border: Border.all(
               color: isValid ? AppColors.text.withValues(alpha: 0.16) : AppColors.accent700,
             ),
@@ -402,7 +389,7 @@ class _StepperField extends StatelessWidget {
                 style: AppTextStyles.body(
                   size: 14,
                   weight: FontWeight.w600,
-                  color: AppColors.text.withValues(alpha: 0.6),
+                  color: AppColors.textMuted,
                 ),
               ),
               const Spacer(),
@@ -421,16 +408,13 @@ class _StepperField extends StatelessWidget {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(decimal ? r'[\d.]' : r'\d')),
                   ],
-                  style: AppTextStyles.heading(size: 16),
+                  style: AppTextStyles.title(size: 16),
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                     hintText: hintText,
-                    hintStyle: AppTextStyles.body(
-                      size: 12,
-                      color: AppColors.text.withValues(alpha: 0.4),
-                    ),
+                    hintStyle: AppTextStyles.body(size: 12, color: AppColors.textMuted),
                   ),
                 ),
               ),

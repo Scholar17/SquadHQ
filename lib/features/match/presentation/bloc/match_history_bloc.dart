@@ -108,12 +108,11 @@ final class MatchHistoryFailure extends MatchHistoryState {
 extension MatchHistoryStateX on MatchHistoryState {
   /// Unwraps Submitting/Failure — those never nest (see MatchHistoryBloc).
   MatchHistory? get history => switch (this) {
-        MatchHistoryLoaded(:final history) => history,
-        MatchHistorySubmitting(:final previous) ||
-        MatchHistoryFailure(:final previous) =>
-          previous.history,
-        MatchHistoryLoading() => null,
-      };
+    MatchHistoryLoaded(:final history) => history,
+    MatchHistorySubmitting(:final previous) ||
+    MatchHistoryFailure(:final previous) => previous.history,
+    MatchHistoryLoading() => null,
+  };
 }
 
 /// Singleton, provided at the app root (see app.dart) like MatchBloc — the
@@ -126,10 +125,10 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     required SetMatchScore setMatchScore,
     required VoteMotm voteMotm,
     required TeamChanges teamChanges,
-  })  : _getMatchHistory = getMatchHistory,
-        _setMatchScore = setMatchScore,
-        _voteMotm = voteMotm,
-        super(const MatchHistoryLoading()) {
+  }) : _getMatchHistory = getMatchHistory,
+       _setMatchScore = setMatchScore,
+       _voteMotm = voteMotm,
+       super(const MatchHistoryLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {
@@ -171,19 +170,16 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     }
     final result = await _getMatchHistory(teamId);
     result.fold(
-      (failure) => emit(
-        MatchHistoryFailure(failure.message, const MatchHistoryLoaded(MatchHistory())),
-      ),
+      (failure) =>
+          emit(MatchHistoryFailure(failure.message, const MatchHistoryLoaded(MatchHistory()))),
       (history) => emit(MatchHistoryLoaded(history)),
     );
   }
 
   MatchHistoryState get _fallback => switch (state) {
-        MatchHistorySubmitting(:final previous) ||
-        MatchHistoryFailure(:final previous) =>
-          previous,
-        final settled => settled,
-      };
+    MatchHistorySubmitting(:final previous) || MatchHistoryFailure(:final previous) => previous,
+    final settled => settled,
+  };
 
   Future<void> _onTeamSelected(
     MatchHistoryTeamSelected event,
@@ -195,10 +191,7 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     await _reload(emit);
   }
 
-  Future<void> _onStarted(
-    MatchHistoryStarted event,
-    Emitter<MatchHistoryState> emit,
-  ) async {
+  Future<void> _onStarted(MatchHistoryStarted event, Emitter<MatchHistoryState> emit) async {
     try {
       if (state.history == null) emit(const MatchHistoryLoading());
       await _reload(emit);
@@ -207,10 +200,7 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     }
   }
 
-  Future<void> _onScoreSubmitted(
-    MatchScoreSubmitted event,
-    Emitter<MatchHistoryState> emit,
-  ) async {
+  Future<void> _onScoreSubmitted(MatchScoreSubmitted event, Emitter<MatchHistoryState> emit) async {
     final fallback = _fallback;
     emit(MatchHistorySubmitting(fallback));
     final result = await _setMatchScore(

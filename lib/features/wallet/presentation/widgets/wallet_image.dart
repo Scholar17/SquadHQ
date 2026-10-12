@@ -70,7 +70,7 @@ class _ImageUnavailable extends StatelessWidget {
     return Center(
       child: Text(
         "Couldn't load image",
-        style: AppTextStyles.body(size: 12, color: AppColors.text.withValues(alpha: 0.5)),
+        style: AppTextStyles.body(size: 12, color: AppColors.textMuted),
       ),
     );
   }
@@ -96,12 +96,12 @@ Future<void> showWalletImageViewer(
                 Expanded(
                   child: Text(
                     title,
-                    style: AppTextStyles.heading(size: 16, color: AppColors.neutral100),
+                    style: AppTextStyles.title(size: 16, color: AppColors.onDark),
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
-                  icon: const Icon(Icons.close_rounded, color: AppColors.neutral100),
+                  icon: const Icon(Icons.close_rounded, color: AppColors.onDark),
                   tooltip: 'Close',
                 ),
               ],

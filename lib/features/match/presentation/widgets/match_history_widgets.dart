@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/matchday_player.dart';
@@ -23,7 +24,7 @@ class ResultBadge extends StatelessWidget {
       width: large ? 30 : 22,
       height: large ? 30 : 22,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: color, borderRadius: AppRadius.xs),
       child: Text(
         label,
         semanticsLabel: switch (result) {
@@ -34,7 +35,7 @@ class ResultBadge extends StatelessWidget {
         style: AppTextStyles.body(
           size: large ? 14 : 11,
           weight: FontWeight.w900,
-          color: AppColors.neutral100,
+          color: AppColors.onDark,
           height: 1,
         ),
       ),
@@ -68,7 +69,7 @@ class PlayerAvatar extends StatelessWidget {
         style: AppTextStyles.body(
           size: radius * 0.72,
           weight: FontWeight.w800,
-          color: AppColors.neutral100,
+          color: AppColors.onDark,
           height: 1,
         ),
       ),

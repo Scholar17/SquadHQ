@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/repositories/wallet_repository.dart';
@@ -26,7 +27,7 @@ Future<void> showPayBillSheet(
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => _PayBillSheet(matchId: matchId, userId: userId),
   );
@@ -39,7 +40,7 @@ class _PayBillSheet extends StatelessWidget {
   final String userId;
 
   Future<void> _uploadSlip(BuildContext context) async {
-    final picked = await pickWalletImage();
+    final picked = await pickWalletImage(slip: true);
     if (picked == null || !context.mounted) return;
     context.read<WalletBloc>().add(
           WalletPaymentSubmitted(
@@ -99,7 +100,7 @@ class _PayBillSheet extends StatelessWidget {
                 style: AppTextStyles.body(
                   size: 12.5,
                   weight: FontWeight.w500,
-                  color: AppColors.text.withValues(alpha: 0.6),
+                  color: AppColors.textMuted,
                 ),
               ),
               const SizedBox(height: 14),
@@ -117,7 +118,7 @@ class _PayBillSheet extends StatelessWidget {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: AppRadius.lg,
                   ),
                   child: Text(
                     "${bill.payerName} hasn't added a wallet QR to their profile yet. "
@@ -125,7 +126,7 @@ class _PayBillSheet extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: AppTextStyles.body(
                       size: 12.5,
-                      color: AppColors.text.withValues(alpha: 0.65),
+                      color: AppColors.textSubtle,
                       height: 1.5,
                     ),
                   ),
@@ -145,7 +146,7 @@ class _PayBillSheet extends StatelessWidget {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: AppRadius.lg,
                         border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
                       ),
                       child: WalletImage(kind: WalletImageKind.walletQr, path: qrPath),
@@ -157,7 +158,7 @@ class _PayBillSheet extends StatelessWidget {
                   child: TextButton.icon(
                     onPressed: () => saveWalletQr(context, qrPath),
                     icon: const Icon(Icons.download_rounded, size: 18),
-                    label: Text('Save QR', style: AppTextStyles.heading(size: 13)),
+                    label: Text('Save QR', style: AppTextStyles.title(size: 13, color: AppColors.text)),
                     style: TextButton.styleFrom(foregroundColor: AppColors.text),
                   ),
                 ),
@@ -168,11 +169,11 @@ class _PayBillSheet extends StatelessWidget {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AppColors.accent2_100,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: AppRadius.lg,
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, color: AppColors.accent2_700),
+                      Icon(Icons.check_circle_rounded, color: AppColors.accent2_700),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -193,7 +194,7 @@ class _PayBillSheet extends StatelessWidget {
                         ),
                         child: Text(
                           'View slip',
-                          style: AppTextStyles.heading(size: 12, color: AppColors.accent2_900),
+                          style: AppTextStyles.title(size: 12, color: AppColors.accent2_900),
                         ),
                       ),
                     ],
@@ -213,17 +214,17 @@ class _PayBillSheet extends StatelessWidget {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  color: AppColors.bg,
+                                  color: AppColors.onDark,
                                 ),
                               )
                             : const Icon(Icons.upload_rounded),
                         label: Text(
                           "I've paid — upload slip",
-                          style: AppTextStyles.heading(size: 14, color: AppColors.bg),
+                          style: AppTextStyles.title(size: 14, color: AppColors.onDark),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.bg,
+                          foregroundColor: AppColors.onDark,
                           disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
                           shape: const StadiumBorder(),
                           elevation: 0,
@@ -236,7 +237,7 @@ class _PayBillSheet extends StatelessWidget {
                           side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
                           shape: const StadiumBorder(),
                         ),
-                        child: Text('Replace slip', style: AppTextStyles.heading(size: 14)),
+                        child: Text('Replace slip', style: AppTextStyles.title(size: 14)),
                       ),
               ),
               const SizedBox(height: 10),
@@ -246,7 +247,7 @@ class _PayBillSheet extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: AppTextStyles.body(
                   size: 11.5,
-                  color: AppColors.text.withValues(alpha: 0.5),
+                  color: AppColors.textMuted,
                 ),
               ),
             ],

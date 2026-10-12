@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/app_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/match.dart' as match_entity;
 import '../bloc/match_bloc.dart';
@@ -60,7 +61,7 @@ class MatchListPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Upcoming matches', style: AppTextStyles.heading(size: 16)),
+        title: Text('Upcoming matches', style: AppTextStyles.title(size: 16)),
       ),
       body: SafeArea(
         child: BlocBuilder<MatchBloc, MatchState>(
@@ -77,7 +78,7 @@ class MatchListPage extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: AppTextStyles.body(
                       size: 13.5,
-                      color: AppColors.text.withValues(alpha: 0.6),
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -90,7 +91,7 @@ class MatchListPage extends StatelessWidget {
                 for (final entry in groups.entries) ...[
                   Text(
                     formatMatchDate(entry.value.first.kickoffAt).toUpperCase(),
-                    style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                    style: AppTextStyles.label(color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 10),
                   for (final match in entry.value) ...[
@@ -99,9 +100,9 @@ class MatchListPage extends StatelessWidget {
                       children: [
                         Material(
                           color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: AppRadius.lg,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: AppRadius.lg,
                             onTap: () => context.push(
                               AppRoutes.upcomingMatch,
                               extra: UpcomingMatchArgs(
@@ -122,14 +123,14 @@ class MatchListPage extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.accent,
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: AppRadius.pill,
                               ),
                               child: Text(
                                 'NEXT',
                                 style: AppTextStyles.body(
                                   size: 10,
                                   weight: FontWeight.w800,
-                                  color: AppColors.neutral100,
+                                  color: AppColors.onDark,
                                 ),
                               ),
                             ),
@@ -148,12 +149,12 @@ class MatchListPage extends StatelessWidget {
       floatingActionButton: canCreateMatch
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.bg,
+              foregroundColor: AppColors.onDark,
               onPressed: () => showCreateMatchSheet(context, teamId: activeTeamId),
               icon: const Icon(Icons.add),
               label: Text(
                 'New match',
-                style: AppTextStyles.heading(size: 13, color: AppColors.bg),
+                style: AppTextStyles.title(size: 13, color: AppColors.onDark),
               ),
             )
           : null,

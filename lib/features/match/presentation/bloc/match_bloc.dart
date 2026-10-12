@@ -20,12 +20,12 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     required DeleteMatch deleteMatch,
     required NudgeMatchRsvp nudgeMatchRsvp,
     required TeamChanges teamChanges,
-  })  : _nudgeMatchRsvp = nudgeMatchRsvp,
-        _getUpcomingMatches = getUpcomingMatches,
-        _createMatch = createMatch,
-        _updateMatch = updateMatch,
-        _deleteMatch = deleteMatch,
-        super(const MatchLoading()) {
+  }) : _nudgeMatchRsvp = nudgeMatchRsvp,
+       _getUpcomingMatches = getUpcomingMatches,
+       _createMatch = createMatch,
+       _updateMatch = updateMatch,
+       _deleteMatch = deleteMatch,
+       super(const MatchLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {TeamTable.matches},
@@ -34,7 +34,13 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
       },
     );
     on<MatchTeamSelected>(_onTeamSelected);
-    on<MatchRefreshRequested>((event, emit) => _reload(emit));
+    on<MatchRefreshRequested>((event, emit) async {
+      try {
+        await _reload(emit);
+      } finally {
+        event.done?.complete();
+      }
+    });
     on<MatchCreateRequested>(_onCreateRequested);
     on<MatchUpdateRequested>(_onUpdateRequested);
     on<MatchDeleteRequested>(_onDeleteRequested);
@@ -71,20 +77,14 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     );
   }
 
-  Future<void> _onTeamSelected(
-    MatchTeamSelected event,
-    Emitter<MatchState> emit,
-  ) async {
+  Future<void> _onTeamSelected(MatchTeamSelected event, Emitter<MatchState> emit) async {
     _serverChanges.watch(event.teamId);
     _teamId = event.teamId;
     emit(const MatchLoading());
     await _reload(emit);
   }
 
-  Future<void> _onCreateRequested(
-    MatchCreateRequested event,
-    Emitter<MatchState> emit,
-  ) async {
+  Future<void> _onCreateRequested(MatchCreateRequested event, Emitter<MatchState> emit) async {
     final fallback = state;
     emit(MatchSubmitting(fallback));
     final result = await _createMatch(
@@ -103,10 +103,7 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     );
   }
 
-  Future<void> _onUpdateRequested(
-    MatchUpdateRequested event,
-    Emitter<MatchState> emit,
-  ) async {
+  Future<void> _onUpdateRequested(MatchUpdateRequested event, Emitter<MatchState> emit) async {
     final fallback = state;
     emit(MatchSubmitting(fallback));
     final result = await _updateMatch(
@@ -125,10 +122,7 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     );
   }
 
-  Future<void> _onDeleteRequested(
-    MatchDeleteRequested event,
-    Emitter<MatchState> emit,
-  ) async {
+  Future<void> _onDeleteRequested(MatchDeleteRequested event, Emitter<MatchState> emit) async {
     final fallback = state;
     emit(MatchSubmitting(fallback));
     final result = await _deleteMatch(event.matchId);
@@ -138,10 +132,7 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     );
   }
 
-  Future<void> _onNudgeRequested(
-    MatchNudgeRequested event,
-    Emitter<MatchState> emit,
-  ) async {
+  Future<void> _onNudgeRequested(MatchNudgeRequested event, Emitter<MatchState> emit) async {
     final fallback = state;
     emit(MatchSubmitting(fallback));
     final result = await _nudgeMatchRsvp(event.matchId);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/entities/bill_split.dart';
@@ -31,7 +32,7 @@ Future<void> showBillDetailsSheet(
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => BlocBuilder<WalletBloc, WalletState>(
       builder: (context, state) {
@@ -57,7 +58,7 @@ Future<void> showBillDetailsSheet(
                 style: AppTextStyles.body(
                   size: 12.5,
                   weight: FontWeight.w500,
-                  color: AppColors.text.withValues(alpha: 0.6),
+                  color: AppColors.textMuted,
                 ),
               ),
               const SizedBox(height: 16),
@@ -76,7 +77,7 @@ Future<void> showBillDetailsSheet(
                           '${splitModeLabel(bill.splitMode)} · ${split.shares.length}',
                           style: AppTextStyles.body(
                             size: 12,
-                            color: AppColors.text.withValues(alpha: 0.55),
+                            color: AppColors.textMuted,
                           ),
                         ),
                       ],
@@ -88,9 +89,9 @@ Future<void> showBillDetailsSheet(
               const SizedBox(height: 16),
               Container(
                 decoration: BoxDecoration(
-                  color: AppColors.neutral100,
+                  color: AppColors.card,
                   border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.lg,
                 ),
                 child: Column(
                   children: [
@@ -108,7 +109,7 @@ Future<void> showBillDetailsSheet(
                           'No players in this split yet.',
                           style: AppTextStyles.body(
                             size: 12.5,
-                            color: AppColors.text.withValues(alpha: 0.55),
+                            color: AppColors.textMuted,
                           ),
                         ),
                       ),
@@ -130,7 +131,7 @@ Future<void> showBillDetailsSheet(
                       side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
                       shape: const StadiumBorder(),
                     ),
-                    child: Text('Edit bill', style: AppTextStyles.heading(size: 14)),
+                    child: Text('Edit bill', style: AppTextStyles.title(size: 14)),
                   ),
                 ),
               ],
@@ -203,7 +204,7 @@ class _ShareRow extends StatelessWidget {
                 path: payment.slipPath,
                 title: "${share.member.name}'s payment slip",
               ),
-              child: Text('View slip', style: AppTextStyles.heading(size: 12)),
+              child: Text('View slip', style: AppTextStyles.title(size: 12, color: AppColors.text)),
             ),
         ],
       ),
