@@ -2,7 +2,11 @@ import 'package:equatable/equatable.dart';
 
 /// What a notification is about — the `<kind>` prefix of its push key in
 /// supabase/sql/017_pick_unpaid_reminders.sql's due_push_notifications(),
-/// or 024_squads.sql's due_squad_push_notifications().
+/// due_squad_push_notifications() (latest: 028_expense_added.sql), or
+/// due_match_comment_push_notifications() (043_match_comments.sql), or
+/// due_rating_push_notifications() (045_player_ratings.sql), or
+/// due_mention_push_notifications() (049_mentions.sql), or
+/// due_member_removed_push_notifications() (051_leave_and_remove_members.sql).
 enum NotificationKind {
   newMatch('new_match'),
   rsvpNudge('rsvp_nudge'),
@@ -22,6 +26,34 @@ enum NotificationKind {
   settleRejected('settle_rejected'),
   expenseComment('expense_comment'),
   commentReply('comment_reply'),
+  squadReminder('squad_reminder'),
+  monthEnd('month_end'),
+  settleNudge('settle_nudge'),
+  expenseAdded('expense_added'),
+  tripAdded('trip_added'),
+  tripClosed('trip_closed'),
+
+  /// "Settle up for <trip>" — a squad reminder about one trip (035/036).
+  tripReminder('trip_reminder'),
+  monthlyDue('monthly_due'),
+  matchComment('match_comment'),
+  matchReply('match_reply'),
+  billComment('bill_comment'),
+  billReply('bill_reply'),
+  settleRecorded('settle_recorded'),
+  promiseMade('promise_made'),
+  promiseDue('promise_due'),
+  playerRated('player_rated'),
+  ratingImproved('rating_improved'),
+
+  /// "Aung Ko mentioned you" — in a comment on a match, a bill or an
+  /// expense (049).
+  matchMention('match_mention'),
+  billMention('bill_mention'),
+  expenseMention('expense_mention'),
+
+  /// "You were removed from <group>" (051).
+  memberRemoved('member_removed'),
   other('');
 
   const NotificationKind(this.dbName);
@@ -48,6 +80,16 @@ enum NotificationTarget {
 
   /// A squad expense's detail screen (comments and replies).
   expense,
+
+  /// A squad trip's page (you're on it; it closed for settling up).
+  trip,
+
+  /// The team's Squad tab (a teammate rated themselves or levelled up).
+  squad,
+
+  /// The group itself (you were removed from it): Home, in it if you've
+  /// rejoined since.
+  group,
 }
 
 /// One entry in the player's notification list — a push that was sent to
@@ -62,6 +104,7 @@ class AppNotification extends Equatable {
     this.matchId,
     this.expenseId,
     this.teamId,
+    this.tripId,
     this.readAt,
   });
 
@@ -75,38 +118,78 @@ class AppNotification extends Equatable {
   /// The squad expense a comment notification is about.
   final String? expenseId;
   final String? teamId;
+
+  /// The squad trip it's about (034_trip_notifications.sql).
+  final String? tripId;
   final DateTime? readAt;
 
   bool get isRead => readAt != null;
 
+  /// A comment, reply or mention on a football match or its bill.
+  bool get isMatchComment => switch (kind) {
+    NotificationKind.matchComment ||
+    NotificationKind.matchReply ||
+    NotificationKind.matchMention ||
+    NotificationKind.billComment ||
+    NotificationKind.billReply ||
+    NotificationKind.billMention => true,
+    _ => false,
+  };
+
   NotificationTarget get target => switch (kind) {
-        NotificationKind.motmVote || NotificationKind.motmResult => NotificationTarget.pastMatch,
-        NotificationKind.feeDue ||
-        NotificationKind.slip ||
-        NotificationKind.payReminder =>
-          NotificationTarget.wallet,
-        NotificationKind.settlePending ||
-        NotificationKind.settleConfirmed ||
-        NotificationKind.settleRejected =>
-          NotificationTarget.settle,
-        NotificationKind.expenseComment || NotificationKind.commentReply =>
-          NotificationTarget.expense,
-        _ => NotificationTarget.match,
-      };
+    NotificationKind.motmVote || NotificationKind.motmResult => NotificationTarget.pastMatch,
+    NotificationKind.feeDue ||
+    NotificationKind.slip ||
+    NotificationKind.payReminder ||
+    NotificationKind.billComment ||
+    NotificationKind.billReply ||
+    NotificationKind.billMention => NotificationTarget.wallet,
+    NotificationKind.settlePending ||
+    NotificationKind.settleConfirmed ||
+    NotificationKind.settleRejected ||
+    NotificationKind.squadReminder ||
+    NotificationKind.monthEnd ||
+    NotificationKind.settleNudge ||
+    NotificationKind.monthlyDue ||
+    NotificationKind.settleRecorded ||
+    NotificationKind.promiseMade ||
+    NotificationKind.promiseDue => NotificationTarget.settle,
+    NotificationKind.expenseAdded ||
+    NotificationKind.expenseComment ||
+    NotificationKind.commentReply ||
+    NotificationKind.expenseMention => NotificationTarget.expense,
+    NotificationKind.tripAdded ||
+    NotificationKind.tripClosed ||
+    NotificationKind.tripReminder => NotificationTarget.trip,
+    NotificationKind.playerRated || NotificationKind.ratingImproved => NotificationTarget.squad,
+    NotificationKind.memberRemoved => NotificationTarget.group,
+    _ => NotificationTarget.match,
+  };
 
   AppNotification markedRead(DateTime at) => AppNotification(
-        id: id,
-        kind: kind,
-        title: title,
-        body: body,
-        createdAt: createdAt,
-        matchId: matchId,
-        expenseId: expenseId,
-        teamId: teamId,
-        readAt: readAt ?? at,
-      );
+    id: id,
+    kind: kind,
+    title: title,
+    body: body,
+    createdAt: createdAt,
+    matchId: matchId,
+    expenseId: expenseId,
+    teamId: teamId,
+    tripId: tripId,
+    readAt: readAt ?? at,
+  );
 
   @override
-  List<Object?> get props =>
-      [id, kind, title, body, createdAt, matchId, expenseId, teamId, readAt];
+  List<Object?> get props => [
+    id,
+    kind,
+    title,
+    body,
+    createdAt,
+    matchId,
+    expenseId,
+    teamId,
+    tripId,
+    readAt,
+  ];
 }

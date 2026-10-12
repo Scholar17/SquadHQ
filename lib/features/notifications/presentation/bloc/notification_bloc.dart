@@ -84,10 +84,10 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     required GetNotifications getNotifications,
     required MarkNotificationsRead markNotificationsRead,
     required WatchNotifications watchNotifications,
-  })  : _getNotifications = getNotifications,
-        _markNotificationsRead = markNotificationsRead,
-        _watchNotifications = watchNotifications,
-        super(const NotificationState()) {
+  }) : _getNotifications = getNotifications,
+       _markNotificationsRead = markNotificationsRead,
+       _watchNotifications = watchNotifications,
+       super(const NotificationState()) {
     on<NotificationsStarted>(_onStarted);
     on<NotificationsStopped>((event, emit) {
       _stopWatching();
@@ -123,9 +123,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   Future<void> _reload(Emitter<NotificationState> emit) async {
     final result = await _getNotifications(const NoParams());
     result.fold(
-      (failure) => emit(
-        NotificationState(items: state.items, loaded: true, error: failure.message),
-      ),
+      (failure) =>
+          emit(NotificationState(items: state.items, loaded: true, error: failure.message)),
       (items) => emit(NotificationState(items: items, loaded: true)),
     );
   }
@@ -165,7 +164,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     emit(NotificationState(items: after, loaded: state.loaded));
     final result = await _markNotificationsRead(ids);
     result.fold(
-      (failure) => emit(NotificationState(items: before, loaded: state.loaded, error: failure.message)),
+      (failure) =>
+          emit(NotificationState(items: before, loaded: state.loaded, error: failure.message)),
       (_) {},
     );
   }

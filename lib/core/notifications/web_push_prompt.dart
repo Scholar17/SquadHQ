@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_radius.dart';
 import '../theme/app_text_styles.dart';
 import 'push_notifications.dart';
 
@@ -69,7 +70,7 @@ class _WebPushPromptState extends State<WebPushPrompt> {
           decoration: BoxDecoration(
             color: AppColors.accent100,
             border: Border.all(color: AppColors.accent700.withValues(alpha: 0.18)),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.lg,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +87,7 @@ class _WebPushPromptState extends State<WebPushPrompt> {
                       body,
                       style: AppTextStyles.body(
                         size: 12,
-                        color: AppColors.text.withValues(alpha: 0.65),
+                        color: AppColors.textSubtle,
                         height: 1.4,
                       ),
                     ),
@@ -96,14 +97,14 @@ class _WebPushPromptState extends State<WebPushPrompt> {
                         onPressed: _busy ? null : _turnOn,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.bg,
+                          foregroundColor: AppColors.onDark,
                           shape: const StadiumBorder(),
                           elevation: 0,
                           minimumSize: const Size(0, 36),
                         ),
                         child: Text(
                           _busy ? 'Turning on…' : 'Turn on',
-                          style: AppTextStyles.heading(size: 13, color: AppColors.bg),
+                          style: AppTextStyles.title(size: 13, color: AppColors.onDark),
                         ),
                       ),
                     ],
@@ -114,7 +115,7 @@ class _WebPushPromptState extends State<WebPushPrompt> {
                 onPressed: () => setState(() => _dismissed = true),
                 icon: const Icon(Icons.close_rounded, size: 18),
                 tooltip: 'Dismiss',
-                color: AppColors.text.withValues(alpha: 0.5),
+                color: AppColors.textMuted,
               ),
             ],
           ),

@@ -28,9 +28,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
 
   @override
   Future<Either<Failure, Unit>> markRead({Set<String>? ids}) => _guard(() async {
-        await _remoteDataSource.markRead(ids: ids);
-        return unit;
-      });
+    await _remoteDataSource.markRead(ids: ids);
+    return unit;
+  });
 
   @override
   Stream<void> watch() => _remoteDataSource.watch();
