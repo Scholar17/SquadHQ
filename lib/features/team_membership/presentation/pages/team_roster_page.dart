@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
@@ -11,10 +12,12 @@ import '../bloc/team_membership_event.dart';
 import '../bloc/team_roster_bloc.dart';
 import '../bloc/team_roster_event.dart';
 import '../bloc/team_roster_state.dart';
+import '../widgets/group_member_actions.dart';
 
 /// Reached from a team card's "Manage team" action. [team] is the caller's
 /// own membership row, so [Team.role] tells this page whether to show
-/// super-admin-only controls (promote/demote, delete team).
+/// super-admin-only controls (promote/demote, delete team) and whom the
+/// caller may remove (see [canRemoveMember]).
 class TeamRosterPage extends StatelessWidget {
   const TeamRosterPage({super.key, required this.team});
 
@@ -46,18 +49,21 @@ class _TeamRosterView extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.neutral100,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: Text('Delete ${team.name}?', style: AppTextStyles.heading(size: 20)),
         content: Text(
           'This removes the team and every member from it. This cannot be undone.',
-          style: AppTextStyles.body(size: 13.5, color: AppColors.text.withValues(alpha: 0.7)),
+          style: AppTextStyles.body(size: 13.5, color: AppColors.textSubtle),
         ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('Cancel', style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.body(size: 14, weight: FontWeight.w700, color: AppColors.text),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -98,7 +104,7 @@ class _TeamRosterView extends StatelessWidget {
           backgroundColor: AppColors.bg,
           elevation: 0,
           foregroundColor: AppColors.text,
-          title: Text(team.name, style: AppTextStyles.heading(size: 16)),
+          title: Text(team.name, style: AppTextStyles.title(size: 16)),
         ),
         body: SafeArea(
           child: BlocBuilder<TeamRosterBloc, TeamRosterState>(
@@ -113,14 +119,21 @@ class _TeamRosterView extends StatelessWidget {
                 children: [
                   Text(
                     'ROSTER',
-                    style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                    style: AppTextStyles.label(color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 10),
                   for (final member in settled.members) ...[
                     _MemberRow(
                       member: member,
                       canManage: _isSuperAdmin && member.role != TeamRole.superAdmin,
+                      canRemove: canRemoveMember(team.role, member.role),
                       isSubmitting: isSubmitting,
+                      onRemove: () async {
+                        final bloc = context.read<TeamRosterBloc>();
+                        if (await confirmRemove(context, team: team, name: member.name)) {
+                          bloc.add(TeamRosterRemoveRequested(member.profileId));
+                        }
+                      },
                       onPromote: () => context.read<TeamRosterBloc>().add(
                         TeamRosterPromoteRequested(member.profileId),
                       ),
@@ -143,7 +156,7 @@ class _TeamRosterView extends StatelessWidget {
                         ),
                         child: Text(
                           'Delete team',
-                          style: AppTextStyles.heading(size: 14, color: AppColors.accent700),
+                          style: AppTextStyles.title(size: 14, color: AppColors.accent700),
                         ),
                       ),
                     ),
@@ -162,16 +175,20 @@ class _MemberRow extends StatelessWidget {
   const _MemberRow({
     required this.member,
     required this.canManage,
+    required this.canRemove,
     required this.isSubmitting,
     required this.onPromote,
     required this.onDemote,
+    required this.onRemove,
   });
 
   final TeamMember member;
   final bool canManage;
+  final bool canRemove;
   final bool isSubmitting;
   final VoidCallback onPromote;
   final VoidCallback onDemote;
+  final VoidCallback onRemove;
 
   static String _roleLabel(TeamRole role) => switch (role) {
     TeamRole.superAdmin => 'SUPER ADMIN',
@@ -184,8 +201,8 @@ class _MemberRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.neutral100,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.card,
+        borderRadius: AppRadius.md,
         border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
       ),
       child: Row(
@@ -198,7 +215,7 @@ class _MemberRow extends StatelessWidget {
             onForegroundImageError: member.avatarUrl != null ? (_, _) {} : null,
             child: Text(
               member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-              style: AppTextStyles.heading(size: 14, color: AppColors.neutral800),
+              style: AppTextStyles.title(size: 14, color: AppColors.neutral800),
             ),
           ),
           const SizedBox(width: 12),
@@ -210,7 +227,7 @@ class _MemberRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _roleLabel(member.role),
-                  style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                  style: AppTextStyles.label(color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -228,6 +245,13 @@ class _MemberRow extends StatelessWidget {
                   color: AppColors.accent700,
                 ),
               ),
+            ),
+          if (canRemove)
+            IconButton(
+              onPressed: isSubmitting ? null : onRemove,
+              tooltip: 'Remove ${member.name}',
+              icon: const Icon(Icons.person_remove_outlined),
+              color: AppColors.accent700,
             ),
         ],
       ),

@@ -56,3 +56,34 @@ final class TeamSwitchRequested extends TeamMembershipEvent {
   @override
   List<Object?> get props => [teamId];
 }
+
+/// A quiet reload (no Loading in between), e.g. after a change on the
+/// server.
+final class TeamMembershipRefreshRequested extends TeamMembershipEvent {
+  const TeamMembershipRefreshRequested();
+}
+
+/// [newOwnerId]: who becomes super admin, when the super admin leaves.
+/// [done] gets the error message, or null once left.
+final class TeamLeaveRequested extends TeamMembershipEvent {
+  const TeamLeaveRequested(this.teamId, {this.newOwnerId, this.done});
+
+  final String teamId;
+  final String? newOwnerId;
+  final void Function(String? error)? done;
+
+  @override
+  List<Object?> get props => [teamId, newOwnerId];
+}
+
+/// [done] gets the error message, or null once removed.
+final class TeamMemberRemoveRequested extends TeamMembershipEvent {
+  const TeamMemberRemoveRequested({required this.teamId, required this.profileId, this.done});
+
+  final String teamId;
+  final String profileId;
+  final void Function(String? error)? done;
+
+  @override
+  List<Object?> get props => [teamId, profileId];
+}

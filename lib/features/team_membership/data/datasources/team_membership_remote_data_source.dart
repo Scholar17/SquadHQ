@@ -25,6 +25,10 @@ abstract interface class TeamMembershipRemoteDataSource {
 
   Future<void> deleteTeam(String teamId);
 
+  Future<void> leaveTeam(String teamId, {String? newOwnerId});
+
+  Future<void> removeMember({required String teamId, required String profileId});
+
   Future<void> setTeamTimezone({required String teamId, required String timezone});
 }
 
@@ -163,6 +167,30 @@ class TeamMembershipRemoteDataSourceImpl
   Future<void> deleteTeam(String teamId) async {
     try {
       await _supabase.rpc('delete_team', params: {'p_team_id': teamId});
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  @override
+  Future<void> leaveTeam(String teamId, {String? newOwnerId}) async {
+    try {
+      await _supabase.rpc('leave_team', params: {
+        'p_team_id': teamId,
+        'p_new_owner': newOwnerId,
+      });
+    } on PostgrestException catch (e) {
+      throw ServerException(e.message);
+    }
+  }
+
+  @override
+  Future<void> removeMember({required String teamId, required String profileId}) async {
+    try {
+      await _supabase.rpc('remove_team_member', params: {
+        'p_team_id': teamId,
+        'p_profile_id': profileId,
+      });
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     }

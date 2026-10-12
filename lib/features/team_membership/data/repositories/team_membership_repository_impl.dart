@@ -106,6 +106,33 @@ class TeamMembershipRepositoryImpl implements TeamMembershipRepository {
   }
 
   @override
+  Future<Either<Failure, Unit>> leaveTeam(String teamId, {String? newOwnerId}) async {
+    try {
+      await _remoteDataSource.leaveTeam(teamId, newOwnerId: newOwnerId);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(friendlyErrorMessage(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> removeMember({
+    required String teamId,
+    required String profileId,
+  }) async {
+    try {
+      await _remoteDataSource.removeMember(teamId: teamId, profileId: profileId);
+      return const Right(unit);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(friendlyErrorMessage(e)));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> setTeamTimezone({
     required String teamId,
     required String timezone,

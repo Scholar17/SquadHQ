@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team.dart';
 import '../bloc/team_membership_bloc.dart';
@@ -17,7 +18,7 @@ Future<void> showTeamSwitcherSheet(BuildContext context) {
     context: context,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => const _TeamSwitcherSheet(),
   );
@@ -43,7 +44,7 @@ class _TeamSwitcherSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your groups', style: AppTextStyles.heading(size: 18)),
+            Text('Your groups', style: AppTextStyles.title(size: 18)),
             const SizedBox(height: 14),
             BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
               builder: (context, state) {
@@ -57,7 +58,7 @@ class _TeamSwitcherSheet extends StatelessWidget {
                       "You're not on a team yet.",
                       style: AppTextStyles.body(
                         size: 13.5,
-                        color: AppColors.text.withValues(alpha: 0.6),
+                        color: AppColors.textMuted,
                       ),
                     ),
                   );
@@ -87,7 +88,7 @@ class _TeamSwitcherSheet extends StatelessWidget {
               },
               child: Text(
                 '+ Create or join a group',
-                style: AppTextStyles.heading(size: 13, color: AppColors.accent700),
+                style: AppTextStyles.title(size: 13, color: AppColors.accent700),
               ),
             ),
           ],
@@ -108,14 +109,14 @@ class _TeamRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.neutral100,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.card,
+            borderRadius: AppRadius.md,
             border: Border.all(
               color: team.isActive
                   ? AppColors.accent
@@ -127,7 +128,7 @@ class _TeamRow extends StatelessWidget {
               Icon(
                 team.isSquad ? Icons.receipt_long_rounded : Icons.sports_soccer_rounded,
                 size: 20,
-                color: AppColors.text.withValues(alpha: 0.55),
+                color: AppColors.textMuted,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -142,7 +143,7 @@ class _TeamRow extends StatelessWidget {
                       team.isSquad ? 'Squad' : 'Football team',
                       style: AppTextStyles.body(
                         size: 11.5,
-                        color: AppColors.text.withValues(alpha: 0.55),
+                        color: AppColors.textMuted,
                         height: 1.3,
                       ),
                     ),
@@ -154,7 +155,7 @@ class _TeamRow extends StatelessWidget {
               else
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: AppColors.text.withValues(alpha: 0.4),
+                  color: AppColors.textMuted,
                 ),
             ],
           ),

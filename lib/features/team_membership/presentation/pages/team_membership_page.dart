@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team.dart';
 import '../bloc/team_membership_bloc.dart';
+import '../widgets/group_member_actions.dart';
 import '../widgets/timezone_picker_sheet.dart';
 import '../bloc/team_membership_event.dart';
 import '../bloc/team_membership_state.dart';
@@ -66,7 +68,7 @@ class _TeamMembershipPageState extends State<TeamMembershipPage> {
           backgroundColor: AppColors.bg,
           elevation: 0,
           foregroundColor: AppColors.text,
-          title: Text('Groups', style: AppTextStyles.heading(size: 16)),
+          title: Text('Groups', style: AppTextStyles.title(size: 16)),
         ),
         body: SafeArea(
           child: BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
@@ -114,7 +116,7 @@ class _TeamsView extends StatelessWidget {
         if (teams.isNotEmpty) ...[
           Text(
             'YOUR GROUPS (${teams.length})',
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+            style: AppTextStyles.label(color: AppColors.textMuted),
           ),
           const SizedBox(height: 10),
           for (final team in teams) ...[
@@ -136,7 +138,7 @@ class _TeamsView extends StatelessWidget {
             'Start a football team or a friends squad, or join one with an invite code.',
             style: AppTextStyles.body(
               size: 13.5,
-              color: AppColors.text.withValues(alpha: 0.62),
+              color: AppColors.textSubtle,
             ),
           ),
           const SizedBox(height: 20),
@@ -147,7 +149,7 @@ class _TeamsView extends StatelessWidget {
             '${TeamMembershipLoaded.maxTeams} squads. Leave one to create or join another.',
             style: AppTextStyles.body(
               size: 12.5,
-              color: AppColors.text.withValues(alpha: 0.55),
+              color: AppColors.textMuted,
             ),
           )
         else ...[
@@ -209,8 +211,8 @@ class _TeamCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.neutral100,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.card,
+        borderRadius: AppRadius.lg,
         border: Border.all(
           color: team.isActive ? AppColors.accent : AppColors.text.withValues(alpha: 0.1),
         ),
@@ -223,7 +225,7 @@ class _TeamCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   _roleLabel(team),
-                  style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+                  style: AppTextStyles.label(color: AppColors.textMuted),
                 ),
               ),
               if (team.isActive)
@@ -252,7 +254,7 @@ class _TeamCard extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'INVITE CODE',
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+            style: AppTextStyles.label(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),
           Row(
@@ -262,7 +264,7 @@ class _TeamCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.bg,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppRadius.pill,
                     border: Border.all(color: AppColors.text.withValues(alpha: 0.16)),
                   ),
                   child: Text(
@@ -299,11 +301,25 @@ class _TeamCard extends StatelessWidget {
                 ),
                 child: Text(
                   'Manage team',
-                  style: AppTextStyles.heading(size: 13, color: AppColors.text),
+                  style: AppTextStyles.title(size: 13, color: AppColors.text),
                 ),
               ),
             ),
           ],
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton(
+              onPressed: () => leaveGroup(context, team),
+              child: Text(
+                'Leave ${groupWord(team)}',
+                style: AppTextStyles.body(
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: AppColors.accent700,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -321,8 +337,8 @@ class _Section extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.neutral100,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.card,
+        borderRadius: AppRadius.lg,
         border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
       ),
       child: Column(
@@ -330,7 +346,7 @@ class _Section extends StatelessWidget {
         children: [
           Text(
             title,
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.5)),
+            style: AppTextStyles.label(color: AppColors.textMuted),
           ),
           const SizedBox(height: 10),
           ...children,
@@ -364,7 +380,7 @@ class _RoundedField extends StatelessWidget {
           fillColor: AppColors.bg,
           contentPadding: const EdgeInsets.symmetric(horizontal: 18),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: AppRadius.pill,
             borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
           ),
         ),
@@ -393,7 +409,7 @@ class _PrimaryButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.bg,
+          foregroundColor: AppColors.onDark,
           disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
           shape: const StadiumBorder(),
           elevation: 0,
@@ -404,10 +420,10 @@ class _PrimaryButton extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: AppColors.bg,
+                  color: AppColors.onDark,
                 ),
               )
-            : Text(label, style: AppTextStyles.heading(size: 14, color: AppColors.bg)),
+            : Text(label, style: AppTextStyles.title(size: 14, color: AppColors.onDark)),
       ),
     );
   }
@@ -435,7 +451,7 @@ class _TimezoneRow extends StatelessWidget {
       children: [
         Text(
           'TIME ZONE',
-          style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+          style: AppTextStyles.label(color: AppColors.textMuted),
         ),
         const SizedBox(height: 6),
         Row(
@@ -462,7 +478,7 @@ class _TimezoneRow extends StatelessWidget {
         ),
         Text(
           "When match day ends for Man of the Match voting. Times show in your phone's time.",
-          style: AppTextStyles.body(size: 11.5, color: AppColors.text.withValues(alpha: 0.5)),
+          style: AppTextStyles.body(size: 11.5, color: AppColors.textMuted),
         ),
       ],
     );
@@ -535,7 +551,7 @@ class _CreateGroupFormState extends State<_CreateGroupForm> {
           const SizedBox(height: 14),
           Text(
             'CURRENCY',
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+            style: AppTextStyles.label(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),
           Row(
@@ -555,11 +571,11 @@ class _CreateGroupFormState extends State<_CreateGroupForm> {
                     showCheckmark: false,
                     onSelected: (_) => setState(() => _currency = currency),
                     selectedColor: AppColors.neutral900,
-                    backgroundColor: AppColors.neutral100,
+                    backgroundColor: AppColors.card,
                     labelStyle: AppTextStyles.body(
                       size: 14,
                       weight: FontWeight.w700,
-                      color: _currency == currency ? AppColors.neutral100 : AppColors.text,
+                      color: _currency == currency ? AppColors.onDark : AppColors.text,
                     ),
                     shape: StadiumBorder(
                       side: BorderSide(color: AppColors.text.withValues(alpha: 0.14)),
@@ -576,7 +592,7 @@ class _CreateGroupFormState extends State<_CreateGroupForm> {
           Text(
             "You're in the max of ${TeamMembershipLoaded.maxTeams} "
             '${isSquad ? 'squads' : 'teams'}. Leave one to create another.',
-            style: AppTextStyles.body(size: 12.5, color: AppColors.text.withValues(alpha: 0.55)),
+            style: AppTextStyles.body(size: 12.5, color: AppColors.textMuted),
           )
         else
           _PrimaryButton(
@@ -618,16 +634,16 @@ class _KindCard extends StatelessWidget {
       selected: selected,
       button: true,
       child: Material(
-        color: selected ? AppColors.accent100 : AppColors.neutral100,
+        color: selected ? AppColors.accent100 : AppColors.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.lg,
           side: BorderSide(
             color: selected ? AppColors.accent700 : AppColors.text.withValues(alpha: 0.1),
             width: 2,
           ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadius.lg,
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -637,21 +653,21 @@ class _KindCard extends StatelessWidget {
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(color: tile, borderRadius: BorderRadius.circular(14)),
-                  child: Icon(icon, color: AppColors.neutral100),
+                  decoration: BoxDecoration(color: tile, borderRadius: AppRadius.md),
+                  child: Icon(icon, color: AppColors.onDark),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: AppTextStyles.heading(size: 17, height: 1.3)),
+                      Text(title, style: AppTextStyles.title(size: 17, height: 1.3)),
                       const SizedBox(height: 3),
                       Text(
                         body,
                         style: AppTextStyles.body(
                           size: 13,
-                          color: AppColors.text.withValues(alpha: 0.62),
+                          color: AppColors.textSubtle,
                           height: 1.45,
                         ),
                       ),

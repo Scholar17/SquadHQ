@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/usecases/delete_team.dart';
 import '../../domain/usecases/get_team_members.dart';
+import '../../domain/usecases/remove_team_member.dart';
 import '../../domain/usecases/set_member_role.dart';
 import 'team_roster_event.dart';
 import 'team_roster_state.dart';
@@ -16,7 +17,9 @@ class TeamRosterBloc extends Bloc<TeamRosterEvent, TeamRosterState> {
     required GetTeamMembers getTeamMembers,
     required SetMemberRole setMemberRole,
     required DeleteTeam deleteTeam,
+    required RemoveTeamMember removeTeamMember,
   })  : _getTeamMembers = getTeamMembers,
+        _removeTeamMember = removeTeamMember,
         _setMemberRole = setMemberRole,
         _deleteTeam = deleteTeam,
         super(const TeamRosterLoading()) {
@@ -24,12 +27,14 @@ class TeamRosterBloc extends Bloc<TeamRosterEvent, TeamRosterState> {
     on<TeamRosterPromoteRequested>(_onPromoteRequested);
     on<TeamRosterDemoteRequested>(_onDemoteRequested);
     on<TeamRosterDeleteTeamRequested>(_onDeleteTeamRequested);
+    on<TeamRosterRemoveRequested>(_onRemoveRequested);
   }
 
   final String teamId;
   final GetTeamMembers _getTeamMembers;
   final SetMemberRole _setMemberRole;
   final DeleteTeam _deleteTeam;
+  final RemoveTeamMember _removeTeamMember;
 
   Future<void> _reload(Emitter<TeamRosterState> emit) async {
     final result = await _getTeamMembers(teamId);
@@ -75,6 +80,21 @@ class TeamRosterBloc extends Bloc<TeamRosterEvent, TeamRosterState> {
     Emitter<TeamRosterState> emit,
   ) =>
       _setRole(event.profileId, TeamRole.player, emit);
+
+  Future<void> _onRemoveRequested(
+    TeamRosterRemoveRequested event,
+    Emitter<TeamRosterState> emit,
+  ) async {
+    final fallback = state;
+    emit(TeamRosterSubmitting(fallback));
+    final result = await _removeTeamMember(
+      RemoveTeamMemberParams(teamId: teamId, profileId: event.profileId),
+    );
+    await result.fold(
+      (failure) async => emit(TeamRosterFailure(failure.message, fallback)),
+      (_) => _reload(emit),
+    );
+  }
 
   Future<void> _onDeleteTeamRequested(
     TeamRosterDeleteTeamRequested event,

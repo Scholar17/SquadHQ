@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
 /// "UTC+7", "UTC+5:30", "UTC-3" — [zone]'s offset right now, or null if
@@ -27,7 +28,7 @@ Future<String?> showTimezonePickerSheet(BuildContext context, {required String c
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: AppRadius.sheet,
     ),
     builder: (_) => _TimezonePicker(current: current),
   );
@@ -69,14 +70,14 @@ class _TimezonePickerState extends State<_TimezonePicker> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Team time zone', style: AppTextStyles.heading(size: 18)),
+            Text('Team time zone', style: AppTextStyles.title(size: 18)),
             const SizedBox(height: 4),
             Text(
               'Decides when match day ends for Man of the Match voting. Times '
               "still show in each player's own phone time.",
               style: AppTextStyles.body(
                 size: 12,
-                color: AppColors.text.withValues(alpha: 0.6),
+                color: AppColors.textMuted,
                 height: 1.4,
               ),
             ),
@@ -88,10 +89,10 @@ class _TimezonePickerState extends State<_TimezonePicker> {
                 hintText: 'Search a city, e.g. Bangkok',
                 prefixIcon: const Icon(Icons.search_rounded),
                 filled: true,
-                fillColor: AppColors.neutral100,
+                fillColor: AppColors.card,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadius.pill,
                   borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
                 ),
               ),
@@ -104,7 +105,7 @@ class _TimezonePickerState extends State<_TimezonePicker> {
                         'No time zone matches "$_query"',
                         style: AppTextStyles.body(
                           size: 13,
-                          color: AppColors.text.withValues(alpha: 0.55),
+                          color: AppColors.textMuted,
                         ),
                       ),
                     )
@@ -125,7 +126,7 @@ class _TimezonePickerState extends State<_TimezonePicker> {
                             utcOffsetLabel(zone) ?? '',
                             style: AppTextStyles.body(
                               size: 12,
-                              color: AppColors.text.withValues(alpha: 0.55),
+                              color: AppColors.textMuted,
                             ),
                           ),
                           trailing: selected

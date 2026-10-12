@@ -42,4 +42,18 @@ abstract interface class TeamMembershipRepository {
 
   /// Caller must be the team's super admin.
   Future<Either<Failure, Unit>> deleteTeam(String teamId);
+
+  /// Fails while the caller's money in the group isn't settled, or if
+  /// they're its last member. The super admin passes [newOwnerId], who
+  /// takes over — see `leave_team` in
+  /// supabase/sql/051_leave_and_remove_members.sql.
+  Future<Either<Failure, Unit>> leaveTeam(String teamId, {String? newOwnerId});
+
+  /// The super admin removes admins and players; an admin, players. Fails
+  /// while the member's money in the group isn't settled — see
+  /// `remove_team_member` in supabase/sql/051_leave_and_remove_members.sql.
+  Future<Either<Failure, Unit>> removeMember({
+    required String teamId,
+    required String profileId,
+  });
 }

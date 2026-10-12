@@ -22,7 +22,7 @@ final class TeamRosterLoaded extends TeamRosterState {
   List<Object?> get props => [members];
 }
 
-/// A promote/demote/delete submission is in flight; [previous] is what to
+/// A promote/demote/remove/delete submission is in flight; [previous] is what to
 /// fall back to (always [TeamRosterLoaded] in practice).
 final class TeamRosterSubmitting extends TeamRosterState {
   const TeamRosterSubmitting(this.previous);

@@ -29,6 +29,15 @@ final class TeamRosterDemoteRequested extends TeamRosterEvent {
   List<Object?> get props => [profileId];
 }
 
+final class TeamRosterRemoveRequested extends TeamRosterEvent {
+  const TeamRosterRemoveRequested(this.profileId);
+
+  final String profileId;
+
+  @override
+  List<Object?> get props => [profileId];
+}
+
 final class TeamRosterDeleteTeamRequested extends TeamRosterEvent {
   const TeamRosterDeleteTeamRequested();
 }
