@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:go_router/go_router.dart';
@@ -6,7 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'core/di/injection_container.dart';
 import 'core/notifications/notification_routing.dart';
 import 'core/routing/app_router.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
+import 'core/theme/widgets/responsive_frame.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/match/presentation/bloc/match_bloc.dart';
 import 'features/match/presentation/bloc/match_history_bloc.dart';
@@ -22,8 +26,9 @@ class SquadHqApp extends StatefulWidget {
   State<SquadHqApp> createState() => _SquadHqAppState();
 }
 
-class _SquadHqAppState extends State<SquadHqApp> {
+class _SquadHqAppState extends State<SquadHqApp> with WidgetsBindingObserver {
   final authBloc = sl<AuthBloc>();
+  final _theme = sl<ThemeController>();
 
   // Created once (not per build) so tapped notifications have a stable
   // router to navigate with.
@@ -33,6 +38,46 @@ class _SquadHqAppState extends State<SquadHqApp> {
   void initState() {
     super.initState();
     NotificationRouting.attach(_router);
+    WidgetsBinding.instance.addObserver(this);
+    _theme.addListener(_applyTheme);
+    // First frame: just pick the palette — nothing's built to repaint yet.
+    _applyTheme(repaint: false);
+  }
+
+  @override
+  void dispose() {
+    _theme.removeListener(_applyTheme);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// "System" follows the phone as it switches.
+  @override
+  void didChangePlatformBrightness() => _applyTheme();
+
+  /// Points [AppColors] at the chosen palette and repaints every screen
+  /// with it — including widgets that wouldn't rebuild on their own
+  /// (const ones read the colours in build, not via an inherited theme).
+  void _applyTheme({bool repaint = true}) {
+    final brightness = switch (_theme.value) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    };
+    final palette = brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
+    SystemChrome.setSystemUIOverlayStyle(
+      brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+    );
+    if (identical(palette, AppColors.palette)) return;
+    AppColors.palette = palette;
+    if (!repaint || !mounted) return;
+    void rebuild(Element element) {
+      element.markNeedsBuild();
+      element.visitChildren(rebuild);
+    }
+
+    (context as Element).visitChildren(rebuild);
+    setState(() {});
   }
 
   @override
@@ -59,9 +104,11 @@ class _SquadHqAppState extends State<SquadHqApp> {
       child: MaterialApp.router(
         title: 'Squad HQ',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
+        theme: AppColors.isDark ? AppTheme.dark : AppTheme.light,
         routerConfig: _router,
         scaffoldMessengerKey: NotificationRouting.messengerKey,
+        // Tablets and desktop web: one readable column, not edge to edge.
+        builder: (context, child) => ResponsiveFrame(child: child ?? const SizedBox.shrink()),
       ),
     );
   }
