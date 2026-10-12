@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/money_input_formatter.dart';
+import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../../wallet/domain/repositories/wallet_repository.dart';
 import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
@@ -24,16 +27,21 @@ Future<void> showPaySheet(
   required String me,
   required String toId,
   required int suggestedCents,
+  String? tripId,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: AppColors.neutral100,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    backgroundColor: AppColors.card,
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
+    builder: (_) => _PaySheet(
+      teamId: teamId,
+      me: me,
+      toId: toId,
+      suggestedCents: suggestedCents,
+      tripId: tripId,
     ),
-    builder: (_) => _PaySheet(teamId: teamId, me: me, toId: toId, suggestedCents: suggestedCents),
   );
 }
 
@@ -43,12 +51,16 @@ class _PaySheet extends StatefulWidget {
     required this.me,
     required this.toId,
     required this.suggestedCents,
+    this.tripId,
   });
 
   final String teamId;
   final String me;
   final String toId;
   final int suggestedCents;
+
+  /// Paying back this (closed) trip, apart from the squad's own.
+  final String? tripId;
 
   @override
   State<_PaySheet> createState() => _PaySheetState();
@@ -60,6 +72,11 @@ class _PaySheetState extends State<_PaySheet> {
   );
   SettlementMethod? _method;
   PickedImage? _slip;
+  final _amountFocus = FocusNode();
+
+  /// Set from the tap until the send fails, so a fast double tap can't
+  /// send the same payment (and slip) twice.
+  bool _sending = false;
 
   @override
   void initState() {
@@ -70,6 +87,7 @@ class _PaySheetState extends State<_PaySheet> {
   @override
   void dispose() {
     _amount.dispose();
+    _amountFocus.dispose();
     super.dispose();
   }
 
@@ -79,12 +97,25 @@ class _PaySheetState extends State<_PaySheet> {
     _ => SettlementMethod.cash,
   };
 
+  /// Half of what's owed, rounded up to a whole unit (never more than it).
+  int get _half {
+    final half = ((widget.suggestedCents / 2) / 100).ceil() * 100;
+    return half > widget.suggestedCents ? widget.suggestedCents : half;
+  }
+
+  void _setAmount(int? cents) {
+    _amount.text = cents == null ? '' : moneyInput(cents);
+    if (cents == null) _amountFocus.requestFocus();
+  }
+
   Future<void> _pickSlip() async {
-    final picked = await pickWalletImage();
+    final picked = await pickWalletImage(slip: true);
     if (picked != null && mounted) setState(() => _slip = picked);
   }
 
   void _send(SettlementMethod method) {
+    if (_sending) return;
+    setState(() => _sending = true);
     final amount = parseMoney(_amount.text) ?? 0;
     context.read<SquadLedgerBloc>().add(
       SettlementSendRequested(
@@ -95,6 +126,7 @@ class _PaySheetState extends State<_PaySheet> {
           method: method,
           slipBytes: _slip?.bytes,
           slipExtension: _slip?.fileExtension,
+          tripId: widget.tripId,
         ),
       ),
     );
@@ -109,6 +141,7 @@ class _PaySheetState extends State<_PaySheet> {
       listener: (context, state) {
         final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
         if (state case SquadLedgerFailure(:final message)) {
+          setState(() => _sending = false);
           messenger.showSnackBar(SnackBar(content: Text(message)));
           return;
         }
@@ -117,7 +150,9 @@ class _PaySheetState extends State<_PaySheet> {
         messenger.showSnackBar(SnackBar(content: Text('Sent — waiting for $name to confirm.')));
       },
       builder: (context, state) {
-        final ledger = state.ledger ?? SquadLedger.empty;
+        final full = state.ledger ?? SquadLedger.empty;
+        final tripId = widget.tripId;
+        final ledger = tripId == null ? full : full.forTrip(tripId);
         final currency = ledger.currency;
         final receiver = ledger.member(widget.toId);
         final name = ledger.nameOf(widget.toId);
@@ -134,100 +169,126 @@ class _PaySheetState extends State<_PaySheet> {
               SettlementMethod.bank => receiver?.hasBankDetails ?? false,
               SettlementMethod.cash => true,
             };
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-            children: [
-              const _Grabber(),
-              Row(
-                children: [
-                  SquadAvatar(
-                    initial: receiver?.initial ?? '?',
-                    size: 36,
-                    color: AppColors.teamGold,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text('Pay $name', style: AppTextStyles.heading(size: 20))),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Close',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Text(currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Semantics(
-                      label: 'Amount to pay',
-                      child: TextField(
-                        controller: _amount,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                        style: AppTextStyles.heading(size: 36),
-                        decoration: const InputDecoration(
-                          hintText: '0',
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
+        return StickyActionSheet(
+          background: AppColors.card,
+          children: [
+            const _Grabber(),
+            Row(
+              children: [
+                SquadAvatar(
+                  initial: receiver?.initial ?? '?',
+                  photoUrl: receiver?.avatarUrl,
+                  size: 36,
+                  color: AppColors.teamGold,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Pay $name', style: AppTextStyles.heading(size: 20))),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Close',
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Text(currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Semantics(
+                    label: 'Amount to pay',
+                    child: TextField(
+                      controller: _amount,
+                      focusNode: _amountFocus,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: const [MoneyInputFormatter()],
+                      style: AppTextStyles.heading(size: 36),
+                      decoration: const InputDecoration(
+                        hintText: '0',
+                        border: InputBorder.none,
+                        isDense: true,
                       ),
                     ),
                   ),
+                ),
+              ],
+            ),
+            // Pay it all, half, or any part.
+            if (widget.suggestedCents > 0) ...[
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SquadChoiceChip(
+                    label: 'Full',
+                    selected: amount == widget.suggestedCents,
+                    onTap: () => _setAmount(widget.suggestedCents),
+                  ),
+                  if (_half < widget.suggestedCents)
+                    SquadChoiceChip(
+                      label: 'Half · ${formatMoney(_half, currency)}',
+                      selected: amount == _half,
+                      onTap: () => _setAmount(_half),
+                    ),
+                  SquadChoiceChip(
+                    label: 'Custom',
+                    selected: amount != widget.suggestedCents && amount != _half,
+                    onTap: () => _setAmount(null),
+                  ),
                 ],
               ),
-              Text(
-                [
-                  if (owed > 0) 'You owe ${formatMoney(owed, currency)}',
-                  if (pending > 0) '${formatMoney(pending, currency)} already sent and waiting',
-                  'pay less for a partial payment',
-                ].join(' · '),
-                style: AppTextStyles.body(size: 12, color: squadMuted),
-              ),
-              const SizedBox(height: 14),
-              _MethodTabs(method: method, onChanged: (picked) => setState(() => _method = picked)),
-              const SizedBox(height: 14),
-              switch (method) {
-                SettlementMethod.qr =>
-                  receiver?.walletQrPath == null
-                      ? _Missing("$name hasn't added a wallet QR yet. Try bank or cash.")
-                      : _QrPanel(
-                          path: receiver!.walletQrPath!,
-                          caption:
-                              'Scan in your banking or wallet app, pay '
-                              '${formatMoney(amount, currency)}, then add the slip.',
-                        ),
-                SettlementMethod.bank =>
-                  receiver?.hasBankDetails != true
-                      ? _Missing("$name hasn't added bank details yet. Try QR or cash.")
-                      : _BankPanel(member: receiver!),
-                SettlementMethod.cash => _Missing(
-                  'Hand $name ${formatMoney(amount, currency)} in cash, then tap below. '
-                  'No slip needed.',
-                  icon: Icons.payments_outlined,
-                ),
-              },
-              if (needsSlip) ...[
-                const SizedBox(height: 12),
-                _SlipButton(slip: _slip, onPick: _pickSlip),
-              ],
-              const SizedBox(height: 16),
-              SquadPrimaryButton(
-                label: method == SettlementMethod.cash ? 'I paid in cash' : 'Send for confirmation',
-                isLoading: state is SquadLedgerSubmitting,
-                onPressed: canSend ? () => _send(method) : null,
-              ),
               const SizedBox(height: 8),
-              Text(
-                '$name confirms before your balance changes.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.body(size: 12, color: squadMuted),
-              ),
             ],
+            Text(
+              [
+                if (owed > 0) 'You owe ${formatMoney(owed, currency)}',
+                if (pending > 0) '${formatMoney(pending, currency)} already sent and waiting',
+                if (amount > 0 && amount < widget.suggestedCents)
+                  '${formatMoney(widget.suggestedCents - amount, currency)} left after this'
+                else if (widget.suggestedCents > 0)
+                  'or pay part of it',
+              ].join(' · '),
+              style: AppTextStyles.body(size: 12, color: squadMuted),
+            ),
+            const SizedBox(height: 14),
+            _MethodTabs(method: method, onChanged: (picked) => setState(() => _method = picked)),
+            const SizedBox(height: 14),
+            switch (method) {
+              SettlementMethod.qr =>
+                receiver?.walletQrPath == null
+                    ? _Missing("$name hasn't added a wallet QR yet. Try bank or cash.")
+                    : _QrPanel(
+                        path: receiver!.walletQrPath!,
+                        caption:
+                            'Scan in your banking or wallet app, pay '
+                            '${formatMoney(amount, currency)}, then add the slip.',
+                      ),
+              SettlementMethod.bank =>
+                receiver?.hasBankDetails != true
+                    ? _Missing("$name hasn't added bank details yet. Try QR or cash.")
+                    : _BankPanel(member: receiver!),
+              SettlementMethod.cash => _Missing(
+                'Hand $name ${formatMoney(amount, currency)} in cash, then tap below. '
+                'No slip needed.',
+                icon: Icons.payments_outlined,
+              ),
+            },
+            if (needsSlip) ...[
+              const SizedBox(height: 12),
+              _SlipButton(slip: _slip, onPick: _pickSlip),
+            ],
+          ],
+          action: SquadPrimaryButton(
+            label: method == SettlementMethod.cash ? 'I paid in cash' : 'Send for confirmation',
+            isLoading: _sending || state is SquadLedgerSubmitting,
+            onPressed: canSend ? () => _send(method) : null,
+          ),
+          footer: Text(
+            '$name confirms before your balance changes.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body(size: 12, color: squadMuted),
           ),
         );
       },
@@ -270,7 +331,7 @@ class _MethodTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(22)),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
       child: Row(
         children: [
           for (final option in SettlementMethod.values)
@@ -279,7 +340,7 @@ class _MethodTabs extends StatelessWidget {
                 selected: option == method,
                 button: true,
                 child: Material(
-                  color: option == method ? AppColors.neutral100 : Colors.transparent,
+                  color: option == method ? AppColors.card : Colors.transparent,
                   shape: const StadiumBorder(),
                   child: InkWell(
                     customBorder: const StadiumBorder(),
@@ -343,7 +404,7 @@ class _QrPanel extends StatelessWidget {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: AppRadius.md,
                 border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
               ),
               child: WalletImage(kind: WalletImageKind.walletQr, path: path),
@@ -390,7 +451,7 @@ class _BankPanel extends StatelessWidget {
     ];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
       child: Column(
         children: [
           for (final (label, value) in rows)
@@ -409,7 +470,7 @@ class _BankPanel extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Copy ${label.toLowerCase()}',
-                    icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.accent700),
+                    icon: Icon(Icons.copy_rounded, size: 18, color: AppColors.accent700),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: value));
                       ScaffoldMessenger.of(context)
@@ -435,7 +496,7 @@ class _Missing extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.bg, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
       child: Row(
         children: [
           Icon(icon, color: squadMuted),
@@ -461,11 +522,11 @@ class _SlipButton extends StatelessWidget {
     return Material(
       color: AppColors.bg,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         side: BorderSide(color: AppColors.neutral500),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         onTap: onPick,
         child: Padding(
           padding: const EdgeInsets.all(10),
@@ -473,11 +534,11 @@ class _SlipButton extends StatelessWidget {
             children: [
               if (picked != null)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.xs,
                   child: Image.memory(picked.bytes, width: 44, height: 44, fit: BoxFit.cover),
                 )
               else
-                const SizedBox(
+                SizedBox(
                   width: 44,
                   height: 44,
                   child: Icon(Icons.receipt_long_outlined, color: squadMuted),

@@ -3,7 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
-import '../../domain/entities/expense_comment.dart';
+import '../../../comments/domain/entities/comment.dart';
 import '../../domain/entities/squad_ledger.dart';
 import '../../domain/entities/squad_member.dart';
 import '../../domain/repositories/squad_repository.dart';
@@ -42,6 +42,26 @@ class SquadRepositoryImpl implements SquadRepository {
       _done(() => _remoteDataSource.deleteExpense(expenseId));
 
   @override
+  Future<Either<Failure, String>> saveTrip(TripDraft draft) =>
+      _guard(() => _remoteDataSource.saveTrip(draft));
+
+  @override
+  Future<Either<Failure, Unit>> setTripClosed(String tripId, {required bool closed}) =>
+      _done(() => _remoteDataSource.setTripClosed(tripId, closed: closed));
+
+  @override
+  Future<Either<Failure, String>> saveRecurring(RecurringDraft draft) =>
+      _guard(() => _remoteDataSource.saveRecurring(draft));
+
+  @override
+  Future<Either<Failure, Unit>> setRecurringPaused(String id, {required bool paused}) =>
+      _done(() => _remoteDataSource.setRecurringPaused(id, paused: paused));
+
+  @override
+  Future<Either<Failure, Unit>> deleteRecurring(String id) =>
+      _done(() => _remoteDataSource.deleteRecurring(id));
+
+  @override
   Future<Either<Failure, Unit>> sendSettlement(SettlementDraft draft) =>
       _done(() => _remoteDataSource.sendSettlement(draft));
 
@@ -59,7 +79,41 @@ class SquadRepositoryImpl implements SquadRepository {
   );
 
   @override
-  Future<Either<Failure, List<ExpenseComment>>> getComments(String expenseId) =>
+  Future<Either<Failure, int>> remind({
+    required String teamId,
+    required Map<String, int> amounts,
+    String? tripId,
+  }) => _guard(() => _remoteDataSource.remind(teamId: teamId, amounts: amounts, tripId: tripId));
+
+  @override
+  Future<Either<Failure, Unit>> nudgeSettlement(String settlementId) =>
+      _done(() => _remoteDataSource.nudgeSettlement(settlementId));
+
+  @override
+  Future<Either<Failure, Unit>> promisePayment(PromiseDraft draft) =>
+      _done(() => _remoteDataSource.promisePayment(draft));
+
+  @override
+  Future<Either<Failure, Unit>> recordReceived(ReceivedDraft draft) =>
+      _done(() => _remoteDataSource.recordReceived(draft));
+
+  @override
+  Future<Either<Failure, Unit>> confirmPartialPayment({
+    required String settlementId,
+    required int receivedCents,
+  }) => _done(
+    () => _remoteDataSource.confirmPartialPayment(
+      settlementId: settlementId,
+      receivedCents: receivedCents,
+    ),
+  );
+
+  @override
+  Future<Either<Failure, Unit>> setReminderDay({required String teamId, int? day}) =>
+      _done(() => _remoteDataSource.setReminderDay(teamId: teamId, day: day));
+
+  @override
+  Future<Either<Failure, List<Comment>>> getComments(String expenseId) =>
       _guard(() => _remoteDataSource.getComments(expenseId));
 
   @override

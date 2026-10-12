@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/squad_member.dart';
@@ -43,9 +44,9 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: AppColors.neutral100,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: AppRadius.sheet,
       ),
       builder: (_) => _BankDetailsSheet(initial: _details ?? const BankDetails()),
     );
@@ -62,9 +63,9 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.neutral100,
+        color: AppColors.card,
         border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
       ),
       child: Row(
         children: [
@@ -73,9 +74,9 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
             height: 40,
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.sm,
             ),
-            child: const Icon(Icons.account_balance_outlined, size: 20, color: oweColor),
+            child: Icon(Icons.account_balance_outlined, size: 20, color: oweColor),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -86,7 +87,7 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
                     children: [
                       Text(
                         has ? (details.bankName ?? 'Bank account') : 'Bank details',
-                        style: AppTextStyles.heading(size: 15, height: 1.3),
+                        style: AppTextStyles.title(size: 15, height: 1.3),
                       ),
                       Text(
                         has
@@ -170,7 +171,7 @@ class _BankDetailsSheetState extends State<_BankDetailsSheet> {
           filled: true,
           fillColor: AppColors.bg,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadius.md,
             borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
           ),
         ),

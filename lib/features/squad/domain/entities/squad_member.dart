@@ -13,6 +13,7 @@ class SquadMember extends Equatable {
     this.bankName,
     this.bankAccountName,
     this.bankAccountNo,
+    this.reminderDay,
   });
 
   final String profileId;
@@ -23,6 +24,10 @@ class SquadMember extends Equatable {
   final String? bankName;
   final String? bankAccountName;
   final String? bankAccountNo;
+
+  /// The day of the month (1–28) they get the "you owe" reminder; null
+  /// for the month's last day (044).
+  final int? reminderDay;
 
   bool get isAdmin => role != TeamRole.player;
 
@@ -49,6 +54,7 @@ class SquadMember extends Equatable {
     bankName,
     bankAccountName,
     bankAccountNo,
+    reminderDay,
   ];
 }
 

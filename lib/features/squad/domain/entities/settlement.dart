@@ -28,6 +28,10 @@ class Settlement extends Equatable {
     this.slipPath,
     this.rejectReason,
     this.respondedAt,
+    this.nudgedAt,
+    this.tripId,
+    this.recordedBy,
+    this.sentCents,
   });
 
   final String id;
@@ -40,6 +44,31 @@ class Settlement extends Equatable {
   final String? slipPath;
   final String? rejectReason;
   final DateTime? respondedAt;
+
+  /// When the payer last sent "Remind to confirm".
+  final DateTime? nudgedAt;
+
+  /// The trip it pays back; null for the squad's own.
+  final String? tripId;
+
+  /// Recorded by whoever was owed — cash they got in hand — rather than
+  /// sent by the payer (044). Confirmed from the start.
+  final String? recordedBy;
+
+  /// What the payer sent, when the receiver confirmed getting only part of
+  /// it ([amountCents]); the rest still counts as owed (044).
+  final int? sentCents;
+
+  /// Confirmed for less than was sent.
+  bool get isPartlyReceived => sentCents != null && sentCents! > amountCents;
+
+  /// The payer already sent "Remind to confirm" today (phone's day; the
+  /// server checks by the squad's time zone).
+  bool nudgedToday({DateTime? now}) {
+    final at = nudgedAt?.toLocal();
+    final today = (now ?? DateTime.now()).toLocal();
+    return at != null && at.year == today.year && at.month == today.month && at.day == today.day;
+  }
 
   bool get isPending => status == SettlementStatus.pending;
   bool get isConfirmed => status == SettlementStatus.confirmed;
@@ -57,5 +86,9 @@ class Settlement extends Equatable {
     slipPath,
     rejectReason,
     respondedAt,
+    nudgedAt,
+    tripId,
+    recordedBy,
+    sentCents,
   ];
 }

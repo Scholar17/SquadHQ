@@ -58,6 +58,54 @@ final class ExpenseDeleteRequested extends SquadLedgerEvent {
   List<Object?> get props => [expenseId];
 }
 
+final class TripSaveRequested extends SquadLedgerEvent {
+  const TripSaveRequested(this.draft);
+
+  final TripDraft draft;
+
+  @override
+  List<Object?> get props => [draft];
+}
+
+/// An admin closes a trip for settling up, or reopens it.
+final class TripClosedChanged extends SquadLedgerEvent {
+  const TripClosedChanged(this.tripId, {required this.closed});
+
+  final String tripId;
+  final bool closed;
+
+  @override
+  List<Object?> get props => [tripId, closed];
+}
+
+final class RecurringSaveRequested extends SquadLedgerEvent {
+  const RecurringSaveRequested(this.draft);
+
+  final RecurringDraft draft;
+
+  @override
+  List<Object?> get props => [draft];
+}
+
+final class RecurringPausedChanged extends SquadLedgerEvent {
+  const RecurringPausedChanged(this.id, {required this.paused});
+
+  final String id;
+  final bool paused;
+
+  @override
+  List<Object?> get props => [id, paused];
+}
+
+final class RecurringDeleteRequested extends SquadLedgerEvent {
+  const RecurringDeleteRequested(this.id);
+
+  final String id;
+
+  @override
+  List<Object?> get props => [id];
+}
+
 final class SettlementSendRequested extends SquadLedgerEvent {
   const SettlementSendRequested(this.draft);
 
@@ -77,6 +125,48 @@ final class SettlementAnswered extends SquadLedgerEvent {
 
   @override
   List<Object?> get props => [settlementId, accept, reason];
+}
+
+/// The receiver got only [receivedCents] of a pending payment (044).
+final class SettlementPartlyReceived extends SquadLedgerEvent {
+  const SettlementPartlyReceived(this.settlementId, {required this.receivedCents});
+
+  final String settlementId;
+  final int receivedCents;
+
+  @override
+  List<Object?> get props => [settlementId, receivedCents];
+}
+
+/// "I'll pay on …" (044).
+final class PaymentPromised extends SquadLedgerEvent {
+  const PaymentPromised(this.draft);
+
+  final PromiseDraft draft;
+
+  @override
+  List<Object?> get props => [draft];
+}
+
+/// Whoever's owed records cash they got, or calls what's left even (044).
+final class ReceivedRecorded extends SquadLedgerEvent {
+  const ReceivedRecorded(this.draft);
+
+  final ReceivedDraft draft;
+
+  @override
+  List<Object?> get props => [draft];
+}
+
+/// Your "you owe" reminder day in the squad; null for month end (044).
+final class ReminderDayChanged extends SquadLedgerEvent {
+  const ReminderDayChanged({required this.teamId, required this.day});
+
+  final String teamId;
+  final int? day;
+
+  @override
+  List<Object?> get props => [teamId, day];
 }
 
 sealed class SquadLedgerState extends Equatable {
@@ -142,10 +232,28 @@ class SquadLedgerBloc extends Bloc<SquadLedgerEvent, SquadLedgerState> {
     required DeleteExpense deleteExpense,
     required SendSettlement sendSettlement,
     required RespondSettlement respondSettlement,
+    required SaveTrip saveTrip,
+    required SetTripClosed setTripClosed,
+    required SaveRecurring saveRecurring,
+    required SetRecurringPaused setRecurringPaused,
+    required DeleteRecurring deleteRecurring,
+    required PromisePayment promisePayment,
+    required RecordReceived recordReceived,
+    required ConfirmPartialPayment confirmPartialPayment,
+    required SetReminderDay setReminderDay,
     required TeamChanges teamChanges,
   }) : _getSquadLedger = getSquadLedger,
+       _promisePayment = promisePayment,
+       _recordReceived = recordReceived,
+       _confirmPartialPayment = confirmPartialPayment,
+       _setReminderDay = setReminderDay,
        _saveExpense = saveExpense,
        _deleteExpense = deleteExpense,
+       _saveTrip = saveTrip,
+       _setTripClosed = setTripClosed,
+       _saveRecurring = saveRecurring,
+       _setRecurringPaused = setRecurringPaused,
+       _deleteRecurring = deleteRecurring,
        _sendSettlement = sendSettlement,
        _respondSettlement = respondSettlement,
        super(const SquadLedgerLoading()) {
@@ -158,6 +266,11 @@ class SquadLedgerBloc extends Bloc<SquadLedgerEvent, SquadLedgerState> {
         TeamTable.expensePayers,
         TeamTable.expenseShares,
         TeamTable.settlements,
+        TeamTable.squadReminders,
+        TeamTable.trips,
+        TeamTable.recurringExpenses,
+        TeamTable.expenseGuests,
+        TeamTable.paymentPromises,
       },
       onChange: () {
         if (!isClosed) add(const SquadRefreshRequested());
@@ -175,7 +288,32 @@ class SquadLedgerBloc extends Bloc<SquadLedgerEvent, SquadLedgerState> {
     on<ExpenseDeleteRequested>(
       (event, emit) => _submit(emit, () => _deleteExpense(event.expenseId)),
     );
+    on<TripSaveRequested>((event, emit) => _submit(emit, () => _saveTrip(event.draft)));
+    on<TripClosedChanged>(
+      (event, emit) =>
+          _submit(emit, () => _setTripClosed((tripId: event.tripId, closed: event.closed))),
+    );
+    on<RecurringSaveRequested>((event, emit) => _submit(emit, () => _saveRecurring(event.draft)));
+    on<RecurringPausedChanged>(
+      (event, emit) =>
+          _submit(emit, () => _setRecurringPaused((id: event.id, paused: event.paused))),
+    );
+    on<RecurringDeleteRequested>((event, emit) => _submit(emit, () => _deleteRecurring(event.id)));
     on<SettlementSendRequested>((event, emit) => _submit(emit, () => _sendSettlement(event.draft)));
+    on<PaymentPromised>((event, emit) => _submit(emit, () => _promisePayment(event.draft)));
+    on<ReceivedRecorded>((event, emit) => _submit(emit, () => _recordReceived(event.draft)));
+    on<SettlementPartlyReceived>(
+      (event, emit) => _submit(
+        emit,
+        () => _confirmPartialPayment((
+          settlementId: event.settlementId,
+          receivedCents: event.receivedCents,
+        )),
+      ),
+    );
+    on<ReminderDayChanged>(
+      (event, emit) => _submit(emit, () => _setReminderDay((teamId: event.teamId, day: event.day))),
+    );
     on<SettlementAnswered>(
       (event, emit) => _submit(
         emit,
@@ -191,8 +329,17 @@ class SquadLedgerBloc extends Bloc<SquadLedgerEvent, SquadLedgerState> {
   final GetSquadLedger _getSquadLedger;
   final SaveExpense _saveExpense;
   final DeleteExpense _deleteExpense;
+  final SaveTrip _saveTrip;
+  final SetTripClosed _setTripClosed;
+  final SaveRecurring _saveRecurring;
+  final SetRecurringPaused _setRecurringPaused;
+  final DeleteRecurring _deleteRecurring;
   final SendSettlement _sendSettlement;
   final RespondSettlement _respondSettlement;
+  final PromisePayment _promisePayment;
+  final RecordReceived _recordReceived;
+  final ConfirmPartialPayment _confirmPartialPayment;
+  final SetReminderDay _setReminderDay;
 
   /// Reloads when a squad-mate adds an expense, pays or confirms.
   late final TeamChangeWatcher _serverChanges;
@@ -215,8 +362,14 @@ class SquadLedgerBloc extends Bloc<SquadLedgerEvent, SquadLedgerState> {
     // A switch may have happened while loading.
     if (teamId != _teamId) return;
     result.fold(
-      (failure) =>
-          emit(SquadLedgerFailure(failure.message, const SquadLedgerLoaded(SquadLedger.empty))),
+      // Keep what's on screen if a refresh fails; a failed first load stays
+      // Loading underneath, so screens show the error (never an empty squad).
+      (failure) => emit(
+        SquadLedgerFailure(failure.message, switch (state.settled) {
+          final SquadLedgerLoaded loaded => loaded,
+          _ => const SquadLedgerLoading(),
+        }),
+      ),
       (ledger) => emit(SquadLedgerLoaded(ledger)),
     );
   }

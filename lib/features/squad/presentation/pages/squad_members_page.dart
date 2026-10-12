@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../../team_membership/domain/entities/team.dart';
+import '../../../team_membership/presentation/widgets/group_member_actions.dart';
 import '../../domain/entities/squad_member.dart';
 import '../active_group.dart';
 import '../bloc/squad_ledger_bloc.dart';
@@ -15,7 +17,8 @@ import '../squad_formatting.dart';
 import '../widgets/squad_widgets.dart';
 
 /// A squad's Members tab: your profile (and whether friends can pay you),
-/// the invite code, and everyone's role and balance.
+/// the invite code, and everyone's role and balance. Admins tap a member
+/// to remove them; anyone can leave from the bottom.
 class SquadMembersPage extends StatelessWidget {
   const SquadMembersPage({super.key, required this.user});
 
@@ -32,9 +35,7 @@ class SquadMembersPage extends StatelessWidget {
         child: BlocBuilder<SquadLedgerBloc, SquadLedgerState>(
           builder: (context, state) {
             final ledger = state.ledger;
-            if (squad == null || ledger == null) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.accent));
-            }
+            if (squad == null || ledger == null) return SquadLoadingView(state: state);
             final balances = ledger.balances;
             final members = [...ledger.members]
               ..sort((a, b) => (balances[b.profileId] ?? 0).compareTo(balances[a.profileId] ?? 0));
@@ -55,6 +56,7 @@ class SquadMembersPage extends StatelessWidget {
                       children: [
                         SquadAvatar(
                           initial: mine?.initial ?? '?',
+                          photoUrl: mine?.avatarUrl,
                           size: 48,
                           color: AppColors.accent300,
                         ),
@@ -65,7 +67,7 @@ class SquadMembersPage extends StatelessWidget {
                             children: [
                               Text(
                                 'Your profile',
-                                style: AppTextStyles.heading(size: 16, height: 1.3),
+                                style: AppTextStyles.title(size: 16, height: 1.3),
                               ),
                               const SizedBox(height: 4),
                               Wrap(
@@ -87,7 +89,7 @@ class SquadMembersPage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded, color: squadMuted),
+                        Icon(Icons.chevron_right_rounded, color: squadMuted),
                       ],
                     ),
                   ),
@@ -96,7 +98,7 @@ class SquadMembersPage extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadius.lg,
                     ),
                     child: Row(
                       children: [
@@ -126,7 +128,7 @@ class SquadMembersPage extends StatelessWidget {
                           icon: const Icon(Icons.copy_rounded, size: 16),
                           label: Text(
                             'Copy',
-                            style: AppTextStyles.heading(size: 13, color: AppColors.neutral100),
+                            style: AppTextStyles.title(size: 13, color: AppColors.onDark),
                           ),
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.neutral900,
@@ -149,9 +151,35 @@ class SquadMembersPage extends StatelessWidget {
                       isMe: member.profileId == me,
                       balance: balances[member.profileId] ?? 0,
                       money: (cents) => formatMoney(cents, ledger.currency),
+                      onTap: member.profileId != me && canRemoveMember(squad.role, member.role)
+                          ? () {
+                              final ledgerBloc = context.read<SquadLedgerBloc>();
+                              removeFromGroup(
+                                context,
+                                team: squad,
+                                profileId: member.profileId,
+                                name: member.name,
+                                onRemoved: () => ledgerBloc.add(const SquadRefreshRequested()),
+                              );
+                            }
+                          : null,
                     ),
                     const SizedBox(height: 8),
                   ],
+                  const SizedBox(height: 12),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => leaveGroup(context, squad),
+                      child: Text(
+                        'Leave squad',
+                        style: AppTextStyles.body(
+                          size: 13,
+                          weight: FontWeight.w700,
+                          color: AppColors.accent700,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -174,7 +202,7 @@ class _Chip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
         color: ok ? AppColors.accent2_100 : AppColors.accent100,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadius.pill,
       ),
       child: Text(
         text,
@@ -195,12 +223,16 @@ class _MemberRow extends StatelessWidget {
     required this.isMe,
     required this.balance,
     required this.money,
+    this.onTap,
   });
 
   final SquadMember member;
   final bool isMe;
   final int balance;
   final String Function(int cents) money;
+
+  /// Set when you may remove them.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -210,10 +242,12 @@ class _MemberRow extends StatelessWidget {
       _ => ('settled up', squadMuted),
     };
     return SquadCard(
+      onTap: onTap,
       child: Row(
         children: [
           SquadAvatar(
             initial: member.initial,
+            photoUrl: member.avatarUrl,
             color: isMe
                 ? AppColors.accent300
                 : member.role == TeamRole.superAdmin
@@ -227,7 +261,7 @@ class _MemberRow extends StatelessWidget {
               children: [
                 Text(
                   isMe ? 'You' : member.name,
-                  style: AppTextStyles.heading(size: 15, height: 1.3),
+                  style: AppTextStyles.title(size: 15, height: 1.3),
                 ),
                 Text(
                   member.roleLabel,

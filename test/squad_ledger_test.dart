@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:squad_hq/features/squad/domain/entities/expense.dart';
 import 'package:squad_hq/features/squad/domain/entities/expense_split.dart';
+import 'package:squad_hq/features/squad/domain/entities/recurring_expense.dart';
 import 'package:squad_hq/features/squad/domain/entities/settlement.dart';
 import 'package:squad_hq/features/squad/domain/entities/squad_ledger.dart';
 import 'package:squad_hq/features/squad/domain/entities/squad_member.dart';
@@ -44,6 +45,21 @@ void main() {
       expect(split.shares, {'ko': 33334, 'min': 33333, 'su': 33333});
       expect(split.shares.values.reduce((a, b) => a + b), 100000);
       expect(split.roundedCents, isNull);
+    });
+
+    test('Custom: only the ticked people, each with a typed amount', () {
+      ExpenseSplit custom(List<String> ticked) => ExpenseSplit.compute(
+        mode: ExpenseSplitMode.custom,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: ticked,
+        // c's amount was typed, then c unticked: it doesn't count.
+        exactCents: {'a': 60000, 'b': 40000, 'c': 25000},
+      );
+      expect(custom(['a', 'b']).shares, {'a': 60000, 'b': 40000});
+      expect(custom(['a', 'b']).isValid, isTrue);
+      expect(custom(['a', 'b', 'c']).isValid, isFalse);
+      expect(custom([]).error, 'Pick who shares it');
     });
 
     test('Exact shares must add up to the amount', () {
@@ -98,6 +114,42 @@ void main() {
     });
   });
 
+  group('RecurringExpense', () {
+    RecurringExpense plan({int day = 15, DateTime? lastMonth, DateTime? pausedAt}) =>
+        RecurringExpense(
+          id: 'yt',
+          title: 'YouTube Family',
+          category: ExpenseCategory.other,
+          amountCents: 42000,
+          payerId: 'a',
+          splitMode: ExpenseSplitMode.equal,
+          shares: const {'a': 14000, 'b': 14000, 'c': 14000},
+          chargeDay: day,
+          startsOn: DateTime(2026, 10),
+          createdBy: 'a',
+          lastMonth: lastMonth,
+          pausedAt: pausedAt,
+        );
+
+    test('"Last day" fits each month', () {
+      final lastDay = plan(day: RecurringExpense.lastDay);
+      expect(lastDay.chargeDateIn(DateTime(2027, 2)), DateTime(2027, 2, 28));
+      expect(lastDay.chargeDateIn(DateTime(2028, 2)), DateTime(2028, 2, 29));
+      expect(lastDay.chargeDateIn(DateTime(2026, 10)), DateTime(2026, 10, 31));
+    });
+
+    test('Next charge: this month until charged, then next; none while paused', () {
+      expect(plan().nextCharge(DateTime(2026, 10, 4)), DateTime(2026, 10, 15));
+      expect(
+        plan(lastMonth: DateTime(2026, 10)).nextCharge(DateTime(2026, 10, 20)),
+        DateTime(2026, 11, 15),
+      );
+      // Not before its first month.
+      expect(plan().nextCharge(DateTime(2026, 9, 1)), DateTime(2026, 10, 15));
+      expect(plan(pausedAt: DateTime(2026, 10, 2)).nextCharge(DateTime(2026, 10, 4)), isNull);
+    });
+  });
+
   group('SquadLedger', () {
     SquadMember member(String id) => SquadMember(profileId: id, name: id, role: TeamRole.player);
 
@@ -137,6 +189,102 @@ void main() {
       expect(ledger.rawDebts, hasLength(2));
     });
 
+    test('Several payers: each person short owes each payer in proportion', () {
+      // ฿1,000 dinner: Aung paid ฿600, Ko ฿400; four people, ฿250 each.
+      final dinner = Expense(
+        id: 'dinner',
+        title: 'dinner',
+        category: ExpenseCategory.food,
+        amountCents: 100000,
+        spentAt: DateTime(2026, 9, 27),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        payers: const {'aung': 60000, 'ko': 40000},
+        shares: const {'aung': 25000, 'ko': 25000, 'min': 25000, 'su': 25000},
+        createdBy: 'aung',
+      );
+      // Aung is ฿350 over, Ko ฿150: a ฿250 share is 70% / 30%.
+      expect(dinner.owed, [
+        (fromId: 'min', toId: 'aung', cents: 17500),
+        (fromId: 'min', toId: 'ko', cents: 7500),
+        (fromId: 'su', toId: 'aung', cents: 17500),
+        (fromId: 'su', toId: 'ko', cents: 7500),
+      ]);
+      expect(dinner.netFor('ko'), 15000);
+      expect(dinner.canEdit('ko', isAdmin: false), isTrue);
+
+      final ledger = SquadLedger(
+        currency: GroupCurrency.thb,
+        members: [member('aung'), member('ko'), member('min'), member('su')],
+        expenses: [dinner],
+      );
+      expect(ledger.balances, {'aung': 35000, 'ko': 15000, 'min': -25000, 'su': -25000});
+      expect(ledger.owedBetween('min', 'ko'), 7500);
+      expect(ledger.debtLines('min', 'aung').single.cents, 17500);
+      expect(ledger.paidByLabel(dinner), 'aung & ko');
+    });
+
+    test('Several payers: odd amounts still add up exactly', () {
+      final odd = Expense(
+        id: 'odd',
+        title: 'odd',
+        category: ExpenseCategory.food,
+        amountCents: 100001,
+        spentAt: DateTime(2026, 9, 27),
+        splitMode: ExpenseSplitMode.exact,
+        payerId: 'a',
+        payers: const {'a': 33334, 'b': 33333, 'c': 33334},
+        shares: const {'d': 33333, 'e': 33333, 'f': 33335},
+        createdBy: 'a',
+      );
+      final owed = odd.owed;
+      for (final id in ['d', 'e', 'f']) {
+        final paid = owed.where((x) => x.fromId == id).fold(0, (sum, x) => sum + x.cents);
+        expect(paid, odd.shareOf(id));
+      }
+      for (final id in ['a', 'b', 'c']) {
+        final got = owed.where((x) => x.toId == id).fold(0, (sum, x) => sum + x.cents);
+        expect(got, odd.paidBy(id));
+      }
+    });
+
+    test('A treat with several payers: nobody owes anything', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.treat,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+        payers: const {'a': 70000, 'b': 30000},
+      );
+      expect(split.shares, {'a': 70000, 'b': 30000});
+    });
+
+    test('Every expense behind a debt shows, oldest cleared first by payments', () {
+      // Newest first, like the ledger.
+      final ledger = SquadLedger(
+        currency: GroupCurrency.thb,
+        members: [member('me'), member('aung')],
+        expenses: [
+          expense('taxi', 'aung', {'me': 10000, 'aung': 10000}),
+          expense('hotel', 'me', {'me': 20000, 'aung': 20000}),
+          expense('drinks', 'aung', {'me': 15000, 'aung': 15000}),
+          expense('dinner', 'aung', {'me': 30000, 'aung': 30000}),
+        ],
+        settlements: [settlement('me', 'aung', 10000, SettlementStatus.confirmed)],
+      );
+      final lines = ledger.debtLines('me', 'aung');
+      // ฿300 + ฿150 + ฿100 − ฿200 (hotel) − ฿100 paid = ฿250.
+      expect(ledger.owedBetween('me', 'aung'), 25000);
+      expect(lines.fold(0, (sum, line) => sum + line.cents), 25000);
+      // Every expense shows; the payment covered part of the oldest.
+      expect(
+        [for (final line in lines) (line.expense?.id, line.cents)],
+        [('dinner', 20000), ('drinks', 15000), ('taxi', 10000), ('hotel', -20000)],
+      );
+      expect(lines.first.isPartlyPaid, isTrue);
+      expect(lines[1].isPartlyPaid, isFalse);
+    });
+
     test('A payment changes balances only once the receiver confirms it', () {
       final expenses = [
         expense('dinner', 'aung', {'aung': 30000, 'toe': 30000}),
@@ -160,6 +308,56 @@ void main() {
       expect(confirmed.balanceOf('aung'), 0);
       expect(confirmed.simplifiedDebts, isEmpty);
       expect(confirmed.rawDebts, isEmpty);
+    });
+
+    test('Send again shows once per receiver, and not after sending again', () {
+      final now = DateTime(2026, 9, 29);
+      Settlement attempt(int n, SettlementStatus status, {String to = 'aung'}) => Settlement(
+        id: 'try-$n-$to',
+        fromId: 'toe',
+        toId: to,
+        amountCents: 30000,
+        method: SettlementMethod.qr,
+        status: status,
+        createdAt: DateTime(2026, 9, 28, n),
+        slipPath: 'slip-$n',
+      );
+      SquadLedger ledger(List<Settlement> newestFirst) => SquadLedger(
+        currency: GroupCurrency.thb,
+        members: [member('aung'), member('toe'), member('min')],
+        settlements: newestFirst,
+      );
+
+      final rejectedOnce = ledger([attempt(1, SettlementStatus.rejected)]);
+      expect(rejectedOnce.sentBackTo('toe', now: now).map((s) => s.rejected.id), ['try-1-aung']);
+
+      // Sent again: the same item, now waiting on Aung — nothing to send.
+      final resent = ledger([
+        attempt(2, SettlementStatus.pending),
+        attempt(1, SettlementStatus.rejected),
+      ]);
+      final resentItem = resent.sentBackTo('toe', now: now).single;
+      expect(resentItem.rejected.id, 'try-1-aung');
+      expect(resentItem.resent?.id, 'try-2-aung');
+      expect(resent.awaitingConfirmationBy('aung').map((s) => s.slipPath), ['slip-2']);
+
+      // Rejected again: still one item, the latest.
+      final rejectedTwice = ledger([
+        attempt(2, SettlementStatus.rejected),
+        attempt(1, SettlementStatus.rejected),
+        attempt(3, SettlementStatus.rejected, to: 'min'),
+      ]);
+      expect(rejectedTwice.sentBackTo('toe', now: now).map((s) => (s.rejected.id, s.resent)), [
+        ('try-2-aung', null),
+        ('try-3-min', null),
+      ]);
+      expect(rejectedTwice.sentBackTo('aung', now: now), isEmpty);
+
+      final confirmed = ledger([
+        attempt(3, SettlementStatus.confirmed),
+        attempt(2, SettlementStatus.rejected),
+      ]);
+      expect(confirmed.sentBackTo('toe', now: now), isEmpty);
     });
 
     test('Balances always sum to zero', () {

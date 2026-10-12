@@ -10,20 +10,29 @@ import 'expense.dart';
 class ExpenseSplit extends Equatable {
   const ExpenseSplit._({required this.shares, this.exactCents, this.roundedCents, this.error});
 
-  /// [participants] share it: everyone for [ExpenseSplitMode.equal], the
-  /// ticked people for [ExpenseSplitMode.chosen]. [exactCents] are the
-  /// typed amounts for [ExpenseSplitMode.exact].
+  /// [payerId] is whoever paid the most; with [payers] (several people
+  /// paid) a treat leaves each covering what they paid. [participants] share it: everyone for [ExpenseSplitMode.equal], the
+  /// ticked people for [ExpenseSplitMode.chosen] and
+  /// [ExpenseSplitMode.custom]. [exactCents] are the typed amounts for
+  /// [ExpenseSplitMode.exact], and for [ExpenseSplitMode.custom] where only
+  /// the participants' count.
   factory ExpenseSplit.compute({
     required ExpenseSplitMode mode,
     required int totalCents,
     required String payerId,
     required List<String> participants,
     Map<String, int> exactCents = const {},
+    Map<String, int>? payers,
   }) {
     if (totalCents <= 0) return const ExpenseSplit._(shares: {}, error: 'Enter an amount');
     return switch (mode) {
-      ExpenseSplitMode.treat => ExpenseSplit._(shares: {payerId: totalCents}),
+      // A treat: each payer covers what they paid, so nobody owes.
+      ExpenseSplitMode.treat => ExpenseSplit._(shares: payers ?? {payerId: totalCents}),
       ExpenseSplitMode.exact => _exact(totalCents, exactCents),
+      ExpenseSplitMode.custom =>
+        participants.isEmpty
+            ? const ExpenseSplit._(shares: {}, error: 'Pick who shares it')
+            : _exact(totalCents, {for (final id in participants) id: ?exactCents[id]}),
       ExpenseSplitMode.equal ||
       ExpenseSplitMode.chosen => _equal(totalCents, payerId, participants),
     };
