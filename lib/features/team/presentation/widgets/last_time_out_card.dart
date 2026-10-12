@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team_snapshot.dart';
 
@@ -15,14 +16,14 @@ class LastTimeOutCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'LAST TIME OUT',
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+            style: AppTextStyles.label(color: AppColors.textMuted),
           ),
           const SizedBox(height: 10),
           Row(
@@ -31,7 +32,7 @@ class LastTimeOutCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   result.homeTeam,
-                  style: AppTextStyles.heading(size: 15),
+                  style: AppTextStyles.title(size: 15),
                 ),
               ),
               Text(
@@ -42,7 +43,7 @@ class LastTimeOutCard extends StatelessWidget {
                 child: Text(
                   result.awayTeam,
                   textAlign: TextAlign.right,
-                  style: AppTextStyles.heading(size: 15),
+                  style: AppTextStyles.title(size: 15),
                 ),
               ),
             ],
@@ -53,7 +54,7 @@ class LastTimeOutCard extends StatelessWidget {
             style: AppTextStyles.body(
               size: 12,
               weight: FontWeight.w500,
-              color: AppColors.text.withValues(alpha: 0.6),
+              color: AppColors.textMuted,
               height: 1.5,
             ),
           ),

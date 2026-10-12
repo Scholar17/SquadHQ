@@ -25,22 +25,17 @@ final class TeamError extends TeamState {
 final class TeamLoaded extends TeamState {
   const TeamLoaded({
     required this.snapshot,
-    required this.role,
     required this.myRsvp,
   });
 
   final TeamSnapshot snapshot;
-  final SquadRole role;
   final RsvpStatus myRsvp;
 
-  bool get isManager => role == SquadRole.manager;
-
-  TeamLoaded copyWith({SquadRole? role, RsvpStatus? myRsvp}) => TeamLoaded(
+  TeamLoaded copyWith({RsvpStatus? myRsvp}) => TeamLoaded(
         snapshot: snapshot,
-        role: role ?? this.role,
         myRsvp: myRsvp ?? this.myRsvp,
       );
 
   @override
-  List<Object?> get props => [snapshot, role, myRsvp];
+  List<Object?> get props => [snapshot, myRsvp];
 }

@@ -13,10 +13,6 @@ final class TeamStarted extends TeamEvent {
   const TeamStarted();
 }
 
-final class TeamRoleToggled extends TeamEvent {
-  const TeamRoleToggled();
-}
-
 /// The signed-in player's own RSVP — separate from the roster, which
 /// represents everyone else on the team.
 final class TeamMyRsvpChanged extends TeamEvent {

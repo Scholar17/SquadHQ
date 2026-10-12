@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team_snapshot.dart';
 
@@ -30,7 +31,7 @@ class MatchdayHeroCard extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: AppColors.neutral900,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xl,
         boxShadow: const [
           BoxShadow(color: Color(0x292E2B25), blurRadius: 10, offset: Offset(0, 3)),
         ],
@@ -55,7 +56,7 @@ class MatchdayHeroCard extends StatelessWidget {
                 style: AppTextStyles.body(
                   size: 11,
                   weight: FontWeight.w600,
-                  color: AppColors.neutral100.withValues(alpha: 0.55),
+                  color: AppColors.onDarkMuted,
                 ),
               ),
             ],
@@ -63,14 +64,14 @@ class MatchdayHeroCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             'vs ${match.opponent}',
-            style: AppTextStyles.heading(size: 29, color: AppColors.neutral100),
+            style: AppTextStyles.heading(size: 29, color: AppColors.onDark),
           ),
           const SizedBox(height: 4),
           Text(
             match.venueLine,
             style: AppTextStyles.body(
               size: 13,
-              color: AppColors.neutral100.withValues(alpha: 0.62),
+              color: AppColors.onDarkMuted,
             ),
           ),
           Container(
@@ -162,7 +163,7 @@ class _Stat extends StatelessWidget {
             style: AppTextStyles.body(
               size: 11,
               weight: FontWeight.w500,
-              color: AppColors.neutral100.withValues(alpha: 0.55),
+              color: AppColors.onDarkMuted,
             ),
           ),
         ],
@@ -200,19 +201,19 @@ class _PillButton extends StatelessWidget {
               ),
               child: Text(
                 label,
-                style: AppTextStyles.heading(size: 14, color: AppColors.neutral800),
+                style: AppTextStyles.title(size: 14, color: AppColors.neutral800),
               ),
             )
           : OutlinedButton(
               onPressed: onTap,
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.neutral100,
+                foregroundColor: AppColors.onDark,
                 side: const BorderSide(color: Color(0x47F9F4ED)),
                 shape: const StadiumBorder(),
               ),
               child: Text(
                 label,
-                style: AppTextStyles.heading(size: 14, color: AppColors.neutral100),
+                style: AppTextStyles.title(size: 14, color: AppColors.onDark),
               ),
             ),
     );

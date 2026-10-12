@@ -14,6 +14,11 @@ import 'package:squad_hq/core/theme/app_colors.dart';
 import 'package:squad_hq/features/auth/domain/entities/app_user.dart';
 import 'package:squad_hq/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:squad_hq/features/auth/presentation/pages/profile_page.dart';
+import 'package:squad_hq/features/comments/domain/entities/match_topic.dart';
+import 'package:squad_hq/features/comments/domain/entities/mention.dart';
+import 'package:squad_hq/features/comments/domain/repositories/match_comments_repository.dart';
+import 'package:squad_hq/features/comments/domain/repositories/mention_members_repository.dart';
+import 'package:squad_hq/features/player_rating/domain/repositories/player_rating_repository.dart';
 import 'package:squad_hq/features/match/domain/entities/match.dart';
 import 'package:squad_hq/features/match/domain/entities/matchday_player.dart';
 import 'package:squad_hq/features/match/domain/entities/match_history.dart';
@@ -26,24 +31,28 @@ import 'package:squad_hq/features/match/presentation/bloc/match_bloc.dart';
 import 'package:squad_hq/features/match/presentation/bloc/match_event.dart';
 import 'package:squad_hq/features/match/presentation/bloc/match_history_bloc.dart';
 import 'package:squad_hq/features/notifications/domain/entities/app_notification.dart';
+import 'package:squad_hq/features/team_membership/presentation/bloc/team_membership_event.dart';
 import 'package:squad_hq/features/notifications/domain/repositories/notification_repository.dart';
 import 'package:squad_hq/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:squad_hq/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:squad_hq/features/squad/domain/entities/expense.dart';
+import 'package:squad_hq/features/squad/domain/entities/payment_promise.dart';
 import 'package:squad_hq/features/squad/domain/repositories/squad_repository.dart';
 import 'package:squad_hq/features/squad/presentation/bloc/squad_ledger_bloc.dart';
 import 'package:squad_hq/features/squad/presentation/pages/expense_detail_page.dart';
+import 'package:squad_hq/features/squad/presentation/pages/settle_with_page.dart';
+import 'package:squad_hq/features/squad/presentation/pages/trip_page.dart';
+import 'package:squad_hq/features/squad/domain/entities/squad_member.dart' as squad_member;
+import 'package:squad_hq/features/squad/domain/entities/trip.dart';
 import 'package:squad_hq/features/squad/presentation/pages/expenses_page.dart';
 import 'package:squad_hq/features/squad/presentation/pages/settle_page.dart';
 import 'package:squad_hq/features/squad/presentation/pages/squad_home_page.dart';
 import 'package:squad_hq/features/squad/presentation/pages/squad_members_page.dart';
-import 'package:squad_hq/features/team/domain/entities/team_snapshot.dart';
 import 'package:squad_hq/features/team/presentation/bloc/team_bloc.dart';
 import 'package:squad_hq/features/team/presentation/bloc/team_event.dart';
 import 'package:squad_hq/features/team/presentation/pages/app_shell_page.dart';
 import 'package:squad_hq/features/team/presentation/pages/dashboard_page.dart';
 import 'package:squad_hq/features/team/presentation/pages/match_page.dart';
-import 'package:squad_hq/features/team/presentation/pages/player_card_page.dart';
 import 'package:squad_hq/features/team/presentation/pages/squad_page.dart';
 import 'package:squad_hq/features/team/presentation/pages/wallet_page.dart';
 import 'package:squad_hq/features/team/presentation/widgets/group_tab.dart';
@@ -56,7 +65,10 @@ import 'package:squad_hq/features/wallet/presentation/bloc/wallet_bloc.dart';
 import 'package:squad_hq/features/wallet/presentation/bloc/wallet_event.dart';
 import 'package:squad_hq/features/wallet/presentation/pages/wallet_bills_page.dart';
 
+import 'fake_match_comments_repository.dart';
+import 'fake_mention_members_repository.dart';
 import 'fake_notification_repository.dart';
+import 'fake_player_rating_repository.dart';
 import 'fake_squad_repository.dart';
 import 'fake_team_changes.dart';
 import 'fake_match_repository.dart';
@@ -73,8 +85,36 @@ class _SeededTeamMembershipBloc extends TeamMembershipBloc {
           getMyTeams: sl(),
           switchActiveTeam: sl(),
           setTeamTimezone: sl(),
+          leaveTeam: sl(),
+          removeTeamMember: sl(),
+          teamChanges: sl(),
         ) {
     emit(TeamMembershipLoaded(teams));
+  }
+
+  /// Switching happens in memory — the real one round-trips to Supabase.
+  @override
+  void add(TeamMembershipEvent event) {
+    final current = state;
+    if (event is TeamSwitchRequested && current is TeamMembershipLoaded) {
+      emit(
+        TeamMembershipLoaded([
+          for (final team in current.teams)
+            Team(
+              id: team.id,
+              name: team.name,
+              inviteCode: team.inviteCode,
+              role: team.role,
+              isActive: team.id == event.teamId,
+              timezone: team.timezone,
+              kind: team.kind,
+              currency: team.currency,
+            ),
+        ]),
+      );
+      return;
+    }
+    super.add(event);
   }
 }
 
@@ -83,6 +123,9 @@ void main() {
   final fakeWallet = FakeWalletRepository(fakeMatches);
   final fakeNotifications = FakeNotificationRepository();
   final fakeSquad = FakeSquadRepository(userId: 'test-1');
+  final fakeMatchComments = FakeMatchCommentsRepository(userId: 'test-1');
+  final fakeMentionMembers = FakeMentionMembersRepository();
+  final fakeRatings = FakePlayerRatingRepository(userId: 'test-1');
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -100,6 +143,12 @@ void main() {
       ..registerLazySingleton<NotificationRepository>(() => fakeNotifications)
       ..unregister<SquadRepository>()
       ..registerLazySingleton<SquadRepository>(() => fakeSquad)
+      ..unregister<MatchCommentsRepository>()
+      ..registerLazySingleton<MatchCommentsRepository>(() => fakeMatchComments)
+      ..unregister<MentionMembersRepository>()
+      ..registerLazySingleton<MentionMembersRepository>(() => fakeMentionMembers)
+      ..unregister<PlayerRatingRepository>()
+      ..registerLazySingleton<PlayerRatingRepository>(() => fakeRatings)
       ..unregister<TeamChanges>()
       ..registerLazySingleton<TeamChanges>(FakeTeamChanges.new);
   });
@@ -109,6 +158,9 @@ void main() {
     fakeWallet.reset();
     fakeNotifications.reset();
     fakeSquad.reset();
+    fakeMatchComments.reset();
+    fakeMentionMembers.reset();
+    fakeRatings.reset();
   });
 
   const user = AppUser(
@@ -142,6 +194,8 @@ void main() {
   }) =>
       MultiBlocProvider(
         providers: [
+          // At the app root, as in app.dart.
+          BlocProvider<AuthBloc>(create: (_) => sl<AuthBloc>()),
           BlocProvider<TeamMembershipBloc>(
             create: (_) => _SeededTeamMembershipBloc(teams ?? [activeTeam(role)]),
           ),
@@ -152,6 +206,15 @@ void main() {
               deleteExpense: sl(),
               sendSettlement: sl(),
               respondSettlement: sl(),
+              saveTrip: sl(),
+              setTripClosed: sl(),
+              saveRecurring: sl(),
+              setRecurringPaused: sl(),
+              deleteRecurring: sl(),
+              promisePayment: sl(),
+              recordReceived: sl(),
+              confirmPartialPayment: sl(),
+              setReminderDay: sl(),
               teamChanges: sl(),
             ),
           ),
@@ -298,6 +361,18 @@ void main() {
             ExpenseDetailPage(expenseId: state.pathParameters['id']!, user: user),
       ),
       GoRoute(
+        path: '/settle-with/:id',
+        builder: (context, state) => SettleWithPage(
+          otherId: state.pathParameters['id']!,
+          user: user,
+          tripId: state.uri.queryParameters['trip'],
+        ),
+      ),
+      GoRoute(
+        path: '/trip/:id',
+        builder: (context, state) => TripPage(tripId: state.pathParameters['id']!, user: user),
+      ),
+      GoRoute(
         path: AppRoutes.walletBills,
         builder: (context, state) {
           final args = state.extra! as WalletBillsArgs;
@@ -324,41 +399,36 @@ void main() {
     expect(find.textContaining('Once a match finishes'), findsOneWidget);
   });
 
-  testWidgets('Home role pill switches an admin between Manager and Player views',
-      (tester) async {
+  testWidgets('Home always shows an admin the Manager view — no role pill', (tester) async {
     await pumpHome(tester, const DashboardPage(user: user));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Manager'), findsOneWidget);
     expect(find.text('+ New match'), findsOneWidget);
-
-    await tester.tap(find.text('Manager'));
-    await tester.pump();
-
-    expect(find.text('Player'), findsOneWidget);
-    expect(find.text('+ New match'), findsNothing);
-
-    await tester.tap(find.text('Player'));
-    await tester.pump();
-
-    expect(find.text('Manager'), findsOneWidget);
-    expect(find.text('+ New match'), findsOneWidget);
+    expect(find.text('Manager'), findsNothing);
+    expect(find.text('Player'), findsNothing);
   });
 
-  testWidgets("Home role pill doesn't let a player switch to Manager", (tester) async {
+  testWidgets("Home's match rows show the viewer's own RSVP", (tester) async {
+    await pumpHome(tester, const DashboardPage(user: user));
+    await tester.pumpAndSettle();
+    expect(find.text('Vote needed'), findsOneWidget);
+
+    await fakeMatches.setRsvp(matchId: 'match-1', answer: RsvpAnswer.yes);
+    tester.element(find.byType(DashboardPage)).read<WalletBloc>().add(const WalletRefreshRequested());
+    await tester.pumpAndSettle();
+    expect(find.text("You're in ✓"), findsOneWidget);
+    expect(find.text('Vote needed'), findsNothing);
+  });
+
+  testWidgets('Home shows a player the Player view — no role pill', (tester) async {
     await pumpHome(tester, const DashboardPage(user: user), role: TeamRole.player);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Player'), findsOneWidget);
-
-    await tester.tap(find.text('Player'));
-    await tester.pump();
-
-    expect(find.text('Player'), findsOneWidget);
+    expect(find.text('+ New match'), findsNothing);
     expect(find.text('Manager'), findsNothing);
-    expect(find.text('Only team admins can switch to the Manager view'), findsOneWidget);
+    expect(find.text('Player'), findsNothing);
   });
 
   testWidgets('Match tab lets a player RSVP to the next match', (tester) async {
@@ -450,13 +520,12 @@ void main() {
     expect(find.text('17%'), findsOneWidget);
   });
 
-  testWidgets('Admins in the Manager view can vote too, without the urgent styling',
-      (tester) async {
+  testWidgets('Admins get the same urgent vote prompt as players', (tester) async {
     await pumpHome(tester, const MatchPage(user: user));
     await tester.pumpAndSettle();
 
-    // Not voted yet: options + Submit vote, but no glow/"needed" label.
-    expect(find.text('POLL · YOUR VOTE NEEDED'), findsNothing);
+    // Not voted yet: options + Submit vote, flagged as needed.
+    expect(find.text('POLL · YOUR VOTE NEEDED'), findsOneWidget);
     expect(find.text('Submit vote'), findsOneWidget);
     expect(
       tester.getTopLeft(find.text('Are you playing vs Sundown United?')).dy,
@@ -543,6 +612,172 @@ void main() {
     expect(fakeWallet.bills['match-1']?.payerId, 'test-1');
   });
 
+  testWidgets('@mention a teammate: picked from a list, shown by their current username', (
+    tester,
+  ) async {
+    await pumpHome(tester, const MatchPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    // A bigger group than fits in the @ list at once.
+    fakeMentionMembers.members = [
+      ...FakeMentionMembersRepository.defaults,
+      for (var i = 10; i < 20; i++)
+        MentionMember(
+          id: '00000000-0000-0000-0000-0000000000$i',
+          name: 'Player $i',
+          username: 'player$i',
+        ),
+    ];
+    const matchThread = (matchId: 'match-1', topic: MatchTopic.match);
+    await tester.scrollUntilVisible(find.text('Match chat'), 200);
+    await tester.tap(find.text('Match chat'));
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const ValueKey('comment-field'));
+    // @ alone lists the whole group, scrolling.
+    await tester.tap(field);
+    await tester.enterText(field, '@');
+    await tester.pumpAndSettle();
+    final suggestions = find.byKey(const ValueKey('mention-suggestions'));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('mention-00000000-0000-0000-0000-000000000019')),
+      100,
+      scrollable: find.descendant(of: suggestions, matching: find.byType(Scrollable)),
+    );
+    fakeMentionMembers.reset();
+
+    // Typing @au suggests Aung Ko; picking them fills in their username.
+    await tester.enterText(field, 'Bibs @au');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('mention-suggestions')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mention-test-1')), findsNothing); // not yourself
+    await tester.tap(find.byKey(const ValueKey('mention-${FakeMentionMembersRepository.aungKo}')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller!.text, 'Bibs @aungko ');
+    expect(find.byKey(const ValueKey('mention-suggestions')), findsNothing);
+
+    // Saved by id; shown as @aungko.
+    await tester.enterText(field, 'Bibs @aungko please, and @nobody');
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(
+      fakeMatchComments.inThread(matchThread).single.body,
+      'Bibs <@${FakeMentionMembersRepository.aungKo}> please, and @nobody',
+    );
+    expect(find.text('Bibs @aungko please, and @nobody'), findsOneWidget);
+
+    // Aung Ko renames themselves: the old comment follows.
+    fakeMentionMembers.members = [
+      for (final member in FakeMentionMembersRepository.defaults)
+        member.id == FakeMentionMembersRepository.aungKo
+            ? const MentionMember(
+                id: FakeMentionMembersRepository.aungKo,
+                name: 'Aung Ko',
+                username: 'ak10',
+              )
+            : member,
+    ];
+    (sl<TeamChanges>() as FakeTeamChanges).push('team-1', TeamTable.matchComments);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Bibs @ak10 please, and @nobody'), findsOneWidget);
+
+    // Renamed again, with no new comment to reload the thread: reopening
+    // the chat catches up.
+    fakeMentionMembers.members = [
+      for (final member in FakeMentionMembersRepository.defaults)
+        member.id == FakeMentionMembersRepository.aungKo
+            ? const MentionMember(
+                id: FakeMentionMembersRepository.aungKo,
+                name: 'Aung Ko',
+                username: 'ak7',
+              )
+            : member,
+    ];
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1 comment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bibs @ak7 please, and @nobody'), findsOneWidget);
+  });
+
+  testWidgets('Match chat and bill comments, with replies, live', (tester) async {
+    fakeWallet.bills['match-1'] = const MatchBill(
+      totalCost: 900,
+      payerId: 'p-2',
+      payerName: 'Aung Ko',
+      payerQrPath: 'p-2/qr.png',
+      splitMode: SplitMode.team,
+    );
+    await pumpHome(tester, const MatchPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    const matchThread = (matchId: 'match-1', topic: MatchTopic.match);
+    const billThread = (matchId: 'match-1', topic: MatchTopic.bill);
+
+    // The match's thread: a comment.
+    await tester.scrollUntilVisible(find.text('Match chat'), 200);
+    expect(find.text('Talk about the match with the team'), findsOneWidget);
+    await tester.tap(find.text('Match chat'));
+    await tester.pumpAndSettle();
+    expect(find.text('No comments yet. Sort out lifts, bibs, the ball…'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('comment-field')), 'Who has the bibs?');
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(find.text('Who has the bibs?'), findsOneWidget);
+    expect(find.text('You'), findsOneWidget);
+
+    // Aung Ko answers on their phone; it arrives over Realtime.
+    fakeMatchComments.commentAs(
+      'p-2',
+      matchThread,
+      'I do!',
+      parentId: fakeMatchComments.inThread(matchThread).single.id,
+    );
+    (sl<TeamChanges>() as FakeTeamChanges).push('team-1', TeamTable.matchComments);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('I do!'), findsOneWidget);
+    expect(find.text('COMMENTS · 2'), findsOneWidget);
+
+    // Replying to the reply joins the same thread.
+    await tester.tap(find.text('Reply').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Replying to Aung Ko'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('comment-field')), 'Great, thanks');
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    final thread = fakeMatchComments.inThread(matchThread);
+    expect(thread.last.parentId, thread.first.id);
+
+    // Back on the Match tab: the count and the latest comment.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('3 comments'), findsOneWidget);
+    expect(find.text('You: Great, thanks'), findsOneWidget);
+
+    // The bill has its own thread, on its card.
+    await tester.scrollUntilVisible(find.text('Comment on this bill'), -200);
+    await tester.tap(find.text('Comment on this bill'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bill comments'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('comment-field')), 'Drinks included?');
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(fakeMatchComments.inThread(billThread).single.body, 'Drinks included?');
+    expect(fakeMatchComments.inThread(matchThread), hasLength(3));
+
+    // A player can delete their own comment, not Aung Ko's.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('3 comments'), 200);
+    await tester.tap(find.text('3 comments'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete'), findsNWidgets(2));
+  });
+
   testWidgets('Wallet shows what a player owes the payer and marks it paid', (tester) async {
     fakeWallet.bills['match-1'] = const MatchBill(
       totalCost: 900,
@@ -594,7 +829,7 @@ void main() {
     expect(find.text("You've paid"), findsOneWidget);
   });
 
-  testWidgets('The payer can only edit their bill from the Manager view', (tester) async {
+  testWidgets('An admin payer can edit their bill', (tester) async {
     fakeWallet.bills['match-1'] = const MatchBill(
       totalCost: 900,
       payerId: 'test-1',
@@ -606,9 +841,16 @@ void main() {
 
     expect(find.text('Paid by you'), findsOneWidget);
     expect(find.text('Edit bill'), findsOneWidget);
+  });
 
-    final page = tester.element(find.byType(WalletPage));
-    page.read<TeamBloc>().add(const TeamRoleToggled());
+  testWidgets("A payer who's only a player can't edit their bill", (tester) async {
+    fakeWallet.bills['match-1'] = const MatchBill(
+      totalCost: 900,
+      payerId: 'test-1',
+      payerName: 'Test Player',
+      splitMode: SplitMode.team,
+    );
+    await pumpHome(tester, const WalletPage(user: user), role: TeamRole.player);
     await tester.pumpAndSettle();
 
     expect(find.text('Paid by you'), findsOneWidget);
@@ -634,31 +876,87 @@ void main() {
     expect(find.text('Edit bill'), findsNothing);
   });
 
-  testWidgets('Squad tab lists the roster and opens a player card', (tester) async {
-    final router = GoRouter(
-      initialLocation: AppRoutes.squad,
-      routes: [
-        GoRoute(
-          path: AppRoutes.squad,
-          builder: (context, state) => teamProvided(const SquadPage(user: user)),
-        ),
-        GoRoute(
-          path: AppRoutes.teamPlayer,
-          builder: (context, state) => PlayerCardPage(member: state.extra! as SquadMember),
-        ),
-      ],
+  testWidgets("Squad tab tells a new account with no team to create or join one", (tester) async {
+    await tester.pumpWidget(
+      homeProvided(MaterialApp(home: teamProvided(const SquadPage(user: user))), teams: const []),
     );
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Neymar'), findsOneWidget);
+    expect(find.text("You're not on a team yet"), findsOneWidget);
+    expect(find.text('Create or join a team'), findsOneWidget);
+  });
 
-    await tester.tap(find.text('Neymar'));
+  testWidgets('Squad tab shows the team average and real ratings, and opens a card', (tester) async {
+    await pumpHome(tester, const SquadPage(user: user));
+    await tester.pumpAndSettle();
+
+    // (74 + 80) / 2, from the two who've rated; Min Thu hasn't.
+    expect(find.text('TEAM RATING'), findsOneWidget);
+    expect(find.text('77'), findsOneWidget);
+    expect(find.text('2 of 3 players rated'), findsOneWidget);
+    expect(find.text('Test Player (you)'), findsOneWidget);
+    expect(find.text('No rating yet'), findsOneWidget);
+    // Rated already: no Fill rating button for me.
+    expect(find.text('Fill rating'), findsNothing);
+
+    await tester.tap(find.text('Aung Ko'));
     await tester.pumpAndSettle();
 
     expect(find.text('Player card'), findsOneWidget);
     expect(find.text('OVR'), findsOneWidget);
+    expect(find.text('ST · W'), findsOneWidget);
+  });
+
+  testWidgets('Fill rating opens only from your own row on the Squad tab', (tester) async {
+    fakeRatings.unrate();
+    tester.view
+      ..physicalSize = const Size(800, 1600)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(homeProvided(MaterialApp.router(routerConfig: shellRouter())));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    // Unrated, but nothing pops up by itself.
+    expect(find.text('Where do you play?'), findsNothing);
+
+    await tester.tap(find.text('Squad'));
+    await tester.pumpAndSettle();
+    // My row is the only way in — one Fill rating button.
+    expect(find.text('No rating yet'), findsNWidgets(2));
+    expect(find.text('Fill rating'), findsOneWidget);
+
+    await tester.tap(find.text('Fill rating'));
+    await tester.pumpAndSettle();
+    expect(find.text('Where do you play?'), findsOneWidget);
+
+    await tester.tap(find.text('Striker'));
+    await tester.tap(find.text('Central midfield'));
+    await tester.pump();
+    expect(find.text('Main: ST · also CM'), findsOneWidget);
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // The questions are for the main position.
+    expect(find.text('Question 1 for ST'), findsOneWidget);
+    await tester.tap(find.text('Answer A1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Answer B2'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('See my rating'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRatings.submitted.single.positions, ['ST', 'CM']);
+    expect(fakeRatings.submitted.single.answerIds, ['ST-q1-a', 'ST-q2-b']);
+    expect(find.text('Your card is in'), findsOneWidget);
+    expect(find.text('71'), findsOneWidget);
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your card is in'), findsNothing);
+    // Back on the Squad tab, rated: the button's gone.
+    expect(find.text('Fill rating'), findsNothing);
+    expect(find.text('ST · CM · 3 apps'), findsOneWidget);
   });
 
   testWidgets('Your profile shows account details and confirms before logging out',
@@ -668,7 +966,7 @@ void main() {
       routes: [
         GoRoute(
           path: AppRoutes.squad,
-          builder: (context, state) => teamProvided(const SquadPage(user: user)),
+          builder: (context, state) => homeProvided(const SquadPage(user: user)),
         ),
         GoRoute(
           path: AppRoutes.profile,
@@ -691,12 +989,57 @@ void main() {
     expect(find.text('Test Player'), findsOneWidget);
     expect(find.text('+66812345678'), findsOneWidget);
     expect(find.text('Google'), findsOneWidget);
+
+    // Name: a pencil opens it, filled in; empty isn't allowed.
+    await tester.tap(find.byTooltip('Edit name'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your name'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('edit-field')), '');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter your name.'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Mention name: only under Account, said what it's for; the header
+    // just shows it.
+    expect(find.text('@testplayer'), findsNWidgets(2));
+    expect(find.byTooltip('Edit username'), findsNothing);
+    expect(find.text('Teammates type it after @ to mention you in comments'), findsOneWidget);
+    await tester.tap(find.text('Mention name'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mention name'), findsNWidgets(2)); // the row, and the dialog's title
+    await tester.enterText(find.byKey(const ValueKey('edit-field')), 'ab');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Username must be at least 3 characters.'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Phone: tap the row; +66 and the 9 digits, as at sign-up.
+    await tester.tap(find.text('+66812345678'));
+    await tester.pumpAndSettle();
+    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.text('812345678'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('edit-field')), '123');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a 9-digit mobile number.'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Photo: tap it to change (the camera badge on it).
+    expect(find.byIcon(Icons.photo_camera_rounded), findsOneWidget);
     expect(find.text('WALLET QR'), findsOneWidget);
     expect(find.text('Upload QR'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('BANK DETAILS'), 200);
-    expect(find.text('Optional · for squad-mates who pay by transfer'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Optional · for squad-mates who pay by transfer'),
+      200,
+    );
+    expect(find.text('BANK DETAILS'), findsOneWidget);
     // No Firebase in tests, so push shows as unavailable.
-    await tester.scrollUntilVisible(find.text('NOTIFICATIONS'), 200);
+    await tester.ensureVisible(find.text('NOTIFICATIONS', skipOffstage: false));
+    await tester.pumpAndSettle();
     expect(find.text('NOTIFICATIONS'), findsOneWidget);
     expect(find.text('Not available here'), findsOneWidget);
 
@@ -712,6 +1055,28 @@ void main() {
     // Cancelled: still on the profile, still signed in.
     expect(find.text('Log out?'), findsNothing);
     expect(find.text('Log out'), findsOneWidget);
+
+    // Privacy policy, and Delete account as a menu row: an acknowledgement
+    // to tick, Continue, then a last dialog.
+    expect(find.text('Terms of Service'), findsOneWidget);
+    expect(find.text('Privacy policy'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Delete account'), 200);
+    await tester.tap(find.text('Delete account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Deleting your account is permanent'), findsOneWidget);
+    FilledButton continueButton() =>
+        tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.scrollUntilVisible(find.text('Continue'), 200);
+    expect(continueButton().onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('delete-acknowledge')));
+    await tester.pump();
+    expect(continueButton().onPressed, isNotNull);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete your account?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete your account?'), findsNothing);
   });
 
   testWidgets('App shell switches between all four tabs', (tester) async {
@@ -725,8 +1090,8 @@ void main() {
     await tester.tap(find.text('Wallet'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Bill history'), findsOneWidget);
-    // An admin in the Manager view never gets the RSVP badge.
-    expect(find.text('!'), findsNothing);
+    // Admins play too: not having voted badges the Match tab for them as well.
+    expect(find.text('!'), findsOneWidget);
 
     await tester.tap(find.text('Squad'));
     await tester.pumpAndSettle();
@@ -887,6 +1252,59 @@ void main() {
     expect(find.text('Change vote'), findsOneWidget);
   });
 
+  testWidgets('Players who played log their goals, assists and saves after the match',
+      (tester) async {
+    finishedJustNow();
+    await pumpMatchTab(tester, role: TeamRole.player);
+    await tester.tap(find.byTooltip('Match history'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('vs Harbour City'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('YOUR STATS'), 200);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('One more goals'));
+    await tester.tap(find.byTooltip('One more goals'));
+    await tester.tap(find.byTooltip('One more assists'));
+    await tester.pump();
+    await tester.scrollUntilVisible(find.text('Save my stats'), 100);
+    await tester.tap(find.text('Save my stats'));
+    await tester.pumpAndSettle();
+
+    final logged = fakeRatings.matchStats['recent-1']!;
+    expect((logged.goals, logged.assists, logged.saves), (2, 1, 0));
+    expect(find.text('Logged'), findsOneWidget);
+    expect(find.text('Save my stats'), findsNothing);
+  });
+
+  testWidgets('A defender logs tackles, not saves, and gets clean sheets from the score',
+      (tester) async {
+    fakeRatings.ratings['test-1'] = FakePlayerRatingRepository.ratingOf(72, ['CB']);
+    fakeRatings.cleanSheets.add('recent-1');
+    finishedJustNow();
+    await pumpMatchTab(tester, role: TeamRole.player);
+    await tester.tap(find.byTooltip('Match history'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('vs Harbour City'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('YOUR STATS'), 200);
+    await tester.pumpAndSettle();
+    expect(find.text('Clean sheet — counted for you automatically'), findsOneWidget);
+    expect(find.text('Tackles & interceptions'), findsOneWidget);
+    expect(find.text('Saves'), findsNothing);
+
+    await tester.tap(find.byTooltip('One more tackles & interceptions'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('One more tackles & interceptions'));
+    await tester.pump();
+    await tester.scrollUntilVisible(find.text('Save my stats'), 100);
+    await tester.tap(find.text('Save my stats'));
+    await tester.pumpAndSettle();
+
+    expect(fakeRatings.matchStats['recent-1']!.tackles, 2);
+  });
+
   testWidgets('Man of the Match is decided once everyone who played has voted',
       (tester) async {
     finishedJustNow();
@@ -942,7 +1360,7 @@ void main() {
         id: 'match-2',
         teamId: 'team-1',
         opponent: 'Riverside Rovers',
-        kickoffAt: DateTime(2026, 10, 17, 19),
+        kickoffAt: DateTime(2037, 10, 17, 19),
       ),
     );
     await pumpMatchTab(tester, role: TeamRole.player);
@@ -984,7 +1402,7 @@ void main() {
         id: 'match-2',
         teamId: 'team-1',
         opponent: 'Riverside Rovers',
-        kickoffAt: DateTime(2026, 10, 17, 19),
+        kickoffAt: DateTime(2037, 10, 17, 19),
       ),
     );
     await pumpMatchTab(tester, role: TeamRole.player);
@@ -1051,6 +1469,28 @@ void main() {
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets("A notification for a match made since the app last loaded still opens it",
+      (tester) async {
+    await openHome(tester);
+    // Another admin schedules it; this phone hasn't heard yet.
+    final created = await fakeMatches.createMatch(
+      teamId: 'team-1',
+      opponent: 'Late Arrivals',
+      kickoffAt: DateTime.now().add(const Duration(days: 4)),
+      durationMinutes: 60,
+    );
+    final matchId = created.getOrElse(() => throw StateError('not created')).id;
+    fakeNotifications.items.add(
+      notification('n-new', NotificationKind.newMatch, 'New match vs Late Arrivals', matchId: matchId),
+    );
+
+    NotificationRouting.open('/notifications/n-new');
+    await tester.pumpAndSettle();
+
+    expect(find.text('This match is no longer available.'), findsNothing);
+    expect(find.text('Are you playing vs Late Arrivals?'), findsOneWidget);
+  });
 
   testWidgets('The bell counts unread notifications, lists them, and Read all clears it',
       (tester) async {
@@ -1171,6 +1611,43 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets("Home shows a card for another group's unread notifications", (tester) async {
+    AppNotification inGroup(String id, String teamId, String title, int hoursAgo, {bool read = false}) =>
+        AppNotification(
+          id: id,
+          kind: NotificationKind.newMatch,
+          title: title,
+          body: '',
+          createdAt: DateTime.now().subtract(Duration(hours: hoursAgo)),
+          teamId: teamId,
+          readAt: read ? DateTime.now() : null,
+        );
+    // Newest first, like the inbox.
+    fakeNotifications.items.addAll([
+      inGroup('n1', 'team-1', 'New match vs Sundown United', 1),
+      inGroup('n2', 'squad-1', 'Ko added Hotpot night', 2),
+      inGroup('n3', 'team-1', 'Are you playing on Saturday?', 3),
+      inGroup('n4', 'team-1', 'Man of the Match: Aung Ko', 4, read: true),
+    ]);
+    await pumpSquad(tester);
+
+    // Friday Crew is open: only Golden Goal FC's two unread count.
+    expect(find.text('IN YOUR OTHER GROUPS'), findsOneWidget);
+    expect(find.text('Golden Goal FC'), findsOneWidget);
+    expect(find.text('2 new'), findsOneWidget);
+    expect(find.text('New match vs Sundown United'), findsOneWidget);
+    expect(find.text('Ko added Hotpot night'), findsNothing);
+
+    // All read: the card goes.
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Read all'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('IN YOUR OTHER GROUPS'), findsNothing);
+  });
+
   testWidgets('A squad shows the four squad tabs and an empty Home', (tester) async {
     await pumpSquad(tester);
 
@@ -1181,6 +1658,7 @@ void main() {
     expect(find.text('Friday Crew'), findsOneWidget);
     expect(find.text("You're all square"), findsOneWidget);
     expect(find.text('No expenses yet'), findsOneWidget);
+    expect(find.text('Monthly expense'), findsOneWidget);
 
     await tester.tap(find.text('Members').last);
     await tester.pumpAndSettle();
@@ -1196,6 +1674,8 @@ void main() {
     await tester.tap(find.text('Add expense'));
     await tester.pumpAndSettle();
 
+    // A normal expense: no monthly options.
+    expect(find.text('Charged every month'), findsNothing);
     await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
     await tester.pumpAndSettle();
     expect(find.text('฿334'), findsNWidgets(2));
@@ -1203,6 +1683,15 @@ void main() {
     expect(find.text('฿332'), findsOneWidget);
     expect(find.text('covers the rest'), findsOneWidget);
 
+    // A title is required — the category isn't used in its place.
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add a title'), findsOneWidget);
+    expect(fakeSquad.expenses, isEmpty);
+    // Let the message clear off the Save button.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Friday dinner');
     await tester.tap(find.text('Save expense'));
     await tester.pumpAndSettle();
 
@@ -1210,9 +1699,864 @@ void main() {
     expect(saved.payerId, 'test-1');
     expect(saved.shares, {'test-1': 33200, 'aung': 33400, 'ko': 33400});
     // Back on Home: the others owe me ฿668 between them.
-    expect(find.text("You're owed"), findsOneWidget);
+    expect(find.text("Overall you're owed"), findsOneWidget);
     expect(find.text('฿668'), findsWidgets);
-    expect(find.text('Food'), findsWidgets);
+    // The card shows both the title and the category.
+    expect(find.text('Friday dinner'), findsOneWidget);
+    expect(find.textContaining('Food · '), findsOneWidget);
+    expect(fakeSquad.expenses.single.title, 'Friday dinner');
+  });
+
+  testWidgets('Two people paid: each types what they paid, the rest is split', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '900');
+    await tester.pumpAndSettle();
+
+    // Paid by: me and Aung.
+    await tester.tap(find.text('You').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Several people paid'));
+    await tester.pumpAndSettle();
+    expect(find.text('Who paid? · up to 5'), findsOneWidget);
+    // The sheet sits on top: its "Aung" is the last one.
+    await tester.tap(find.text('Aung').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done · 2 paid'));
+    await tester.pumpAndSettle();
+    expect(find.text('You + 1'), findsOneWidget);
+    expect(find.text('WHO PAID WHAT'), findsOneWidget);
+
+    // The ฿900 I'd typed became my part; the total now follows the boxes.
+    expect(find.text('Total of who paid what'), findsOneWidget);
+    TextField box(String key) => tester.widget<TextField>(find.byKey(ValueKey(key)));
+    expect(box('paid-test-1').controller!.text, '900');
+    expect(box('expense-amount').readOnly, isTrue);
+
+    // I paid ฿500, Aung ฿400: the amount fills in as ฿900.
+    await tester.enterText(find.byKey(const ValueKey('paid-test-1')), '500');
+    await tester.pumpAndSettle();
+    expect(box('expense-amount').controller!.text, '500');
+    await tester.enterText(find.byKey(const ValueKey('paid-aung')), '400');
+    await tester.pumpAndSettle();
+    expect(box('expense-amount').controller!.text, '900');
+    expect(find.text('Total ฿900 from 2 payers.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Hotpot');
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+
+    final saved = fakeSquad.expenses.single;
+    expect(saved.payers, {'test-1': 50000, 'aung': 40000});
+    expect(saved.payerId, 'test-1');
+    expect(saved.shares, {'test-1': 30000, 'aung': 30000, 'ko': 30000});
+    // Ko's ฿300 goes ฿200 to me (I'm ฿200 over) and ฿100 to Aung.
+    expect(saved.owed, [
+      (fromId: 'ko', toId: 'test-1', cents: 20000),
+      (fromId: 'ko', toId: 'aung', cents: 10000),
+    ]);
+    expect(find.text("Overall you're owed"), findsOneWidget);
+  });
+
+  testWidgets('A Settle card says why; tapping it shows how it adds up and the history',
+      (tester) async {
+    // ฿900 dinner: Aung paid ฿500, Ko ฿400, ฿300 each. I'm ฿300 short;
+    // Aung is ฿200 over and Ko ฿100, so I owe Aung ฿200 and Ko ฿100.
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'dinner',
+        title: 'Dinner',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        payers: const {'aung': 50000, 'ko': 40000},
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    // The card explains the ฿200, without listing every expense.
+    expect(find.text('67% of your ฿300 Dinner share — Aung & Ko paid'), findsOneWidget);
+    expect(find.text('33% of your ฿300 Dinner share — Aung & Ko paid'), findsOneWidget);
+
+    await tester.tap(find.text('67% of your ฿300 Dinner share — Aung & Ko paid'));
+    await tester.pumpAndSettle();
+    expect(find.text('YOU PAY AUNG'), findsOneWidget);
+    expect(find.text('Pay ฿200'), findsOneWidget);
+    // A short sum: what I owe Aung for, down to the total.
+    expect(find.text('HOW IT ADDS UP'), findsOneWidget);
+    expect(find.text('You owe Aung for'), findsOneWidget);
+    expect(find.text('You pay Aung'), findsOneWidget);
+  });
+
+  testWidgets('A trip: people add what they paid, an admin closes it, it settles on its own',
+      (tester) async {
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-cm',
+        name: 'Chiang Mai',
+        startsOn: DateTime(2026, 10, 10),
+        endsOn: DateTime(2026, 10, 12),
+        memberIds: const ['test-1', 'aung', 'ko'],
+        createdBy: 'test-1',
+      ),
+    );
+    await pumpSquad(tester);
+
+    // Home's balance card has "Trip expense" (beside "Monthly expense");
+    // one open trip goes straight to its sheet.
+    expect(find.text('New trip'), findsNothing);
+    expect(find.text('Monthly expense'), findsOneWidget);
+    await tester.tap(find.text('Trip expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add trip expense'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+    expect(find.text('TRIPS'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+    await tester.tap(find.text('Chiang Mai'));
+    await tester.pumpAndSettle();
+    expect(find.text('Settling up starts once an admin closes the trip.'), findsOneWidget);
+
+    // A ฿900 dinner I paid, split across the trip.
+    await tester.tap(find.text('Add trip expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add trip expense'), findsNWidgets(2));
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '900');
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Dinner');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    final saved = fakeSquad.expenses.single;
+    expect(saved.tripId, 'trip-cm');
+    expect(saved.shares, {'test-1': 30000, 'aung': 30000, 'ko': 30000});
+    expect(find.text('Dinner'), findsOneWidget);
+    expect(find.textContaining('Food · '), findsOneWidget);
+
+    // Close it: Aung and Ko each owe me ฿300 — for the trip only.
+    await tester.tap(find.text('Close trip'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Close trip').last);
+    await tester.pumpAndSettle();
+    expect(fakeSquad.trips.single.isClosed, isTrue);
+    expect(find.text('YOU GET'), findsOneWidget);
+    expect(find.text('฿600'), findsWidgets);
+    expect(find.text('Aung'), findsWidgets);
+    expect(find.text('For Dinner'), findsNWidgets(2));
+    expect(find.text('Add trip expense'), findsNothing);
+
+    // The squad's own balances never saw it.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text("You're all square"), findsOneWidget);
+    // Closed: as an admin I can still start the next trip from Home.
+    expect(find.text('Trip expense'), findsOneWidget);
+    expect(find.text('You get ฿600'), findsOneWidget);
+  });
+
+  testWidgets('An expense with proof of payment shows it to the squad', (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'dinner',
+        title: 'Friday dinner',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+        receiptPath: 'receipts/squad-1/aung/1.jpg',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Friday dinner'));
+    await tester.pumpAndSettle();
+    expect(find.text('PROOF OF PAYMENT'), findsOneWidget);
+    expect(find.text('Receipt or slip · tap to view'), findsOneWidget);
+  });
+
+  testWidgets("A notification from another group switches to it, and says so", (tester) async {
+    fakeNotifications.items.addAll([
+      AppNotification(
+        id: 'n-other',
+        kind: NotificationKind.newMatch,
+        title: 'New match vs Sundown United',
+        body: '',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        teamId: 'team-1',
+        matchId: 'match-1',
+      ),
+      AppNotification(
+        id: 'n-left',
+        kind: NotificationKind.newMatch,
+        title: 'New match vs Old Rivals',
+        body: '',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 9)),
+        teamId: 'team-i-left',
+        matchId: 'match-gone',
+      ),
+    ]);
+    // In the Friday Crew squad; Golden Goal FC is the other group.
+    await pumpSquad(tester);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New match vs Sundown United'));
+    await tester.pumpAndSettle();
+    expect(find.text('Switched to Golden Goal FC'), findsOneWidget);
+    expect(find.text('Are you playing vs Sundown United?'), findsOneWidget);
+
+    // A group they've left: no match to show, and not called a "match".
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New match vs Old Rivals'));
+    await tester.pumpAndSettle();
+    expect(find.text("You're no longer in this group."), findsOneWidget);
+  });
+
+  testWidgets("A rating notification filed under an expense squad opens the football Squad tab", (
+    tester,
+  ) async {
+    // From before 050_rating_pushes_football_only.sql: filed under the
+    // Friday Crew squad, where ratings mean nothing.
+    fakeNotifications.items.add(
+      AppNotification(
+        id: 'n-rated',
+        kind: NotificationKind.playerRated,
+        title: 'Aung Ko rated themselves 80 OVR',
+        body: 'ST · W',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        teamId: 'squad-1',
+      ),
+    );
+    // In the Friday Crew squad; Golden Goal FC is the football team.
+    await pumpSquad(tester);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung Ko rated themselves 80 OVR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Switched to Golden Goal FC'), findsOneWidget);
+    expect(find.text('TEAM RATING'), findsOneWidget);
+  });
+
+  testWidgets("An expense notification opens the expense, even one added since the ledger loaded", (
+    tester,
+  ) async {
+    fakeNotifications.items.addAll([
+      AppNotification(
+        id: 'n-added',
+        kind: NotificationKind.expenseAdded,
+        title: 'Aung added Hotpot',
+        body: 'Your share: ฿300 of ฿900 in Friday Crew.',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        teamId: 'squad-1',
+        expenseId: 'hotpot',
+      ),
+      AppNotification(
+        id: 'n-gone',
+        kind: NotificationKind.expenseAdded,
+        title: 'Aung added Taxi',
+        body: '',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 9)),
+        teamId: 'squad-1',
+        expenseId: 'taxi-deleted',
+      ),
+    ]);
+    await pumpSquad(tester);
+    // Added on Aung's phone after this ledger loaded, with no live update.
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'hotpot',
+        title: 'Hotpot',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung added Hotpot'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hotpot'), findsWidgets);
+    expect(find.byKey(const ValueKey('comment-field')), findsOneWidget);
+
+    // Deleted: says so, instead of a spinner that never stops.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung added Taxi'));
+    await tester.pumpAndSettle();
+    expect(find.text('This expense was deleted.'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('A trip reminder opens the trip, not a missing match', (tester) async {
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-pk',
+        name: 'Phuket',
+        startsOn: DateTime(2026, 11, 1),
+        endsOn: DateTime(2026, 11, 3),
+        memberIds: const ['test-1', 'aung', 'ko'],
+        createdBy: 'aung',
+      ),
+    );
+    fakeNotifications.items.add(
+      AppNotification(
+        id: 'n-trip-rem',
+        kind: NotificationKind.fromDb('trip_reminder'),
+        title: 'Aung reminded you to settle up for Phuket',
+        body: '',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        teamId: 'squad-1',
+        tripId: 'trip-pk',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung reminded you to settle up for Phuket'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This match is no longer available.'), findsNothing);
+    expect(find.text('Phuket'), findsWidgets);
+  });
+
+  testWidgets('A "trip closed" notification opens the trip', (tester) async {
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-cm',
+        name: 'Chiang Mai',
+        startsOn: DateTime(2026, 10, 10),
+        endsOn: DateTime(2026, 10, 12),
+        memberIds: const ['test-1', 'aung', 'ko'],
+        createdBy: 'aung',
+        closedAt: DateTime(2026, 10, 13),
+      ),
+    );
+    fakeNotifications.items.add(
+      AppNotification(
+        id: 'n-trip',
+        kind: NotificationKind.tripClosed,
+        title: 'Chiang Mai is closed — time to settle up',
+        body: "You're all square for the trip.",
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+        teamId: 'squad-1',
+        tripId: 'trip-cm',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('TRIP'), findsOneWidget);
+
+    await tester.tap(find.text('Chiang Mai is closed — time to settle up'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('CLOSED · SETTLING UP'), findsOneWidget);
+    expect(find.text('Everyone on the trip is settled up.'), findsOneWidget);
+  });
+
+  testWidgets('Anyone on a trip can split a trip expense, among the people on it', (tester) async {
+    // A regular member, not an admin.
+    fakeSquad.members[0] = const squad_member.SquadMember(
+      profileId: 'test-1',
+      name: 'Test Player',
+      role: TeamRole.player,
+      walletQrPath: 'test-1/qr.png',
+    );
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-beach',
+        name: 'Beach',
+        startsOn: DateTime(2026, 10, 10),
+        endsOn: DateTime(2026, 10, 11),
+        memberIds: const ['test-1', 'aung'],
+        createdBy: 'aung',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Trip expense'));
+    await tester.pumpAndSettle();
+
+    // Every split choice, and only Aung and me — Ko isn't going.
+    for (final mode in ['Equal', 'Chosen', 'Exact', 'Custom', 'Treat']) {
+      expect(find.text(mode), findsOneWidget);
+    }
+    expect(find.text('Aung'), findsOneWidget);
+    expect(find.text('Ko'), findsNothing);
+
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '500');
+    await tester.tap(find.text('Exact'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '200');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '300');
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Snacks');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.expenses.single.shares, {'test-1': 20000, 'aung': 30000});
+    expect(fakeSquad.expenses.single.tripId, 'trip-beach');
+  });
+
+  testWidgets('Remind to pay works person to person — even when you owe more overall',
+      (tester) async {
+    Expense paid(String id, String payer, Map<String, int> shares) => Expense(
+      id: id,
+      title: id,
+      category: ExpenseCategory.food,
+      amountCents: shares.values.fold(0, (a, b) => a + b),
+      spentAt: DateTime(2026, 9, 27, 20),
+      splitMode: ExpenseSplitMode.exact,
+      payerId: payer,
+      shares: shares,
+      createdBy: payer,
+    );
+    // Ko owes me ฿300, but I owe Aung ฿500: overall I owe.
+    fakeSquad.expenses
+      ..add(paid('Taxi', 'test-1', {'ko': 30000}))
+      ..add(paid('Hotel', 'aung', {'test-1': 50000}));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remind').last);
+    await tester.pumpAndSettle();
+    expect(fakeSquad.reminded, [('test-1', 'ko', null)]);
+    expect(find.text('Reminder sent.'), findsOneWidget);
+  });
+
+  testWidgets('Trips show in Expenses and Settle; history opens like the Wallet\'s', (tester) async {
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-cm',
+        name: 'Chiang Mai',
+        startsOn: DateTime(2026, 10, 10),
+        endsOn: DateTime(2026, 10, 12),
+        memberIds: const ['test-1', 'aung', 'ko'],
+        createdBy: 'test-1',
+        closedAt: DateTime(2026, 10, 13),
+      ),
+    );
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'raft',
+        title: 'Rafting',
+        category: ExpenseCategory.tickets,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 10, 11, 10),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'test-1',
+        shares: const {'test-1': 30000, 'aung': 30000, 'ko': 30000},
+        createdBy: 'test-1',
+        tripId: 'trip-cm',
+      ),
+    );
+    await pumpSquad(tester);
+
+    // Expenses: the squad's first; trips' on the "Trips" tab,
+    // each under its trip, with "Add trip expense".
+    await tester.tap(find.text('Expenses').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Rafting'), findsNothing);
+    await tester.tap(find.text('Trips'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rafting'), findsOneWidget);
+    expect(find.text('Chiang Mai'), findsOneWidget);
+    expect(find.text('You get ฿600'), findsOneWidget);
+    expect(find.text('Add trip expense'), findsOneWidget);
+
+    // Settle: the trip's own card, and the payment history button.
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    expect(find.text('TRIPS'), findsOneWidget);
+    expect(find.text('You get ฿600'), findsOneWidget);
+    await tester.tap(find.byTooltip('Payment history'));
+    await tester.pumpAndSettle();
+    expect(find.text('Payment history'), findsOneWidget);
+    expect(find.text('No payments yet.'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // On the trip, remind Aung to pay for it.
+    await tester.tap(find.text('You get ฿600'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remind').first);
+    await tester.pumpAndSettle();
+    expect(fakeSquad.reminded, [('test-1', 'aung', 'trip-cm')]);
+  });
+
+  testWidgets('A monthly expense charges this month, shows under Monthly, and can be paused',
+      (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Expenses').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Monthly'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add monthly expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add monthly expense'), findsNWidgets(2));
+    expect(find.text('Charged every month'), findsOneWidget);
+    // Its own categories — the service — not everyday ones.
+    expect(find.text('Food'), findsNothing);
+    expect(find.text('Netflix'), findsOneWidget);
+    await tester.tap(find.text('YouTube'));
+    await tester.pumpAndSettle();
+    // Picking one fills in an empty title.
+    expect(
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(const ValueKey('expense-title')),
+              matching: find.byType(TextField),
+            ),
+          )
+          .controller!
+          .text,
+      'YouTube',
+    );
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '420');
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'YouTube Family');
+    // Charged on the 1st, so this month's charge is always due already.
+    await tester.tap(find.byKey(const ValueKey('charge-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1st').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save monthly expense'));
+    await tester.pumpAndSettle();
+
+    // Saved, and — its day having come this month — charged straight away.
+    final rec = fakeSquad.recurring.single;
+    expect(rec.chargeDay, 1);
+    expect(rec.category, ExpenseCategory.youtube);
+    expect(rec.shares, {'test-1': 14000, 'aung': 14000, 'ko': 14000});
+    final charge = fakeSquad.expenses.single;
+    expect(charge.recurringId, rec.id);
+    expect(charge.title, startsWith('YouTube Family · '));
+    expect(find.text('YouTube Family'), findsOneWidget);
+    expect(find.textContaining('next '), findsOneWidget);
+
+    // I pay the provider: remind those who haven't paid this month.
+    expect(find.text('Aung & Ko still owe for this month'), findsOneWidget);
+    await tester.tap(find.text('Remind to pay'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.reminded, [('test-1', 'aung', null), ('test-1', 'ko', null)]);
+    expect(find.text('Reminders sent to 2 people.'), findsOneWidget);
+    expect(find.text('Reminded'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    // The charge is an ordinary squad expense, marked Monthly.
+    await tester.tap(find.text('Expenses').at(1));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('🔁 Monthly'), findsOneWidget);
+
+    // Pause it.
+    await tester.tap(find.text('Monthly'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('YouTube Family'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pause'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.recurring.single.isPaused, isTrue);
+    expect(find.text('Paused'), findsOneWidget);
+  });
+
+  testWidgets('A You pay card names only the newest expense behind it', (tester) async {
+    Expense byAung(String id, String title, DateTime at) => Expense(
+      id: id,
+      title: title,
+      category: ExpenseCategory.other,
+      amountCents: 30000,
+      spentAt: at,
+      splitMode: ExpenseSplitMode.exact,
+      payerId: 'aung',
+      shares: const {'test-1': 15000, 'aung': 15000},
+      createdBy: 'aung',
+    );
+    fakeSquad.expenses
+      ..add(byAung('drinks', 'Drinks', DateTime(2026, 9, 20)))
+      ..add(byAung('yt', 'YouTube Family · Oct 2026', DateTime(2026, 10, 1)));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('For YouTube Family · Oct 2026 and 1 earlier'), findsOneWidget);
+    expect(find.textContaining('Drinks'), findsNothing);
+  });
+
+  testWidgets('Guests from outside the squad join the split, shown for information', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Dinner');
+    await tester.pumpAndSettle();
+
+    // Tom: covered by me (the default).
+    await tester.tap(find.text('Add guest'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('guest-name')), 'Tom');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add').last);
+    await tester.pumpAndSettle();
+    // Sara: covered by no one — she pays the payer directly.
+    await tester.tap(find.text('Add guest'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('guest-name')), 'Sara');
+    await tester.tap(find.byKey(const ValueKey('guest-host')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('No one — they pay the payer').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add').last);
+    await tester.pumpAndSettle();
+
+    // ฿1,000 ÷ 5 = ฿200 each, guests included.
+    expect(find.text('Tom (guest)'), findsOneWidget);
+    expect(find.text('covered by You'), findsOneWidget);
+    expect(find.text('pays the payer directly'), findsOneWidget);
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+
+    // Their shares sit with whoever covers them — here, me both times
+    // (I paid) — and they're saved alongside for information.
+    final saved = fakeSquad.expenses.single;
+    expect(saved.shares, {'test-1': 60000, 'aung': 20000, 'ko': 20000});
+    expect(saved.guests, const [
+      ExpenseGuest(name: 'Tom', amountCents: 20000, hostId: 'test-1'),
+      ExpenseGuest(name: 'Sara', amountCents: 20000),
+    ]);
+
+    // The expense page lists them as guests; my own share is ฿200.
+    await tester.tap(find.text('Dinner'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tom · guest'), findsOneWidget);
+    expect(find.text('Covered by You'), findsOneWidget);
+    expect(find.text('Pays You directly'), findsOneWidget);
+
+    // Editing brings them back as guests; saving unchanged keeps it all.
+    await tester.tap(find.byTooltip('Edit expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tom (guest)'), findsOneWidget);
+    expect(find.text('Sara (guest)'), findsOneWidget);
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.expenses.single.shares, {'test-1': 60000, 'aung': 20000, 'ko': 20000});
+    expect(fakeSquad.expenses.single.guests, hasLength(2));
+  });
+
+  testWidgets("A payment someone already sent isn't taken off what you owe them", (tester) async {
+    Expense paid(String id, String payer, Map<String, int> shares) => Expense(
+      id: id,
+      title: id,
+      category: ExpenseCategory.other,
+      amountCents: shares.values.fold(0, (a, b) => a + b),
+      spentAt: DateTime(2026, 9, 27, 20),
+      splitMode: ExpenseSplitMode.exact,
+      payerId: payer,
+      shares: shares,
+      createdBy: payer,
+    );
+    // I owe Aung ฿1,000; Aung owes me ฿25 — and has sent it (pending).
+    fakeSquad.expenses
+      ..add(paid('Hotel', 'aung', {'test-1': 100000}))
+      ..add(paid('Coffee', 'test-1', {'aung': 2500}));
+    fakeSquad.receivePayment('aung', 2500);
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    // ฿1,000, not ฿975: Aung's ฿25 is already on its way.
+    expect(find.text('฿1,000'), findsWidgets);
+    expect(find.text('฿975'), findsNothing);
+    expect(
+      find.textContaining('Includes ฿25 Aung sent you · confirm it in To confirm'),
+      findsOneWidget,
+    );
+
+    // How it adds up, as a short sum: 1,000 − 25 + 25 = 1,000.
+    await tester.tap(find.text('Aung'));
+    await tester.pumpAndSettle();
+    expect(find.text('You owe Aung for'), findsOneWidget);
+    expect(find.text('Aung owes you for'), findsOneWidget);
+    expect(find.text('Aung already paid you'), findsOneWidget);
+    expect(find.text('฿1,000 − ฿25 + ฿25 = ฿1,000'), findsOneWidget);
+    expect(find.text('You pay Aung'), findsOneWidget);
+    expect(find.text('Pay ฿1,000'), findsOneWidget);
+    // The payments stay folded away until asked for.
+    expect(find.text('Pending — counted as paid'), findsNothing);
+    await tester.tap(find.text('Aung already paid you'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pending — counted as paid'), findsOneWidget);
+    // And the expenses behind a line.
+    await tester.tap(find.text('You owe Aung for'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hotel'), findsOneWidget);
+  });
+
+  testWidgets('Adding an expense asks for your payment QR first', (tester) async {
+    fakeSquad.members[0] = const squad_member.SquadMember(
+      profileId: 'test-1',
+      name: 'Test Player',
+      role: TeamRole.superAdmin,
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add your payment QR first'), findsOneWidget);
+    expect(find.text('Upload QR'), findsOneWidget);
+    // Not now: no expense sheet.
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add your payment QR first'), findsNothing);
+    expect(find.byKey(const ValueKey('expense-amount')), findsNothing);
+  });
+
+  testWidgets('Adding a trip expense asks for your payment QR first too', (tester) async {
+    fakeSquad.members[0] = const squad_member.SquadMember(
+      profileId: 'test-1',
+      name: 'Test Player',
+      role: TeamRole.superAdmin,
+    );
+    fakeSquad.trips.add(
+      Trip(
+        id: 'trip-cm',
+        name: 'Chiang Mai',
+        startsOn: DateTime(2026, 10, 10),
+        endsOn: DateTime(2026, 10, 12),
+        memberIds: const ['test-1', 'aung', 'ko'],
+        createdBy: 'test-1',
+      ),
+    );
+    await pumpSquad(tester);
+
+    // From Home's "Trip expense"…
+    await tester.tap(find.text('Trip expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add your payment QR first'), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add trip expense'), findsNothing);
+
+    // …and from the trip's own page.
+    await tester.tap(find.text('Chiang Mai'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add trip expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add your payment QR first'), findsOneWidget);
+  });
+
+  testWidgets('Starting a trip asks for your payment QR first', (tester) async {
+    // An admin with no trip yet and no QR.
+    fakeSquad.members[0] = const squad_member.SquadMember(
+      profileId: 'test-1',
+      name: 'Test Player',
+      role: TeamRole.superAdmin,
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Trip expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add your payment QR first'), findsOneWidget);
+    await tester.tap(find.text('Not now'));
+    await tester.pumpAndSettle();
+    expect(find.text('New trip'), findsNothing);
+  });
+
+  testWidgets('Members with a profile photo show it; the rest show initials', (tester) async {
+    fakeSquad.members[2] = const squad_member.SquadMember(
+      profileId: 'ko',
+      name: 'Ko',
+      role: TeamRole.player,
+      avatarUrl: 'https://example.com/avatars/ko.jpg',
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Members').last);
+    await tester.pumpAndSettle();
+
+    final photos = find.byWidgetPredicate(
+      (w) =>
+          w is Image &&
+          w.image is ResizeImage &&
+          ((w.image as ResizeImage).imageProvider as NetworkImage).url ==
+              'https://example.com/avatars/ko.jpg',
+    );
+    expect(photos, findsOneWidget);
+    // Aung has none: just the initial.
+    expect(find.text('A'), findsWidgets);
+  });
+
+  testWidgets('Picking Other asks what it is, and cards show that name', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('category-label')), findsNothing);
+    // Other is last in the row of category chips.
+    await tester.drag(find.text('Food'), const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Other'));
+    await tester.pumpAndSettle();
+    expect(find.text('What for? e.g. Gym'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('category-label')),
+        matching: find.byType(TextField),
+      ),
+      'Gym',
+    );
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '300');
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'October pass');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+
+    final saved = fakeSquad.expenses.single;
+    expect(saved.category, ExpenseCategory.other);
+    expect(saved.categoryLabel, 'Gym');
+    // The card says "Gym", not "Other".
+    expect(find.textContaining('Gym · '), findsOneWidget);
+  });
+
+  testWidgets('How it adds up: 1,000 for breakfast − 500 for dinner = they pay you 500',
+      (tester) async {
+    Expense paid(String id, String payer, Map<String, int> shares) => Expense(
+      id: id,
+      title: id,
+      category: ExpenseCategory.food,
+      amountCents: shares.values.fold(0, (a, b) => a + b),
+      spentAt: DateTime(2026, 9, 27, 8),
+      splitMode: ExpenseSplitMode.exact,
+      payerId: payer,
+      shares: shares,
+      createdBy: payer,
+    );
+    // Aung paid ฿500 for my dinner; I paid ฿1,000 for Aung's breakfast.
+    fakeSquad.expenses
+      ..add(paid('Dinner', 'aung', {'test-1': 50000}))
+      ..add(paid('Breakfast', 'test-1', {'aung': 100000}));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aung owes you for'), findsOneWidget);
+    expect(find.text('฿1,000'), findsWidgets);
+    expect(find.text('You owe Aung for'), findsOneWidget);
+    expect(find.text('−฿500'), findsOneWidget);
+    expect(find.text('฿1,000 − ฿500 = ฿500'), findsOneWidget);
+    expect(find.text('Aung pays you'), findsOneWidget);
   });
 
   testWidgets('A cash payment changes balances only after the receiver confirms it',
@@ -1234,10 +2578,12 @@ void main() {
     await tester.tap(find.text('Settle').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('YOU OWE'), findsOneWidget);
+    expect(find.text('Overall you owe ฿300'), findsOneWidget);
     expect(find.text('฿300'), findsWidgets);
 
-    await tester.tap(find.text('Pay'));
+    // One in the hero, one on the debt row.
+    expect(find.text('Pay'), findsNWidgets(2));
+    await tester.tap(find.text('Pay').first);
     await tester.pumpAndSettle();
     expect(find.text('Pay Aung'), findsOneWidget);
     // Aung has no QR but has bank details, so Bank is picked.
@@ -1247,10 +2593,13 @@ void main() {
     await tester.tap(find.text('I paid in cash'));
     await tester.pumpAndSettle();
 
-    // Sent, but not counted yet.
+    // Sent and waiting: counted as paid, so nothing's left to pay — Aung's
+    // card shows what I sent, Pending, with a nudge.
     expect(fakeSquad.settlements.single.isPending, isTrue);
-    expect(find.text('WAITING FOR CONFIRMATION'), findsOneWidget);
-    expect(find.text('YOU OWE'), findsOneWidget);
+    expect(find.text('Pending'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsOneWidget);
+    expect(find.text('฿300 sent · waiting for Aung to confirm'), findsOneWidget);
+    expect(find.textContaining("Overall you're even"), findsOneWidget);
 
     // Aung confirms on their phone; it arrives over Realtime.
     await fakeSquad.respondSettlement(
@@ -1261,8 +2610,69 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
 
-    expect(find.text('ALL SQUARE'), findsOneWidget);
+    expect(find.text("Overall you're even"), findsOneWidget);
     expect(find.text('SETTLED'), findsOneWidget);
+  });
+
+  testWidgets('Sent back shows only after a reject; sent again, it waits on the You pay card',
+      (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'dinner',
+        title: 'Friday dinner',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    Future<void> payCash(Finder button) async {
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cash'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('I paid in cash'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> aungRejects() async {
+      await fakeSquad.respondSettlement(
+        settlementId: fakeSquad.settlements.last.id,
+        accept: false,
+        reason: 'Nothing arrived',
+      );
+      (sl<TeamChanges>() as FakeTeamChanges).push('squad-1', TeamTable.settlements);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+    }
+
+    await payCash(find.text('Pay').first);
+    // Just waiting: no Sent back yet.
+    expect(find.text('SENT BACK'), findsNothing);
+    await aungRejects();
+    expect(find.text('SENT BACK'), findsOneWidget);
+    expect(find.text('Send again'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsNothing);
+
+    await tester.scrollUntilVisible(find.text('Send again'), 200);
+    await payCash(find.text('Send again'));
+    // Sent again: Sent back goes; the reminder is on Aung's You pay card.
+    expect(find.text('SENT BACK'), findsNothing);
+    expect(find.text('Send again'), findsNothing);
+    expect(find.text('Remind to confirm'), findsOneWidget);
+    expect(find.text('WAITING FOR CONFIRMATION'), findsNothing);
+
+    // Rejected again: still one "Send again", and no reminder.
+    await aungRejects();
+    expect(find.text('Send again'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsNothing);
   });
 
   testWidgets('The receiver confirms a payment from the Settle tab', (tester) async {
@@ -1297,8 +2707,233 @@ void main() {
     expect(fakeSquad.settlements.single.isConfirmed, isTrue);
     expect(find.text('TO CONFIRM'), findsNothing);
     // Aung still owes ฿200; Ko is settled.
-    expect(find.text("YOU'RE OWED"), findsOneWidget);
-    expect(find.text('Aung → You'), findsOneWidget);
+    expect(find.text('from Aung'), findsOneWidget);
+    expect(find.text('Nothing to pay'), findsOneWidget);
+  });
+
+  Expense owedExpense(String id, String payer, Map<String, int> shares) => Expense(
+    id: id,
+    title: id,
+    category: ExpenseCategory.food,
+    amountCents: shares.values.fold(0, (a, b) => a + b),
+    spentAt: DateTime(2026, 9, 27, 8),
+    splitMode: ExpenseSplitMode.exact,
+    payerId: payer,
+    shares: shares,
+    createdBy: payer,
+  );
+
+  testWidgets('Pay part: Full, Half or Custom, and what is left shows', (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'aung', {'test-1': 100000}));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pay ฿1,000'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Full'), findsOneWidget);
+    await tester.tap(find.text('Half · ฿500'));
+    await tester.pump();
+    expect(find.text('You owe ฿1,000 · ฿500 left after this'), findsOneWidget);
+    await tester.tap(find.text('Cash'));
+    await tester.pump();
+    await tester.tap(find.text('I paid in cash'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.settlements.single.amountCents, 50000);
+
+    // What's left, and what's been paid toward it.
+    expect(find.textContaining('Paid ฿500 of ฿1,000 so far'), findsWidgets);
+  });
+
+  testWidgets('A partial payment is flagged to the receiver before they confirm it',
+      (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'test-1', {'aung': 100000}));
+    fakeSquad.receivePayment('aung', 40000);
+    await pumpSquad(tester);
+    // Home says so — with a red dot: it needs checking.
+    expect(find.text('Aung says they paid you ฿400 · part of ฿1,000'), findsOneWidget);
+    expect(find.text('NEEDS YOUR CHECK'), findsOneWidget);
+    expect(find.byKey(const ValueKey('check-dot')), findsOneWidget);
+
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Aung paid you ฿400 · partial'), findsOneWidget);
+    expect(find.textContaining('Part of ฿1,000 · ฿600 left after'), findsOneWidget);
+
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    expect(find.text('PARTIAL PAYMENT TO CONFIRM'), findsOneWidget);
+    expect(
+      find.text(
+        'This is a partial payment: ฿400 of the ฿1,000 Aung owes you. '
+        'After you confirm, they still owe ฿600.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('฿400 of ฿1,000'), findsOneWidget);
+
+    await tester.tap(find.text('Received'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.settlements.single.isConfirmed, isTrue);
+    expect(find.text('Partial payment confirmed. Aung still owes you ฿600.'), findsOneWidget);
+  });
+
+  testWidgets('The receiver confirms only the part that arrived', (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'test-1', {'ko': 100000}));
+    fakeSquad.receivePayment('ko', 100000);
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('I got a different amount'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('received-amount')), '500');
+    await tester.pump();
+    expect(find.text('The other ฿500 still counts as owed by Ko.'), findsOneWidget);
+    await tester.tap(find.text('Confirm ฿500'));
+    await tester.pumpAndSettle();
+
+    final settlement = fakeSquad.settlements.single;
+    expect(settlement.isConfirmed, isTrue);
+    expect(settlement.amountCents, 50000);
+    expect(settlement.sentCents, 100000);
+    expect(find.text('Confirmed ฿500. The other ฿500 still counts as owed.'), findsOneWidget);
+    // Ko still owes the other half.
+    expect(find.text('TO CONFIRM'), findsNothing);
+    expect(find.text('฿500'), findsWidgets);
+  });
+
+  testWidgets('Pay later: promise a day; reminders wait until then', (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'aung', {'test-1': 40000}));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pay later'));
+    await tester.pumpAndSettle();
+    expect(find.text('WHEN WILL YOU PAY AUNG?'), findsOneWidget);
+    await tester.tap(find.text('Promise'));
+    await tester.pumpAndSettle();
+
+    final promise = fakeSquad.promises.single;
+    expect(promise.toId, 'aung');
+    final now = DateTime.now();
+    expect(promise.promisedOn, DateTime(now.year, now.month, now.day + 1));
+    expect(find.textContaining('You said you’d pay on'), findsOneWidget);
+    // One promised day at a time.
+    expect(find.text('Pay later'), findsNothing);
+  });
+
+  testWidgets("Someone who promised a day isn't reminded until then", (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'test-1', {'aung': 30000, 'ko': 30000}));
+    final now = DateTime.now();
+    fakeSquad.promises.add(
+      PaymentPromise(
+        id: 'p1',
+        fromId: 'aung',
+        toId: 'test-1',
+        promisedOn: DateTime(now.year, now.month, now.day + 5),
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Aung will pay you on'), findsOneWidget);
+    // Ko can be reminded; Aung can't.
+    expect(find.text('Remind'), findsNWidgets(2)); // the hero's and Ko's card
+    await tester.tap(find.textContaining('Aung will pay you on'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remind'), findsNothing);
+    expect(find.text('Got cash'), findsOneWidget);
+  });
+
+  testWidgets('Got cash: whoever is owed records it, and it counts straight away',
+      (tester) async {
+    fakeSquad.expenses.add(owedExpense('Dinner', 'test-1', {'aung': 100000}));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aung'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Got cash'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('cash-amount')), '600');
+    await tester.pump();
+    expect(find.text('They owe you ฿1,000 · ฿400 left after this'), findsOneWidget);
+    await tester.tap(find.text('Record ฿600 received'));
+    await tester.pumpAndSettle();
+
+    final cash = fakeSquad.settlements.single;
+    expect(cash.isConfirmed, isTrue);
+    expect(cash.recordedBy, 'test-1');
+    expect(find.text('AUNG PAYS YOU'), findsOneWidget);
+    expect(find.text('฿400'), findsWidgets);
+    expect(find.textContaining('Aung paid ฿600 of ฿1,000 so far'), findsOneWidget);
+  });
+
+  testWidgets('Pick the day of the month for payment reminders', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Reminders: last day of the month'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('reminder-day')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('25'));
+    await tester.pumpAndSettle();
+
+    expect(fakeSquad.members.first.reminderDay, 25);
+    expect(find.text('Reminders: the 25th of each month'), findsOneWidget);
+  });
+
+  testWidgets('Pay the payer back from an expense: Pay, then Pending, then Paid', (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'dinner',
+        title: 'Friday dinner',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Friday dinner'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pay'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pay Aung'), findsOneWidget);
+    await tester.tap(find.text('Cash'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('I paid in cash'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.settlements.single.amountCents, 30000);
+    // Sent: waiting for Aung, so no paying twice.
+    expect(find.text('Pending'), findsOneWidget);
+    expect(find.text('Pay'), findsNothing);
+
+    // Confirmed: nothing left to pay Aung.
+    await fakeSquad.respondSettlement(
+      settlementId: fakeSquad.settlements.single.id,
+      accept: true,
+    );
+    (sl<TeamChanges>() as FakeTeamChanges).push('squad-1', TeamTable.settlements);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Paid'), findsOneWidget);
+    expect(find.text('Pending'), findsNothing);
   });
 
   testWidgets('Comments and replies on an expense, live', (tester) async {
@@ -1327,6 +2962,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Was the tip included?'), findsOneWidget);
     expect(find.text('COMMENTS · 1'), findsOneWidget);
+    // Sent: the keyboard goes away.
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('comment-field'))).focusNode?.hasFocus,
+      isFalse,
+    );
 
     // Aung answers on their phone; it arrives over Realtime.
     fakeSquad.commentAs('aung', 'dinner', 'Yes, ฿100 tip is in the total.',
@@ -1359,6 +2999,102 @@ void main() {
     await tester.pumpAndSettle();
     expect(fakeSquad.comments, isEmpty);
     expect(find.text('Thanks!'), findsNothing);
+  });
+
+  testWidgets('Remind people who owe you — once a day each', (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'hotpot',
+        title: 'Hotpot night',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'test-1',
+        shares: const {'test-1': 30000, 'aung': 30000, 'ko': 30000},
+        createdBy: 'test-1',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('from 2 people'), findsOneWidget);
+    expect(find.text('Remind all'), findsOneWidget);
+    expect(find.text('Remind'), findsNWidgets(2));
+
+    // Remind Ko alone.
+    await tester.tap(find.text('Remind').last);
+    await tester.pumpAndSettle();
+    expect(fakeSquad.reminded, hasLength(1));
+    expect(find.text('Reminder sent.'), findsOneWidget);
+    expect(find.text('Reminded'), findsOneWidget);
+    expect(find.text('Remind'), findsOneWidget);
+
+    // "Remind all" now only reaches Aung — Ko's had today's.
+    await tester.tap(find.text('Remind all'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.reminded, hasLength(2));
+    expect(find.text('Remind all'), findsNothing);
+    expect(find.text('Reminded'), findsNWidgets(3));
+  });
+
+  testWidgets("A squad that fails to load says why — never shows an empty squad", (tester) async {
+    fakeSquad.ledgerError = 'relation "public.squad_reminders" does not exist';
+    await pumpSquad(tester);
+
+    expect(find.text("Couldn't load this squad"), findsOneWidget);
+    expect(find.textContaining('squad_reminders'), findsOneWidget);
+    expect(find.textContaining('0 members'), findsNothing);
+    expect(find.text("You're all square"), findsNothing);
+
+    fakeSquad.ledgerError = null;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Squad · 3 members'), findsOneWidget);
+
+    // A failed refresh keeps what's already on screen.
+    fakeSquad.ledgerError = 'Network error';
+    (sl<TeamChanges>() as FakeTeamChanges).push('squad-1', TeamTable.expenses);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('Squad · 3 members'), findsOneWidget);
+  });
+
+  testWidgets('A sent payment can be nudged to confirm — once a day', (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'dinner',
+        title: 'Friday dinner',
+        category: ExpenseCategory.food,
+        amountCents: 90000,
+        spentAt: DateTime(2026, 9, 27, 20),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000, 'ko': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    // Just sent.
+    fakeSquad.sentPaymentAgo('aung', 30000, const Duration(minutes: 1));
+    await pumpSquad(tester);
+    // Home shows it too, where the pending payment is mentioned.
+    expect(find.text('You paid Aung ฿300 · waiting for them to confirm'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsOneWidget);
+
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    // On Aung's You pay card, not a separate section.
+    expect(find.text('WAITING FOR CONFIRMATION'), findsNothing);
+    expect(find.text('Remind to confirm'), findsOneWidget);
+
+    await tester.tap(find.text('Remind to confirm'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.nudged, [fakeSquad.settlements.single.id]);
+    expect(find.text('Reminded Aung to confirm.'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsNothing);
+    expect(find.text('Reminded'), findsOneWidget);
   });
 
   testWidgets('Home recaps a finished match: vote MOTM, then see the winner', (tester) async {
@@ -1396,16 +3132,15 @@ void main() {
       payerName: 'Aung Ko',
       splitMode: SplitMode.team,
     );
-    // Admin in Manager view: no RSVP nag, so any badge is from MOTM / fee.
     await pumpMatchTab(tester);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
 
     expect(find.text('You owe ฿300 to Aung Ko'), findsOneWidget);
     expect(find.text('Add score'), findsOneWidget);
-    // Two badges: Home (MOTM vote + fee) and Wallet (fee). None on Match —
-    // no RSVP nag in the Manager view.
-    expect(find.text('!'), findsNWidgets(2));
+    // Home (MOTM vote + fee), Wallet (fee), and Match — the admin hasn't
+    // voted on the upcoming match yet.
+    expect(find.text('!'), findsNWidgets(3));
 
     // Home doesn't take payment itself — it sends you to the Wallet tab.
     await tester.tap(find.text('Go to Wallet'));
@@ -1438,7 +3173,6 @@ void main() {
     );
     PendingActions at(DateTime now) => PendingActions.compute(
           userId: 'me',
-          playerView: true,
           now: now,
           history: history,
         );
@@ -1475,7 +3209,7 @@ void main() {
       ],
     );
     PendingActions at(DateTime now) =>
-        PendingActions.compute(userId: 'me', playerView: true, now: now, wallet: wallet);
+        PendingActions.compute(userId: 'me', now: now, wallet: wallet);
 
     // Billed before kick-off: not yet.
     expect(at(kickoff.subtract(const Duration(hours: 2))).walletTabAlert, isFalse);
@@ -1501,7 +3235,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('YOU OWE'), findsOneWidget);
-    expect(find.text('!'), findsNothing);
+    // Only the Match tab's RSVP nag — nothing for the fee yet.
+    expect(find.text('!'), findsOneWidget);
   });
 
   testWidgets('Tapping a poll option shows who voted, with photo and name', (tester) async {

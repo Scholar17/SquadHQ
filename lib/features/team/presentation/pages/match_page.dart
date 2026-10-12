@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_shadows.dart';
 import '../../../auth/domain/entities/app_user.dart';
+import '../../../comments/domain/entities/match_topic.dart';
+import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../match/domain/entities/match.dart' as match_entity;
 import '../../../match/domain/entities/matchday_player.dart';
 import '../../../match/presentation/bloc/match_bloc.dart';
@@ -27,7 +35,6 @@ import '../../../wallet/presentation/bloc/wallet_event.dart';
 import '../../../wallet/presentation/bloc/wallet_state.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole;
-import '../bloc/team_bloc.dart';
 import '../view_role.dart';
 
 /// The matchday hub for the active team's next match — RSVP, the match
@@ -89,12 +96,12 @@ class MatchPage extends StatelessWidget {
                 );
               }
               final isManager =
-                  viewRoleFor(active.role, context.watch<TeamBloc>().state) == SquadRole.manager;
+                  viewRoleFor(active.role) == SquadRole.manager;
               final content = BlocBuilder<MatchBloc, MatchState>(
                 builder: (context, matchState) {
                   final matches = _settledMatches(matchState);
                   if (matches == null) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                    return const SkeletonList(item: MatchCardSkeleton(), count: 1);
                   }
                   if (matches.isEmpty) {
                     return _EmptyMatchday(
@@ -167,15 +174,15 @@ class _SeeMoreBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.neutral200,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: AppRadius.md,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.md,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
-              Icon(Icons.event_rounded, size: 18, color: AppColors.text.withValues(alpha: 0.6)),
+              Icon(Icons.event_rounded, size: 18, color: AppColors.textMuted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -183,8 +190,8 @@ class _SeeMoreBar extends StatelessWidget {
                   style: AppTextStyles.body(size: 13, weight: FontWeight.w600),
                 ),
               ),
-              Text('See more', style: AppTextStyles.heading(size: 13, color: AppColors.accent700)),
-              const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.accent700),
+              Text('See more', style: AppTextStyles.title(size: 13, color: AppColors.accent700)),
+              Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.accent700),
             ],
           ),
         ),
@@ -222,7 +229,7 @@ class UpcomingMatchPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Match', style: AppTextStyles.heading(size: 16)),
+        title: Text('Match', style: AppTextStyles.title(size: 16)),
       ),
       body: BlocConsumer<MatchBloc, MatchState>(
         listenWhen: (previous, current) =>
@@ -351,11 +358,11 @@ class _MatchdayView extends StatelessWidget {
         }
         // A player on the squad who hasn't voted gets the poll at the very
         // top, above the match header; after voting it moves back below.
-        // Anyone on the squad can vote, in either view (admins play too).
-        // Only the Player view makes an unanswered vote urgent — the poll
-        // glows and says "YOUR VOTE NEEDED".
+        // Anyone on the squad can vote, in either view (admins play too),
+        // and an unanswered vote is urgent for all of them — the poll glows
+        // and says "YOUR VOTE NEEDED".
         final canVote = me != null;
-        final needsAnswer = !isManager && canVote && settled is MatchdayLoaded && me.answer == null;
+        final needsAnswer = canVote && settled is MatchdayLoaded && me.answer == null;
         final isSubmitting = state is MatchdaySubmitting;
         void onRsvp(RsvpAnswer answer) =>
             context.read<MatchdayBloc>().add(MatchdayRsvpSubmitted(answer));
@@ -395,27 +402,32 @@ class _MatchdayView extends StatelessWidget {
                   child: _RemindPlayersButton(match: match, silent: settled.countOf(null)),
                 ),
               _MatchBill(matchId: match.id, userId: userId, isManager: isManager),
+              const SizedBox(height: 16),
+              MatchCommentsButton(
+                thread: (matchId: match.id, topic: MatchTopic.match),
+                teamId: match.teamId,
+                userId: userId,
+                canModerate: isManager,
+                subtitle: 'vs ${match.opponent} · ${formatMatchDate(match.kickoffAt)}',
+              ),
               const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'SQUAD',
-                      style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
-                    ),
+                    child: Text('SQUAD', style: AppTextStyles.label(color: AppColors.textMuted)),
                   ),
                   Text(
                     '${players.length} players',
-                    style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.4)),
+                    style: AppTextStyles.label(color: AppColors.textMuted),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
               Container(
                 decoration: BoxDecoration(
-                  color: AppColors.neutral100,
+                  color: AppColors.card,
                   border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadius.lg,
                 ),
                 child: Column(
                   children: [
@@ -439,7 +451,7 @@ class _MatchdayView extends StatelessWidget {
                   style: TextButton.styleFrom(foregroundColor: AppColors.accent700),
                   child: Text(
                     'Cancel match',
-                    style: AppTextStyles.heading(size: 13, color: AppColors.accent700),
+                    style: AppTextStyles.title(size: 13, color: AppColors.accent700),
                   ),
                 ),
               ),
@@ -502,55 +514,12 @@ class _EmptyMatchday extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actionLabel = this.actionLabel;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(color: AppColors.teamGold, shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: const Icon(Icons.sports_soccer_rounded, color: AppColors.neutral800, size: 30),
-            ),
-            const SizedBox(height: 20),
-            Text(title, textAlign: TextAlign.center, style: AppTextStyles.heading(size: 20)),
-            const SizedBox(height: 8),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body(
-                size: 13.5,
-                color: AppColors.text.withValues(alpha: 0.6),
-                height: 1.5,
-              ),
-            ),
-            if (actionLabel != null) ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: onAction,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.bg,
-                    shape: const StadiumBorder(),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    actionLabel,
-                    style: AppTextStyles.heading(size: 14, color: AppColors.bg),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.sports_soccer_rounded,
+      title: title,
+      body: body,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 }
@@ -573,30 +542,28 @@ class _HubHeader extends StatelessWidget {
     final venue = match.venue;
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.neutral900,
-        borderRadius: BorderRadius.circular(24),
-      ),
+      decoration: AppDecorations.darkHero(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  'MATCHDAY HUB',
-                  style: AppTextStyles.body(
-                    size: 11,
-                    weight: FontWeight.w700,
-                    color: AppColors.teamGold,
-                  ).copyWith(letterSpacing: 1.4),
-                ),
+              Text(
+                'MATCHDAY HUB',
+                style: AppTextStyles.body(
+                  size: 11,
+                  weight: FontWeight.w700,
+                  color: AppColors.teamGold,
+                ).copyWith(letterSpacing: 1.4),
               ),
+              const SizedBox(width: 8),
+              Flexible(child: _KickoffChip(kickoffAt: match.kickoffAt)),
+              const Spacer(),
               if (isManager)
                 OutlinedButton(
                   onPressed: onEdit,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.neutral100,
+                    foregroundColor: AppColors.onDark,
                     side: const BorderSide(color: Color(0x47F9F4ED)),
                     shape: const StadiumBorder(),
                     padding: const EdgeInsets.symmetric(horizontal: 13),
@@ -604,7 +571,7 @@ class _HubHeader extends StatelessWidget {
                   ),
                   child: Text(
                     'Edit details',
-                    style: AppTextStyles.heading(size: 11.5, color: AppColors.neutral100),
+                    style: AppTextStyles.title(size: 11.5, color: AppColors.onDark),
                   ),
                 ),
             ],
@@ -612,12 +579,12 @@ class _HubHeader extends StatelessWidget {
           const SizedBox(height: 12),
           RichText(
             text: TextSpan(
-              style: AppTextStyles.heading(size: 24, color: AppColors.neutral100),
+              style: AppTextStyles.heading(size: 24, color: AppColors.onDark),
               children: [
                 TextSpan(text: '$teamName '),
                 TextSpan(
                   text: 'vs',
-                  style: TextStyle(color: AppColors.neutral100.withValues(alpha: 0.45)),
+                  style: TextStyle(color: AppColors.onDarkMuted),
                 ),
                 TextSpan(text: ' ${match.opponent}'),
               ],
@@ -632,11 +599,49 @@ class _HubHeader extends StatelessWidget {
             style: AppTextStyles.body(
               size: 12.5,
               weight: FontWeight.w500,
-              color: AppColors.neutral100.withValues(alpha: 0.62),
+              color: AppColors.onDarkMuted,
               height: 1.6,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// How far off kickoff is — "TODAY", "IN 3 DAYS" — as a chip on the hub
+/// header; gold while it's close, quiet once it's played.
+class _KickoffChip extends StatelessWidget {
+  const _KickoffChip({required this.kickoffAt});
+
+  final DateTime kickoffAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final kickoff = kickoffAt.toLocal();
+    final days = DateUtils.dateOnly(kickoff).difference(DateUtils.dateOnly(now)).inDays;
+    final played = kickoff.isBefore(now);
+    final (label, soon) = switch (days) {
+      0 when played => ('KICKED OFF', true),
+      _ when played => ('PLAYED', false),
+      0 => ('TODAY', true),
+      1 => ('TOMORROW', true),
+      _ => ('IN $days DAYS', days <= 3),
+    };
+    final color = soon ? AppColors.teamGold : AppColors.onDarkMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: AppRadius.pill,
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.label(size: 10, color: color),
       ),
     );
   }
@@ -667,8 +672,8 @@ class _RsvpPoll extends StatefulWidget {
   /// False if the viewer isn't on the squad.
   final bool canVote;
 
-  /// Styles an unanswered vote as must-do (glow, "YOUR VOTE NEEDED") — the
-  /// Player view, before voting.
+  /// Styles an unanswered vote as must-do (glow, "YOUR VOTE NEEDED") —
+  /// anyone on the squad, before voting.
   final bool urgent;
   final bool isSubmitting;
   final ValueChanged<RsvpAnswer> onRsvp;
@@ -746,7 +751,7 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
         return Container(
           decoration: BoxDecoration(
             color: AppColors.neutral200,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: AppRadius.xl,
             border: _urgent ? Border.all(color: AppColors.accent, width: 2) : null,
             boxShadow: [
               if (_urgent)
@@ -770,14 +775,14 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
                 Icon(
                   Icons.poll_rounded,
                   size: 18,
-                  color: _urgent ? AppColors.accent : AppColors.text.withValues(alpha: 0.45),
+                  color: _urgent ? AppColors.accent : AppColors.textMuted,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     _urgent ? 'POLL · YOUR VOTE NEEDED' : 'POLL',
                     style: AppTextStyles.label(
-                      color: _urgent ? AppColors.accent700 : AppColors.text.withValues(alpha: 0.45),
+                      color: _urgent ? AppColors.accent700 : AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -786,7 +791,7 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
                   style: AppTextStyles.body(
                     size: 11,
                     weight: FontWeight.w600,
-                    color: AppColors.text.withValues(alpha: 0.5),
+                    color: AppColors.textMuted,
                   ),
                 ),
               ],
@@ -794,7 +799,7 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
             const SizedBox(height: 6),
             Text(
               'Are you playing vs ${widget.match.opponent}?',
-              style: AppTextStyles.heading(size: 16),
+              style: AppTextStyles.title(size: 16),
             ),
             const SizedBox(height: 2),
             Text(
@@ -807,7 +812,7 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
               style: AppTextStyles.body(
                 size: 12,
                 weight: FontWeight.w500,
-                color: AppColors.text.withValues(alpha: 0.55),
+                color: AppColors.textMuted,
               ),
             ),
             const SizedBox(height: 12),
@@ -849,11 +854,7 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
   }
 
   Widget _footer(int silent) {
-    final muted = AppTextStyles.body(
-      size: 12,
-      weight: FontWeight.w600,
-      color: AppColors.text.withValues(alpha: 0.55),
-    );
+    final muted = AppTextStyles.body(size: 12, weight: FontWeight.w600, color: AppColors.textMuted);
     if (_showOptions) {
       final pending = _pending;
       final canSubmit = pending != null && pending != widget.myAnswer && !widget.isSubmitting;
@@ -867,7 +868,12 @@ class _RsvpPollState extends State<_RsvpPoll> with SingleTickerProviderStateMixi
           _PollButton(
             label: widget.isSubmitting ? 'Submitting…' : 'Submit vote',
             primary: true,
-            onPressed: canSubmit ? () => widget.onRsvp(pending) : null,
+            onPressed: canSubmit
+                ? () {
+                    HapticFeedback.mediumImpact();
+                    widget.onRsvp(pending);
+                  }
+                : null,
           ),
           if (!_needsVote) ...[
             const SizedBox(height: 6),
@@ -923,8 +929,8 @@ class _PollButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
-    final background = primary ? AppColors.accent : AppColors.neutral100;
-    final foreground = primary ? AppColors.neutral100 : AppColors.text;
+    final background = primary ? AppColors.accent : AppColors.card;
+    final foreground = primary ? AppColors.onDark : AppColors.text;
     return SizedBox(
       width: double.infinity,
       height: 42,
@@ -935,7 +941,7 @@ class _PollButton extends StatelessWidget {
           backgroundColor: background,
           disabledBackgroundColor: background.withValues(alpha: 0.45),
           disabledForegroundColor: foreground.withValues(alpha: 0.7),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
         ),
         child: Text(
           label,
@@ -977,39 +983,70 @@ class _PollVoteOption extends StatelessWidget {
         opacity: t.clamp(0, 1),
         child: Transform.translate(offset: Offset(0, (1 - t) * 14), child: child),
       ),
-      child: Material(
-        color: AppColors.neutral100,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: selected ? const BorderSide(color: AppColors.accent, width: 2) : BorderSide.none,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          // Picked: a warm tint and accent outline fade in.
+          color: selected ? AppColors.accent100 : AppColors.card,
+          borderRadius: AppRadius.md,
+          border: Border.all(color: selected ? AppColors.accent : Colors.transparent, width: 2),
+          boxShadow: selected ? AppShadows.subtle : null,
         ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: enabled ? onTap : null,
-          child: SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? AppColors.accent : Colors.transparent,
-                    border: Border.all(
-                      color: selected ? AppColors.accent : AppColors.text.withValues(alpha: 0.3),
-                      width: 2,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: AppRadius.md,
+            onTap: enabled
+                ? () {
+                    if (!selected) HapticFeedback.selectionClick();
+                    onTap();
+                  }
+                : null,
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  const SizedBox(width: 14),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? AppColors.accent : Colors.transparent,
+                      border: Border.all(
+                        color: selected ? AppColors.accent : AppColors.text.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                    // The tick pops in rather than appearing.
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      switchInCurve: Curves.easeOutBack,
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: selected
+                          ? const Icon(
+                              Icons.check_rounded,
+                              key: ValueKey('tick'),
+                              size: 14,
+                              color: AppColors.onDark,
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
-                  child: selected
-                      ? const Icon(Icons.check_rounded, size: 14, color: AppColors.neutral100)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Text(label, style: AppTextStyles.body(size: 14, weight: FontWeight.w600)),
-              ],
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: AppTextStyles.body(
+                      size: 14,
+                      weight: selected ? FontWeight.w800 : FontWeight.w600,
+                      color: selected ? AppColors.accent800 : null,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1048,7 +1085,7 @@ class _PollResultBar extends StatelessWidget {
       hint: 'Show who voted',
       child: InkWell(
         onTap: onShowVoters,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.sm,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1077,7 +1114,7 @@ class _PollResultBar extends StatelessWidget {
                     style: AppTextStyles.body(
                       size: 12,
                       weight: FontWeight.w700,
-                      color: AppColors.text.withValues(alpha: 0.6),
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ),
@@ -1085,7 +1122,7 @@ class _PollResultBar extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             ClipRRect(
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppRadius.pill,
               child: SizedBox(
                 height: 8,
                 child: ColoredBox(
@@ -1107,7 +1144,7 @@ class _PollResultBar extends StatelessWidget {
                                 child: const DecoratedBox(
                                   decoration: BoxDecoration(
                                     color: AppColors.accent,
-                                    borderRadius: BorderRadius.all(Radius.circular(999)),
+                                    borderRadius: AppRadius.pill,
                                   ),
                                 ),
                               ),
@@ -1155,10 +1192,7 @@ class _VoterStack extends StatelessWidget {
                   left: index * 14,
                   child: Container(
                     padding: const EdgeInsets.all(1.5),
-                    decoration: const BoxDecoration(
-                      color: AppColors.neutral200,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: AppColors.neutral200, shape: BoxShape.circle),
                     child: CircleAvatar(
                       radius: 9.5,
                       backgroundColor: AppColors.neutral400,
@@ -1171,7 +1205,7 @@ class _VoterStack extends StatelessWidget {
                         style: AppTextStyles.body(
                           size: 7.5,
                           weight: FontWeight.w800,
-                          color: AppColors.neutral100,
+                          color: AppColors.onDark,
                           height: 1,
                         ),
                       ),
@@ -1185,10 +1219,7 @@ class _VoterStack extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(left: 2),
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.neutral100,
-              borderRadius: BorderRadius.circular(999),
-            ),
+            decoration: BoxDecoration(color: AppColors.card, borderRadius: AppRadius.pill),
             child: Text('+$extra', style: AppTextStyles.body(size: 11, weight: FontWeight.w700)),
           ),
       ],
@@ -1248,7 +1279,7 @@ class _RosterRow extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 11,
                     weight: FontWeight.w500,
-                    color: AppColors.text.withValues(alpha: 0.5),
+                    color: AppColors.textMuted,
                   ),
                 ),
               ],
@@ -1272,9 +1303,7 @@ Future<void> _showPollVotersSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
     builder: (_) => _PollVotersSheet(roster: roster, userId: userId, initial: initial),
   );
 }
@@ -1315,7 +1344,7 @@ class _PollVotersSheetState extends State<_PollVotersSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Votes', style: AppTextStyles.heading(size: 18)),
+            Text('Votes', style: AppTextStyles.title(size: 18)),
             const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1330,7 +1359,7 @@ class _PollVotersSheetState extends State<_PollVotersSheet> {
                       labelStyle: AppTextStyles.body(
                         size: 12.5,
                         weight: FontWeight.w700,
-                        color: _selected == tab.answer ? AppColors.neutral100 : AppColors.text,
+                        color: _selected == tab.answer ? AppColors.onDark : AppColors.text,
                       ),
                       showCheckmark: false,
                       shape: const StadiumBorder(),
@@ -1348,10 +1377,7 @@ class _PollVotersSheetState extends State<_PollVotersSheet> {
                       child: Center(
                         child: Text(
                           'No one yet',
-                          style: AppTextStyles.body(
-                            size: 13,
-                            color: AppColors.text.withValues(alpha: 0.55),
-                          ),
+                          style: AppTextStyles.body(size: 13, color: AppColors.textMuted),
                         ),
                       ),
                     )

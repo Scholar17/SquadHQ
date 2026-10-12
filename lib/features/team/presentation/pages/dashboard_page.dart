@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,10 +7,14 @@ import '../../../../core/clock/clock_scope.dart';
 import '../../../../core/notifications/web_push_prompt.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../../match/domain/entities/match.dart' as match_entity;
 import '../../../match/domain/entities/match_history.dart';
+import '../../../match/domain/entities/matchday_player.dart' show RsvpAnswer;
 import '../../../match/presentation/bloc/match_bloc.dart';
 import '../../../match/presentation/bloc/match_history_bloc.dart';
 import '../../../match/presentation/match_formatting.dart';
@@ -20,14 +25,16 @@ import '../../../match/presentation/bloc/match_state.dart';
 import '../../../match/presentation/widgets/create_match_sheet.dart';
 import '../../../match/presentation/widgets/upcoming_matches_section.dart';
 import '../../../notifications/presentation/bloc/notification_bloc.dart';
+import '../../../notifications/presentation/widgets/other_groups_activity.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
 import '../../../team_membership/presentation/widgets/team_switcher_sheet.dart';
+import '../../../wallet/presentation/bloc/wallet_bloc.dart';
+import '../../../wallet/presentation/bloc/wallet_state.dart';
 import '../../../wallet/presentation/wallet_formatting.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole, TeamInfo;
 import '../bloc/team_bloc.dart';
-import '../bloc/team_event.dart';
 import '../pending_actions.dart';
 import '../view_role.dart';
 import '../widgets/team_header.dart';
@@ -50,10 +57,10 @@ class DashboardPage extends StatelessWidget {
   /// Unwraps Submitting/Failure down to the settled Loaded state — those
   /// two never nest, so one pass is enough (same invariant as elsewhere).
   static TeamMembershipState _settle(TeamMembershipState state) => switch (state) {
-        TeamMembershipSubmitting(:final previous) => previous,
-        TeamMembershipFailure(:final previous) => previous,
-        _ => state,
-      };
+    TeamMembershipSubmitting(:final previous) => previous,
+    TeamMembershipFailure(:final previous) => previous,
+    _ => state,
+  };
 
   static membership.Team? _activeTeam(TeamMembershipState state) {
     final settled = _settle(state);
@@ -65,11 +72,25 @@ class DashboardPage extends StatelessWidget {
   }
 
   static List<match_entity.Match> _settledMatches(MatchState state) => switch (state) {
-        MatchLoaded(:final matches) => matches,
-        MatchSubmitting(:final previous) => _settledMatches(previous),
-        MatchFailure(:final previous) => _settledMatches(previous),
-        _ => const [],
-      };
+    MatchLoaded(:final matches) => matches,
+    MatchSubmitting(:final previous) => _settledMatches(previous),
+    MatchFailure(:final previous) => _settledMatches(previous),
+    _ => const [],
+  };
+
+  /// The viewer's RSVP for each upcoming match on their squad, read from the
+  /// wallet (which reloads after every RSVP) — empty until it has loaded.
+  Map<String, RsvpAnswer?> _myRsvps(BuildContext context, List<match_entity.Match> matches) {
+    final wallet = context.watch<WalletBloc>().state.wallet;
+    if (wallet == null || !wallet.members.any((member) => member.profileId == user.id)) {
+      return const {};
+    }
+    return {
+      for (final match in matches)
+        if (wallet.forMatch(match.id) case final walletMatch?)
+          match.id: walletMatch.answers[user.id],
+    };
+  }
 
   static String _initialsFor(String name) {
     final initials = name
@@ -82,18 +103,6 @@ class DashboardPage extends StatelessWidget {
     return initials.isEmpty ? '?' : initials;
   }
 
-  void _onRoleToggle(BuildContext context, membership.TeamRole role) {
-    if (role == membership.TeamRole.player) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Only team admins can switch to the Manager view')),
-        );
-      return;
-    }
-    context.read<TeamBloc>().add(const TeamRoleToggled());
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,8 +113,10 @@ class DashboardPage extends StatelessWidget {
           builder: (context, membershipState) {
             final settled = _settle(membershipState);
             if (settled is! TeamMembershipLoaded) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.accent),
+              return const SkeletonList(
+                leading: MatchCardSkeleton(),
+                item: BillCardSkeleton(),
+                count: 2,
               );
             }
             final active = _activeTeam(membershipState);
@@ -116,9 +127,7 @@ class DashboardPage extends StatelessWidget {
                 onCreateOrJoin: () => context.push(AppRoutes.team),
               );
             }
-            final teamState = context.watch<TeamBloc>().state;
-            final viewRole = viewRoleFor(active.role, teamState);
-            final canCreateMatch = viewRole == SquadRole.manager;
+            final canCreateMatch = viewRoleFor(active.role) == SquadRole.manager;
             final pending = PendingActions.of(context, user.id);
             return BlocBuilder<MatchBloc, MatchState>(
               builder: (context, matchState) => _DashboardContent(
@@ -128,17 +137,13 @@ class DashboardPage extends StatelessWidget {
                   initials: _initialsFor(active.name),
                   alertCount: context.watch<NotificationBloc>().state.unreadCount,
                 ),
-                role: viewRole,
                 matches: _settledMatches(matchState),
+                myRsvps: _myRsvps(context, _settledMatches(matchState)),
                 canCreateMatch: canCreateMatch,
                 profileInitials: _profileInitials,
                 onBellTap: () => context.push(
                   AppRoutes.notifications,
-                  extra: NotificationsArgs(
-                    userId: user.id,
-                    adminViewIsManager:
-                        viewRoleFor(membership.TeamRole.admin, teamState) == SquadRole.manager,
-                  ),
+                  extra: NotificationsArgs(userId: user.id),
                 ),
                 onMatchTap: (match) => context.push(
                   AppRoutes.upcomingMatch,
@@ -157,7 +162,6 @@ class DashboardPage extends StatelessWidget {
                   isManager: canCreateMatch,
                 ),
                 onTeamTap: () => showTeamSwitcherSheet(context),
-                onRoleToggle: () => _onRoleToggle(context, active.role),
                 onCreateMatch: () => showCreateMatchSheet(context, teamId: active.id),
                 onSeeAllMatches: () => context.push(
                   AppRoutes.matches,
@@ -206,10 +210,7 @@ class _EmptyHome extends StatelessWidget {
                 child: Container(
                   width: 36,
                   height: 36,
-                  decoration: const BoxDecoration(
-                    color: AppColors.neutral300,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: BoxDecoration(color: AppColors.neutral300, shape: BoxShape.circle),
                   alignment: Alignment.center,
                   child: Text(
                     profileInitials,
@@ -221,64 +222,21 @@ class _EmptyHome extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: const BoxDecoration(
-                      color: AppColors.teamGold,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.groups_rounded,
-                      color: AppColors.neutral800,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    "You're not on a team yet",
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.heading(size: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create a squad of your own, or join one with an invite '
-                    'code, to see fixtures and squad stats here.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.body(
-                      size: 13.5,
-                      color: AppColors.text.withValues(alpha: 0.6),
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: onCreateOrJoin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.bg,
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'Create or join a team',
-                        style: AppTextStyles.heading(size: 14, color: AppColors.bg),
-                      ),
-                    ),
-                  ),
-                ],
+          child: EmptyState(
+            icon: Icons.groups_rounded,
+            title: "You're not on a team yet",
+            body:
+                'Create a squad of your own, or join one with an invite '
+                'code, to see fixtures and squad stats here.',
+            steps: const [
+              (icon: Icons.add_circle_outline_rounded, text: "Create a team — you'll be its admin"),
+              (
+                icon: Icons.vpn_key_outlined,
+                text: 'Or join with the invite code your captain shares',
               ),
-            ),
+            ],
+            actionLabel: 'Create or join a team',
+            onAction: onCreateOrJoin,
           ),
         ),
       ],
@@ -289,30 +247,28 @@ class _EmptyHome extends StatelessWidget {
 class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.headerTeam,
-    required this.role,
     required this.matches,
+    required this.myRsvps,
     required this.canCreateMatch,
     required this.profileInitials,
     required this.onBellTap,
     required this.onMatchTap,
     required this.afterTheMatch,
     required this.onTeamTap,
-    required this.onRoleToggle,
     required this.onCreateMatch,
     required this.onSeeAllMatches,
     required this.onProfileTap,
   });
 
   final TeamInfo headerTeam;
-  final SquadRole role;
   final List<match_entity.Match> matches;
+  final Map<String, RsvpAnswer?> myRsvps;
   final bool canCreateMatch;
   final String profileInitials;
   final VoidCallback onBellTap;
   final ValueChanged<match_entity.Match> onMatchTap;
   final Widget afterTheMatch;
   final VoidCallback onTeamTap;
-  final VoidCallback onRoleToggle;
   final VoidCallback onCreateMatch;
   final VoidCallback onSeeAllMatches;
   final VoidCallback onProfileTap;
@@ -324,10 +280,8 @@ class _DashboardContent extends StatelessWidget {
         SliverToBoxAdapter(
           child: TeamHeader(
             team: headerTeam,
-            role: role,
             profileInitials: profileInitials,
             onTeamTap: onTeamTap,
-            onRoleToggle: onRoleToggle,
             onBellTap: onBellTap,
             onProfileTap: onProfileTap,
           ),
@@ -337,8 +291,10 @@ class _DashboardContent extends StatelessWidget {
           sliver: SliverList.list(
             children: [
               const WebPushPrompt(),
+              const OtherGroupsActivity(padding: EdgeInsets.only(bottom: 20)),
               UpcomingMatchesSection(
                 matches: matches,
+                myRsvps: myRsvps,
                 canCreateMatch: canCreateMatch,
                 onCreateMatch: onCreateMatch,
                 onSeeAll: onSeeAllMatches,
@@ -377,17 +333,11 @@ class _AfterTheMatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = Text(
-      'AFTER THE MATCH',
-      style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
-    );
+    final label = Text('AFTER THE MATCH', style: AppTextStyles.label(color: AppColors.textMuted));
     if (recaps.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -399,7 +349,7 @@ class _AfterTheMatch extends StatelessWidget {
               style: AppTextStyles.body(
                 size: 12.5,
                 weight: FontWeight.w500,
-                color: AppColors.text.withValues(alpha: 0.6),
+                color: AppColors.textMuted,
                 height: 1.5,
               ),
             ),
@@ -495,31 +445,32 @@ class _RecapCard extends StatelessWidget {
     final now = ClockScope.now(context);
     final decided = history.motmDecided(pastMatch, now);
     final voters = history.motmVoters(pastMatch);
-    final votesCast =
-        voters.where((voter) => pastMatch.motmVotes.containsKey(voter.profileId)).length;
+    final votesCast = voters
+        .where((voter) => pastMatch.motmVotes.containsKey(voter.profileId))
+        .length;
     // Secret ballot until decided (everyone voted, or midnight after).
     final motmText = !decided
         ? 'Man of the Match voting open · $votesCast of ${voters.length} voted'
         : winners.isEmpty
-            ? 'No Man of the Match — nobody voted'
-            : 'Man of the Match: ${winners.join(' & ')} '
-                '(${tally[winnerIds.first]} ${tally[winnerIds.first] == 1 ? 'vote' : 'votes'}'
-                '${winners.length > 1 ? ' each' : ''})';
+        ? 'No Man of the Match — nobody voted'
+        : 'Man of the Match: ${winners.join(' & ')} '
+              '(${tally[winnerIds.first]} ${tally[winnerIds.first] == 1 ? 'vote' : 'votes'}'
+              '${winners.length > 1 ? ' each' : ''})';
     final muted = AppTextStyles.body(
       size: 12.5,
       weight: FontWeight.w600,
-      color: AppColors.text.withValues(alpha: 0.6),
+      color: AppColors.textMuted,
     );
     return Material(
-      color: AppColors.neutral100,
-      borderRadius: BorderRadius.circular(20),
+      color: AppColors.card,
+      borderRadius: AppRadius.lg,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
         onTap: onOpen,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.lg,
             border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
           ),
           child: Column(
@@ -531,7 +482,7 @@ class _RecapCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('vs ${match.opponent}', style: AppTextStyles.heading(size: 16)),
+                        Text('vs ${match.opponent}', style: AppTextStyles.title(size: 16)),
                         const SizedBox(height: 2),
                         Text(formatMatchDate(match.kickoffAt), style: muted),
                       ],
@@ -600,7 +551,7 @@ class _ActionRow extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(12, 8, action == null ? 12 : 8, 8),
       decoration: BoxDecoration(
         color: highlight ? AppColors.accent100 : AppColors.neutral200,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.md,
       ),
       child: Row(
         children: [
@@ -635,7 +586,7 @@ class _PillButton extends StatelessWidget {
     return TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: primary ? AppColors.neutral100 : AppColors.text,
+        foregroundColor: primary ? AppColors.onDark : AppColors.text,
         backgroundColor: primary ? AppColors.accent : AppColors.neutral200,
         shape: const StadiumBorder(),
         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -643,10 +594,7 @@ class _PillButton extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: AppTextStyles.heading(
-          size: 12.5,
-          color: primary ? AppColors.neutral100 : AppColors.text,
-        ),
+        style: AppTextStyles.title(size: 12.5, color: primary ? AppColors.onDark : AppColors.text),
       ),
     );
   }

@@ -6,7 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
@@ -23,7 +26,6 @@ import '../../../wallet/presentation/widgets/bill_sheet.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
 import '../../../wallet/presentation/widgets/pay_bill_sheet.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole;
-import '../bloc/team_bloc.dart';
 import '../view_role.dart';
 
 /// The team's match bills: what's still owed to whoever paid, what you
@@ -64,12 +66,12 @@ class WalletPage extends StatelessWidget {
               );
             }
             final isManager =
-                viewRoleFor(active.role, context.watch<TeamBloc>().state) == SquadRole.manager;
+                viewRoleFor(active.role) == SquadRole.manager;
             return BlocBuilder<WalletBloc, WalletState>(
               builder: (context, state) {
                 final wallet = state.wallet;
                 if (wallet == null) {
-                  return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+                  return const SkeletonList(item: BillCardSkeleton(), count: 3);
                 }
                 return RefreshIndicator(
                   color: AppColors.accent,
@@ -140,20 +142,13 @@ class _WalletContent extends StatelessWidget {
         if (bills.isEmpty)
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-            ),
+            decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
             child: Text(
               isManager
                   ? 'No bills yet. Paid for a pitch? Add its total cost below and '
                         'it splits automatically.'
                   : "No bills yet. When an admin pays for a match, your share shows up here.",
-              style: AppTextStyles.body(
-                size: 12.5,
-                color: AppColors.text.withValues(alpha: 0.6),
-                height: 1.5,
-              ),
+              style: AppTextStyles.body(size: 12.5, color: AppColors.textMuted, height: 1.5),
             ),
           )
         else ...[
@@ -178,7 +173,7 @@ class _WalletContent extends StatelessWidget {
                 ),
                 child: Text(
                   'See all bills (${bills.length})',
-                  style: AppTextStyles.heading(size: 13, color: AppColors.accent700),
+                  style: AppTextStyles.title(size: 13, color: AppColors.accent700),
                 ),
               ),
             ),
@@ -231,7 +226,7 @@ class _UnbilledListState extends State<_UnbilledList> {
                 _expanded
                     ? 'Show less'
                     : 'See more (${unbilled.length - _UnbilledList._previewCount})',
-                style: AppTextStyles.heading(size: 13, color: AppColors.accent700),
+                style: AppTextStyles.title(size: 13, color: AppColors.accent700),
               ),
             ),
           ),
@@ -266,13 +261,10 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            text,
-            style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
-          ),
+          child: Text(text, style: AppTextStyles.label(color: AppColors.textMuted)),
         ),
         if (trailing != null)
-          Text(trailing, style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.4))),
+          Text(trailing, style: AppTextStyles.label(color: AppColors.textMuted)),
       ],
     );
   }
@@ -324,15 +316,15 @@ class _FocusBillCard extends StatelessWidget {
     final local = match.kickoffAt.toLocal();
     final now = DateTime.now();
     final isToday = local.year == now.year && local.month == now.month && local.day == now.day;
-    final muted = AppColors.neutral100.withValues(alpha: 0.6);
+    final muted = AppColors.onDarkMuted;
     final split = this.split;
     final bill = split?.bill;
     final isPayer = bill?.payerId == userId;
     return Material(
       color: AppColors.neutral900,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: AppRadius.xl,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadius.xl,
         onTap: split == null
             ? null
             : () => showBillDetailsSheet(
@@ -355,7 +347,7 @@ class _FocusBillCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 'vs ${match.opponent}',
-                style: AppTextStyles.heading(size: 18, color: AppColors.neutral100),
+                style: AppTextStyles.title(size: 18, color: AppColors.onDark),
               ),
               const SizedBox(height: 12),
               if (split == null || bill == null) ...[
@@ -368,13 +360,13 @@ class _FocusBillCard extends StatelessWidget {
                   OutlinedButton(
                     onPressed: () => showBillSheet(context, matchId: match.id, userId: userId),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.neutral100,
+                      foregroundColor: AppColors.onDark,
                       side: const BorderSide(color: Color(0x47F9F4ED)),
                       shape: const StadiumBorder(),
                     ),
                     child: Text(
                       'Add total cost',
-                      style: AppTextStyles.heading(size: 12.5, color: AppColors.neutral100),
+                      style: AppTextStyles.title(size: 12.5, color: AppColors.onDark),
                     ),
                   ),
                 ],
@@ -431,7 +423,7 @@ class _MoneyBreakdown extends StatelessWidget {
   final String payerLabel;
   final double total;
 
-  static const _paidColor = AppColors.accent2_100;
+  static Color get _paidColor => AppColors.accent2_100;
   static const _owedColor = AppColors.accent400;
   static const _payersColor = AppColors.teamGold;
 
@@ -447,7 +439,7 @@ class _MoneyBreakdown extends StatelessWidget {
       children: [
         if (total > 0)
           ClipRRect(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: AppRadius.pill,
             child: SizedBox(
               height: 8,
               child: Row(
@@ -475,7 +467,7 @@ class _MoneyBreakdown extends StatelessWidget {
                     style: AppTextStyles.body(
                       size: 12.5,
                       weight: FontWeight.w700,
-                      color: AppColors.neutral100.withValues(alpha: 0.5),
+                      color: AppColors.onDarkMuted,
                     ),
                   ),
                 ),
@@ -491,7 +483,7 @@ class _MoneyBreakdown extends StatelessWidget {
                     style: AppTextStyles.body(
                       size: 12.5,
                       weight: FontWeight.w500,
-                      color: AppColors.neutral100.withValues(alpha: 0.7),
+                      color: AppColors.onDark.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -500,7 +492,7 @@ class _MoneyBreakdown extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 13,
                     weight: FontWeight.w700,
-                    color: AppColors.neutral100,
+                    color: AppColors.onDark,
                   ),
                 ),
               ],
@@ -520,7 +512,7 @@ class _MoneyBreakdown extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 12.5,
                     weight: FontWeight.w700,
-                    color: AppColors.neutral100.withValues(alpha: 0.5),
+                    color: AppColors.onDarkMuted,
                   ),
                 ),
               ),
@@ -530,7 +522,7 @@ class _MoneyBreakdown extends StatelessWidget {
                   style: AppTextStyles.body(
                     size: 12.5,
                     weight: FontWeight.w700,
-                    color: AppColors.neutral100,
+                    color: AppColors.onDark,
                   ),
                 ),
               ),
@@ -564,7 +556,7 @@ class _YourBalanceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accent100,
         border: Border.all(color: AppColors.accent700.withValues(alpha: 0.18)),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +590,7 @@ class _YourBalanceCard extends StatelessWidget {
                         showPayBillSheet(context, matchId: walletMatch.match.id, userId: userId),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.bg,
+                      foregroundColor: AppColors.onDark,
                       shape: const StadiumBorder(),
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -606,7 +598,7 @@ class _YourBalanceCard extends StatelessWidget {
                     ),
                     child: Text(
                       'Pay ${formatBaht(split.roundedShare)}',
-                      style: AppTextStyles.heading(size: 12.5, color: AppColors.bg),
+                      style: AppTextStyles.title(size: 12.5, color: AppColors.onDark),
                     ),
                   ),
                 ],
@@ -633,56 +625,17 @@ class _EmptyWallet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(color: AppColors.teamGold, shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.account_balance_wallet_rounded,
-                color: AppColors.neutral800,
-                size: 30,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(title, textAlign: TextAlign.center, style: AppTextStyles.heading(size: 20)),
-            const SizedBox(height: 8),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body(
-                size: 13.5,
-                color: AppColors.text.withValues(alpha: 0.6),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: onAction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.bg,
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
-                child: Text(
-                  actionLabel,
-                  style: AppTextStyles.heading(size: 14, color: AppColors.bg),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: Icons.account_balance_wallet_rounded,
+      title: title,
+      body: body,
+      steps: const [
+        (icon: Icons.receipt_long_rounded, text: 'Add the pitch cost after a match'),
+        (icon: Icons.call_split_rounded, text: "It's split between everyone who played"),
+        (icon: Icons.qr_code_2_rounded, text: 'Players pay you back by QR'),
+      ],
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 }

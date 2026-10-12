@@ -13,9 +13,6 @@ import '../../wallet/domain/entities/bill_split.dart';
 import '../../wallet/domain/entities/team_wallet.dart';
 import '../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../wallet/presentation/bloc/wallet_state.dart';
-import '../domain/entities/team_snapshot.dart' show SquadRole;
-import 'bloc/team_bloc.dart';
-import 'view_role.dart';
 
 /// A finished match worth recapping on Home: its result, the Man of the
 /// Match vote, and the viewer's unpaid share of its bill, if any.
@@ -89,7 +86,6 @@ class PendingActions {
     };
     return compute(
       userId: userId,
-      playerView: viewRoleFor(active.role, context.watch<TeamBloc>().state) == SquadRole.player,
       now: ClockScope.now(context),
       upcoming: upcoming,
       history: context.watch<MatchHistoryBloc>().state.history,
@@ -100,7 +96,6 @@ class PendingActions {
   /// A match is finished once kick-off + play time has passed.
   static PendingActions compute({
     required String userId,
-    required bool playerView,
     required DateTime now,
     List<Match> upcoming = const [],
     MatchHistory? history,
@@ -130,9 +125,9 @@ class PendingActions {
     }
 
     // The next match's RSVP, read from the wallet (which reloads after
-    // every RSVP) — only nagged in the Player view.
+    // every RSVP) — nagged for everyone on the team, admins included.
     var rsvpNeeded = false;
-    if (playerView && upcoming.isNotEmpty) {
+    if (upcoming.isNotEmpty) {
       final walletMatch = wallet?.forMatch(upcoming.first.id);
       rsvpNeeded = walletMatch != null && !walletMatch.answers.containsKey(userId);
     }

@@ -8,7 +8,6 @@ import 'team_state.dart';
 class TeamBloc extends Bloc<TeamEvent, TeamState> {
   TeamBloc(this._repository) : super(const TeamLoading()) {
     on<TeamStarted>(_onStarted);
-    on<TeamRoleToggled>(_onRoleToggled);
     on<TeamMyRsvpChanged>(_onMyRsvpChanged);
   }
 
@@ -22,21 +21,8 @@ class TeamBloc extends Bloc<TeamEvent, TeamState> {
       (snapshot) => emit(
         TeamLoaded(
           snapshot: snapshot,
-          role: SquadRole.manager,
           myRsvp: RsvpStatus.pending,
         ),
-      ),
-    );
-  }
-
-  void _onRoleToggled(TeamRoleToggled event, Emitter<TeamState> emit) {
-    final current = state;
-    if (current is! TeamLoaded) return;
-    emit(
-      current.copyWith(
-        role: current.role == SquadRole.manager
-            ? SquadRole.player
-            : SquadRole.manager,
       ),
     );
   }

@@ -23,7 +23,6 @@ import '../../../notifications/presentation/bloc/notification_bloc.dart';
 import '../../../notifications/presentation/notification_navigation.dart';
 import '../../../squad/presentation/active_group.dart';
 import '../../../squad/presentation/bloc/squad_ledger_bloc.dart';
-import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
@@ -32,8 +31,6 @@ import '../bloc/team_bloc.dart';
 import '../bloc/team_event.dart';
 import '../match_reminders.dart';
 import '../pending_actions.dart';
-import '../view_role.dart';
-import '../../domain/entities/team_snapshot.dart' show SquadRole;
 
 /// Four tabs, hard stop — Home, Match, Wallet, Squad. One [TeamBloc] feeds
 /// all four so the fixture, roster and role toggle stay in sync between
@@ -80,7 +77,7 @@ class AppShellPage extends StatelessWidget {
                 height: 64,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.neutral100,
+                  color: AppColors.card,
                   border: Border(top: BorderSide(color: AppColors.text.withValues(alpha: 0.08))),
                 ),
                 child: Builder(
@@ -127,7 +124,9 @@ class AppShellPage extends StatelessWidget {
   static bool _squadSettleAlert(BuildContext context, String userId) {
     final ledger = context.watch<SquadLedgerBloc>().state.ledger;
     if (ledger == null) return false;
-    return ledger.awaitingConfirmationBy(userId).isNotEmpty || ledger.balanceOf(userId) < 0;
+    return ledger.awaitingConfirmationBy(userId).isNotEmpty ||
+        ledger.tripPaymentsAwaiting(userId).isNotEmpty ||
+        ledger.balanceOf(userId) < 0;
   }
 
   static const _homeTab = 0;
@@ -254,9 +253,6 @@ class _ActiveTeamSyncState extends State<_ActiveTeamSync> with WidgetsBindingObs
       context,
       notification,
       userId: widget.userId,
-      adminViewIsManager:
-          viewRoleFor(membership.TeamRole.admin, context.read<TeamBloc>().state) ==
-              SquadRole.manager,
     );
   }
 
@@ -326,7 +322,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accent : AppColors.text.withValues(alpha: 0.45);
+    final color = selected ? AppColors.accent : AppColors.textMuted;
     return InkWell(
       onTap: onTap,
       child: Column(
@@ -347,7 +343,7 @@ class _NavItem extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.neutral100, width: 1.5),
+                      border: Border.all(color: AppColors.card, width: 1.5),
                     ),
                     child: Text(
                       '!',
@@ -355,7 +351,7 @@ class _NavItem extends StatelessWidget {
                       style: AppTextStyles.body(
                         size: 9,
                         weight: FontWeight.w900,
-                        color: AppColors.neutral100,
+                        color: AppColors.onDark,
                         height: 1,
                       ),
                     ),
@@ -378,7 +374,8 @@ class _NavItem extends StatelessWidget {
 /// Home; on Home, the first press shows "Press back again to exit" and a
 /// second within [_exitWindow] closes the app. Screens pushed on top
 /// (Profile, history…) aren't affected — they're above the shell and just
-/// close. On web the browser's back button keeps its usual behaviour.
+/// close. On web the browser's back button lands here too (see
+/// WebBackGuard), and exiting leaves the app.
 class _BackButtonScope extends StatefulWidget {
   const _BackButtonScope({required this.navigationShell, required this.child});
 
@@ -416,7 +413,6 @@ class _BackButtonScopeState extends State<_BackButtonScope> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) return widget.child;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {

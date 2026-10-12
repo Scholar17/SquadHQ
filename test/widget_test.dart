@@ -21,6 +21,6 @@ void main() {
 
     expect(find.text('Continue with Facebook'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
-    expect(find.text('Every match,\nsorted.'), findsOneWidget);
+    expect(find.text('Your squad,\nsorted.'), findsOneWidget);
   });
 }

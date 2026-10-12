@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/team_snapshot.dart';
 
@@ -17,7 +18,7 @@ class NeedsYouList extends StatelessWidget {
       children: [
         Text(
           'NEEDS YOU',
-          style: AppTextStyles.label(color: AppColors.text.withValues(alpha: 0.45)),
+          style: AppTextStyles.label(color: AppColors.textMuted),
         ),
         const SizedBox(height: 8),
         for (final item in items) ...[
@@ -37,8 +38,8 @@ class _NeedsYouRow extends StatelessWidget {
 
   Color get _background => switch (item.kind) {
         NeedsYouKind.vote => AppColors.accent100,
-        NeedsYouKind.wallet => AppColors.neutral100,
-        NeedsYouKind.availability => AppColors.neutral100,
+        NeedsYouKind.wallet => AppColors.card,
+        NeedsYouKind.availability => AppColors.card,
       };
 
   Color get _border => switch (item.kind) {
@@ -59,12 +60,12 @@ class _NeedsYouRow extends StatelessWidget {
 
   Color get _metaColor => switch (item.kind) {
         NeedsYouKind.vote => AppColors.accent800,
-        _ => AppColors.text.withValues(alpha: 0.55),
+        _ => AppColors.textMuted,
       };
 
   Color get _chevronColor => switch (item.kind) {
         NeedsYouKind.vote => AppColors.accent700,
-        _ => AppColors.text.withValues(alpha: 0.4),
+        _ => AppColors.textMuted,
       };
 
   @override
@@ -72,14 +73,14 @@ class _NeedsYouRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.md,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: _background,
             border: Border.all(color: _border),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: AppRadius.md,
           ),
           child: Row(
             children: [

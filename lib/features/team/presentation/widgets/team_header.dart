@@ -1,27 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../domain/entities/team_snapshot.dart';
+import '../../domain/entities/team_snapshot.dart' show TeamInfo;
 
 class TeamHeader extends StatelessWidget {
   const TeamHeader({
     super.key,
     required this.team,
-    this.role,
     required this.profileInitials,
     required this.onTeamTap,
-    this.onRoleToggle,
     required this.onBellTap,
     required this.onProfileTap,
   });
 
   final TeamInfo team;
-  /// The Manager/Player view pill — null hides it (squads have no views).
-  final SquadRole? role;
   final String profileInitials;
   final VoidCallback onTeamTap;
-  final VoidCallback? onRoleToggle;
   final VoidCallback onBellTap;
   final VoidCallback onProfileTap;
 
@@ -33,7 +29,7 @@ class TeamHeader extends StatelessWidget {
         children: [
           Expanded(
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.sm,
               onTap: onTeamTap,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
@@ -64,7 +60,7 @@ class TeamHeader extends StatelessWidget {
                                 style: AppTextStyles.body(
                                   size: 10,
                                   weight: FontWeight.w700,
-                                  color: AppColors.text.withValues(alpha: 0.4),
+                                  color: AppColors.textMuted,
                                 ),
                               ),
                             ],
@@ -76,7 +72,7 @@ class TeamHeader extends StatelessWidget {
                             style: AppTextStyles.body(
                               size: 11,
                               weight: FontWeight.w500,
-                              color: AppColors.text.withValues(alpha: 0.5),
+                              color: AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -87,10 +83,6 @@ class TeamHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (role case final role?) ...[
-            _RolePill(role: role, onTap: onRoleToggle ?? () {}),
-            const SizedBox(width: 6),
-          ],
           _IconButton(onTap: onBellTap, badgeCount: team.alertCount),
           const SizedBox(width: 6),
           _ProfileAvatar(initials: profileInitials, onTap: onProfileTap),
@@ -117,34 +109,7 @@ class _TeamMark extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: AppTextStyles.heading(size: 14, color: AppColors.neutral800),
-      ),
-    );
-  }
-}
-
-class _RolePill extends StatelessWidget {
-  const _RolePill({required this.role, required this.onTap});
-
-  final SquadRole role;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.neutral900,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          role == SquadRole.manager ? 'Manager' : 'Player',
-          style: AppTextStyles.heading(size: 12, color: AppColors.neutral100),
-        ),
+        style: AppTextStyles.title(size: 14, color: AppColors.neutral800),
       ),
     );
   }
@@ -168,7 +133,7 @@ class _IconButton extends StatelessWidget {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: AppColors.neutral100,
+                color: AppColors.card,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: AppColors.text.withValues(alpha: 0.1),
@@ -199,7 +164,7 @@ class _IconButton extends StatelessWidget {
                     style: AppTextStyles.body(
                       size: 10,
                       weight: FontWeight.w700,
-                      color: AppColors.bg,
+                      color: AppColors.onDark,
                       height: 1,
                     ),
                   ),
@@ -225,7 +190,7 @@ class _ProfileAvatar extends StatelessWidget {
       child: Container(
         width: 36,
         height: 36,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.neutral300,
           shape: BoxShape.circle,
         ),
