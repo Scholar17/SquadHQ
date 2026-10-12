@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import 'web_back_guard.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
@@ -14,15 +17,15 @@ import '../../features/match/presentation/pages/match_history_page.dart';
 import '../../features/match/presentation/pages/match_list_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/squad/presentation/pages/expense_detail_page.dart';
+import '../../features/squad/presentation/pages/settle_with_page.dart';
+import '../../features/squad/presentation/pages/trip_page.dart';
 import '../../features/squad/presentation/pages/expenses_page.dart';
 import '../../features/squad/presentation/pages/settle_page.dart';
 import '../../features/squad/presentation/pages/squad_home_page.dart';
 import '../../features/squad/presentation/pages/squad_members_page.dart';
-import '../../features/team/domain/entities/team_snapshot.dart';
 import '../../features/team/presentation/pages/app_shell_page.dart';
 import '../../features/team/presentation/pages/dashboard_page.dart';
 import '../../features/team/presentation/pages/match_page.dart';
-import '../../features/team/presentation/pages/player_card_page.dart';
 import '../../features/team/presentation/pages/squad_page.dart';
 import '../../features/team/presentation/pages/wallet_page.dart';
 import '../../features/team/presentation/widgets/group_tab.dart';
@@ -47,7 +50,6 @@ abstract final class AppRoutes {
   static const profile = '/profile';
   static const team = '/team';
   static const teamRoster = '/team/roster';
-  static const teamPlayer = '/team/player';
   static const matches = '/matches';
   static const matchHistory = '/match-history';
   static const upcomingMatch = '/match-detail';
@@ -55,6 +57,14 @@ abstract final class AppRoutes {
 
   /// A squad expense's detail screen.
   static String expenseDetail(String expenseId) => '/expense/$expenseId';
+
+  /// You and one squad-mate: what's owed, why, and your history.
+  /// [tripId]: within that trip, apart from the squad's own.
+  static String settleWith(String profileId, {String? tripId}) =>
+      tripId == null ? '/settle-with/$profileId' : '/settle-with/$profileId?trip=$tripId';
+
+  /// A squad trip: its expenses, who paid what, and settling up.
+  static String trip(String tripId) => '/trip/$tripId';
   static const walletBills = '/wallet-bills';
 }
 
@@ -87,13 +97,9 @@ class MatchListArgs {
 /// [NotificationsPage]'s args, bundled for `extra:`. A full-screen push
 /// outside the tab shell, like [UpcomingMatchArgs].
 class NotificationsArgs {
-  const NotificationsArgs({required this.userId, required this.adminViewIsManager});
+  const NotificationsArgs({required this.userId});
 
   final String userId;
-
-  /// Whether an admin is in the Manager view (Home's header toggle) — so a
-  /// notification opens its match the way the tabs show it.
-  final bool adminViewIsManager;
 }
 
 /// [UpcomingMatchPage]'s args, bundled for `extra:`. It's a full-screen
@@ -155,8 +161,11 @@ String? _authRedirect(GoRouterState state, AuthBloc authBloc) {
 }
 
 GoRouter createAppRouter(AuthBloc authBloc) {
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: AppRoutes.login,
+    // Web: navigating replaces the browser's history entry rather than
+    // adding one — the back button is handled by [WebBackGuard] instead.
+    routerNeglect: kIsWeb,
     refreshListenable: GoRouterRefreshStream(authBloc.stream),
     redirect: (context, state) => _authRedirect(state, authBloc),
     errorBuilder: (context, state) => const _SettlingPage(),
@@ -257,10 +266,6 @@ GoRouter createAppRouter(AuthBloc authBloc) {
         builder: (context, state) => TeamRosterPage(team: state.extra! as Team),
       ),
       GoRoute(
-        path: AppRoutes.teamPlayer,
-        builder: (context, state) => PlayerCardPage(member: state.extra! as SquadMember),
-      ),
-      GoRoute(
         path: AppRoutes.matchHistory,
         builder: (context, state) => MatchHistoryPage(args: state.extra! as MatchHistoryArgs),
       ),
@@ -302,6 +307,28 @@ GoRouter createAppRouter(AuthBloc authBloc) {
               : ExpenseDetailPage(expenseId: state.pathParameters['id']!, user: user);
         },
       ),
+      GoRoute(
+        path: '/settle-with/:id',
+        builder: (context, state) {
+          final user = _authedUser(context);
+          return user == null
+              ? const _SettlingPage()
+              : SettleWithPage(
+                  otherId: state.pathParameters['id']!,
+                  user: user,
+                  tripId: state.uri.queryParameters['trip'],
+                );
+        },
+      ),
+      GoRoute(
+        path: '/trip/:id',
+        builder: (context, state) {
+          final user = _authedUser(context);
+          return user == null
+              ? const _SettlingPage()
+              : TripPage(tripId: state.pathParameters['id']!, user: user);
+        },
+      ),
       // Never shown: _authRedirect hands these push links off. Declared so
       // the location matches a route rather than erroring.
       GoRoute(
@@ -310,6 +337,8 @@ GoRouter createAppRouter(AuthBloc authBloc) {
       ),
     ],
   );
+  WebBackGuard.install(router);
+  return router;
 }
 
 /// A signed-in profile lands on [AppShellPage] once its team list has
@@ -360,7 +389,7 @@ class _SettlingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.bg,
       body: Center(
         child: CircularProgressIndicator(color: AppColors.accent),

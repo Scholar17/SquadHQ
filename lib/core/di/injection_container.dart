@@ -6,11 +6,23 @@ import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/complete_onboarding.dart';
+import '../../features/auth/domain/usecases/delete_account.dart';
 import '../../features/auth/domain/usecases/sign_in_with_facebook.dart';
 import '../../features/auth/domain/usecases/sign_in_with_google.dart';
 import '../../features/auth/domain/usecases/sign_out.dart';
+import '../../features/auth/domain/usecases/update_profile.dart';
 import '../../features/auth/domain/usecases/watch_auth_state.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/comments/data/datasources/match_comments_remote_data_source.dart';
+import '../../features/comments/data/datasources/mention_members_remote_data_source.dart';
+import '../../features/comments/data/repositories/match_comments_repository_impl.dart';
+import '../../features/comments/data/repositories/mention_members_repository_impl.dart';
+import '../../features/comments/domain/entities/match_topic.dart';
+import '../../features/comments/domain/repositories/match_comments_repository.dart';
+import '../../features/comments/domain/repositories/mention_members_repository.dart';
+import '../../features/comments/domain/usecases/get_mention_members.dart';
+import '../../features/comments/domain/usecases/match_comment_usecases.dart';
+import '../../features/comments/presentation/bloc/comments_bloc.dart';
 import '../../features/match/data/datasources/match_remote_data_source.dart';
 import '../../features/match/data/repositories/match_repository_impl.dart';
 import '../../features/match/domain/entities/match.dart';
@@ -48,11 +60,16 @@ import '../../features/notifications/domain/usecases/get_notifications.dart';
 import '../../features/notifications/domain/usecases/mark_notifications_read.dart';
 import '../../features/notifications/domain/usecases/watch_notifications.dart';
 import '../../features/notifications/presentation/bloc/notification_bloc.dart';
+import '../../features/player_rating/data/datasources/player_rating_remote_data_source.dart';
+import '../../features/player_rating/data/repositories/player_rating_repository_impl.dart';
+import '../../features/player_rating/domain/repositories/player_rating_repository.dart';
+import '../../features/player_rating/domain/usecases/player_rating_usecases.dart';
+import '../../features/player_rating/presentation/bloc/rating_quiz_bloc.dart';
+import '../../features/player_rating/presentation/bloc/team_ratings_bloc.dart';
 import '../../features/squad/data/datasources/squad_remote_data_source.dart';
 import '../../features/squad/data/repositories/squad_repository_impl.dart';
 import '../../features/squad/domain/repositories/squad_repository.dart';
 import '../../features/squad/domain/usecases/squad_usecases.dart';
-import '../../features/squad/presentation/bloc/expense_comments_bloc.dart';
 import '../../features/squad/presentation/bloc/squad_ledger_bloc.dart';
 import '../../features/team/data/repositories/mock_team_repository.dart';
 import '../../features/team/domain/repositories/team_repository.dart';
@@ -65,16 +82,22 @@ import '../../features/team_membership/domain/usecases/delete_team.dart';
 import '../../features/team_membership/domain/usecases/get_my_teams.dart';
 import '../../features/team_membership/domain/usecases/get_team_members.dart';
 import '../../features/team_membership/domain/usecases/join_team.dart';
+import '../../features/team_membership/domain/usecases/leave_team.dart';
+import '../../features/team_membership/domain/usecases/remove_team_member.dart';
 import '../../features/team_membership/domain/usecases/set_member_role.dart';
 import '../../features/team_membership/domain/usecases/set_team_timezone.dart';
 import '../../features/team_membership/domain/usecases/switch_active_team.dart';
 import '../../features/team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../features/team_membership/presentation/bloc/team_roster_bloc.dart';
+import '../theme/theme_controller.dart';
 
 final sl = GetIt.instance;
 
 /// Registers every dependency for the app. Call once, before [runApp].
 Future<void> initDependencies() async {
+  // Core - the light / dark choice, read before the first frame.
+  sl.registerSingleton<ThemeController>(await ThemeController.load());
+
   // Core - live updates, one Realtime channel per team shared by the
   // Match, Home and Wallet blocs.
   sl.registerLazySingleton<TeamChanges>(() => SupabaseTeamChanges(Supabase.instance.client));
@@ -90,6 +113,8 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => SignInWithFacebook(sl()))
     ..registerLazySingleton(() => SignInWithGoogle(sl()))
     ..registerLazySingleton(() => CompleteOnboarding(sl()))
+    ..registerLazySingleton(() => UpdateProfile(sl()))
+    ..registerLazySingleton(() => DeleteAccount(sl()))
     ..registerLazySingleton(() => SignOut(sl()))
     ..registerLazySingleton(() => WatchAuthState(sl()))
     ..registerFactory(
@@ -99,6 +124,8 @@ Future<void> initDependencies() async {
         completeOnboarding: sl(),
         signOut: sl(),
         watchAuthState: sl(),
+        updateProfile: sl(),
+        deleteAccount: sl(),
       ),
     );
 
@@ -127,6 +154,8 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => SetMemberRole(sl()))
     ..registerLazySingleton(() => SetTeamTimezone(sl()))
     ..registerLazySingleton(() => DeleteTeam(sl()))
+    ..registerLazySingleton(() => LeaveTeam(sl()))
+    ..registerLazySingleton(() => RemoveTeamMember(sl()))
     // Singleton (not a factory, unlike AuthBloc/TeamBloc): provided once at
     // the app root (see app.dart) so every screen — including ones pushed
     // via Navigator, which sit outside AppShellPage's local providers —
@@ -138,6 +167,9 @@ Future<void> initDependencies() async {
         getMyTeams: sl(),
         switchActiveTeam: sl(),
         setTeamTimezone: sl(),
+        leaveTeam: sl(),
+        removeTeamMember: sl(),
+        teamChanges: sl(),
       ),
     )
     // Factory with a param (the team id) — one fresh instance per
@@ -148,6 +180,7 @@ Future<void> initDependencies() async {
         getTeamMembers: sl(),
         setMemberRole: sl(),
         deleteTeam: sl(),
+        removeTeamMember: sl(),
       ),
     );
 
@@ -211,21 +244,37 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => GetSquadLedger(sl()))
     ..registerLazySingleton(() => SaveExpense(sl()))
     ..registerLazySingleton(() => DeleteExpense(sl()))
+    ..registerLazySingleton(() => SaveTrip(sl()))
+    ..registerLazySingleton(() => SetTripClosed(sl()))
+    ..registerLazySingleton(() => SaveRecurring(sl()))
+    ..registerLazySingleton(() => SetRecurringPaused(sl()))
+    ..registerLazySingleton(() => DeleteRecurring(sl()))
     ..registerLazySingleton(() => SendSettlement(sl()))
     ..registerLazySingleton(() => RespondSettlement(sl()))
+    ..registerLazySingleton(() => RemindToPay(sl()))
+    ..registerLazySingleton(() => NudgeSettlement(sl()))
+    ..registerLazySingleton(() => PromisePayment(sl()))
+    ..registerLazySingleton(() => RecordReceived(sl()))
+    ..registerLazySingleton(() => ConfirmPartialPayment(sl()))
+    ..registerLazySingleton(() => SetReminderDay(sl()))
     ..registerLazySingleton(() => GetExpenseComments(sl()))
     ..registerLazySingleton(() => AddExpenseComment(sl()))
     ..registerLazySingleton(() => DeleteExpenseComment(sl()))
     // Factory with params (expense id, squad id) — one per expense screen.
-    ..registerFactoryParam<ExpenseCommentsBloc, String, String>(
-      (expenseId, teamId) => ExpenseCommentsBloc(
-        expenseId: expenseId,
+    ..registerFactoryParam<CommentsBloc, String, String>(
+      (expenseId, teamId) => CommentsBloc(
+        source: (
+          load: () => sl<GetExpenseComments>()(expenseId),
+          add: (body, parentId) =>
+              sl<AddExpenseComment>()((expenseId: expenseId, body: body, parentId: parentId)),
+          delete: (commentId) => sl<DeleteExpenseComment>()(commentId),
+          members: () => sl<GetMentionMembers>()(teamId),
+        ),
         teamId: teamId,
-        getComments: sl(),
-        addComment: sl(),
-        deleteComment: sl(),
+        table: TeamTable.expenseComments,
         teamChanges: sl(),
       ),
+      instanceName: CommentsBloc.expense,
     )
     ..registerLazySingleton(() => GetMyBankDetails(sl()))
     ..registerLazySingleton(() => SaveMyBankDetails(sl()))
@@ -238,6 +287,15 @@ Future<void> initDependencies() async {
         deleteExpense: sl(),
         sendSettlement: sl(),
         respondSettlement: sl(),
+        saveTrip: sl(),
+        setTripClosed: sl(),
+        saveRecurring: sl(),
+        setRecurringPaused: sl(),
+        deleteRecurring: sl(),
+        promisePayment: sl(),
+        recordReceived: sl(),
+        confirmPartialPayment: sl(),
+        setReminderDay: sl(),
         teamChanges: sl(),
       ),
     );
@@ -292,5 +350,57 @@ Future<void> initDependencies() async {
     // Factory — one per ProfilePage visit.
     ..registerFactory(
       () => WalletQrBloc(getMyWalletQr: sl(), uploadWalletQr: sl()),
+    );
+
+  // Features - Comments on a football match and its bill (and who an
+  // expense or match comment can @mention)
+  sl
+    ..registerLazySingleton<MentionMembersRemoteDataSource>(
+      () => MentionMembersRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<MentionMembersRepository>(() => MentionMembersRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetMentionMembers(sl()))
+    ..registerLazySingleton<MatchCommentsRemoteDataSource>(
+      () => MatchCommentsRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<MatchCommentsRepository>(() => MatchCommentsRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetMatchComments(sl()))
+    ..registerLazySingleton(() => AddMatchComment(sl()))
+    ..registerLazySingleton(() => DeleteMatchComment(sl()))
+    // Factory with params (thread, team id) — one per thread on screen.
+    ..registerFactoryParam<CommentsBloc, MatchThread, String>(
+      (thread, teamId) => CommentsBloc(
+        source: (
+          load: () => sl<GetMatchComments>()(thread),
+          add: (body, parentId) =>
+              sl<AddMatchComment>()((thread: thread, body: body, parentId: parentId)),
+          delete: (commentId) => sl<DeleteMatchComment>()(commentId),
+          members: () => sl<GetMentionMembers>()(teamId),
+        ),
+        teamId: teamId,
+        table: TeamTable.matchComments,
+        teamChanges: sl(),
+      ),
+      instanceName: CommentsBloc.match,
+    );
+
+  // Features - Player ratings (Squad tab, Fill rating, match stats)
+  sl
+    ..registerLazySingleton<PlayerRatingRemoteDataSource>(
+      () => PlayerRatingRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<PlayerRatingRepository>(() => PlayerRatingRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetTeamRatings(sl()))
+    ..registerLazySingleton(() => GetMyRating(sl()))
+    ..registerLazySingleton(() => GetRatingPositions(sl()))
+    ..registerLazySingleton(() => GetRatingQuestions(sl()))
+    ..registerLazySingleton(() => SubmitRating(sl()))
+    ..registerLazySingleton(() => ImproveRating(sl()))
+    ..registerLazySingleton(() => GetMyMatchStats(sl()))
+    ..registerLazySingleton(() => LogMatchStats(sl()))
+    // Factories — one per Squad tab (per team) and per Fill rating.
+    ..registerFactory(() => TeamRatingsBloc(getTeamRatings: sl(), improveRating: sl()))
+    ..registerFactory(
+      () => RatingQuizBloc(getPositions: sl(), getQuestions: sl(), submitRating: sl()),
     );
 }
