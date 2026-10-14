@@ -95,6 +95,9 @@ class _SettlePageState extends State<SettlePage> {
                 if (resent == null) rejected,
             ];
             final settled = ledger.settlements.where((s) => s.isConfirmed).toList();
+            // Not square while a payment is still waiting: open debts count
+            // pending as paid, so they can be empty with one in flight.
+            final allSquare = debts.isEmpty && sentOnly.isEmpty && toConfirm.isEmpty;
 
             void pay(String toId, int owedCents) => showPaySheet(
               context,
@@ -189,7 +192,7 @@ class _SettlePageState extends State<SettlePage> {
                       ],
                     ),
                   ],
-                  if (debts.isEmpty) ...[
+                  if (allSquare) ...[
                     const SizedBox(height: 20),
                     const _AllSquare(),
                   ] else ...[
@@ -237,7 +240,7 @@ class _SettlePageState extends State<SettlePage> {
                       ],
                     ),
                   ],
-                  if (debts.isNotEmpty) ...[
+                  if (!allSquare) ...[
                     const SizedBox(height: 20),
                     SquadSectionLabel(
                       'YOU GET',

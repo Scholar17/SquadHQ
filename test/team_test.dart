@@ -2559,6 +2559,39 @@ void main() {
     expect(find.text('Aung pays you'), findsOneWidget);
   });
 
+  testWidgets('A pending payment that clears every debt still shows, not All square',
+      (tester) async {
+    fakeSquad.expenses.add(
+      Expense(
+        id: 'lunch',
+        title: 'Lunch',
+        category: ExpenseCategory.food,
+        amountCents: 60000,
+        spentAt: DateTime(2026, 9, 27, 13),
+        splitMode: ExpenseSplitMode.equal,
+        payerId: 'aung',
+        shares: const {'aung': 30000, 'test-1': 30000},
+        createdBy: 'aung',
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pay').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cash'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('I paid in cash'));
+    await tester.pumpAndSettle();
+
+    // Nothing's left once it goes through, but it hasn't yet.
+    expect(fakeSquad.settlements.single.isPending, isTrue);
+    expect(find.text('All square'), findsNothing);
+    expect(find.text('Pending'), findsOneWidget);
+    expect(find.text('Remind to confirm'), findsOneWidget);
+  });
+
   testWidgets('A cash payment changes balances only after the receiver confirms it',
       (tester) async {
     fakeSquad.expenses.add(
