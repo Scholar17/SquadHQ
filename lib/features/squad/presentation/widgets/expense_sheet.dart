@@ -201,6 +201,11 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
 
   final _exact = <String, TextEditingController>{};
 
+  /// Exact or custom with no total typed: the total is the shares' sum,
+  /// kept in step as they're typed — until the total's typed over.
+  bool _totalFromShares = false;
+  String? _autoTotal;
+
   /// Who paid, biggest first; several (up to Expense.maxPayers) means each
   /// types what they paid.
   late List<String> _payerIds = switch ((widget.editing, widget.editingMonthly)) {
@@ -322,7 +327,29 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
         _paidFor(key).text = moneyInput(value);
       }
     }
-    _amount.addListener(_rebuild);
+    _amount.addListener(_onAmountChanged);
+  }
+
+  /// Typing over a total filled in from the shares makes it yours.
+  void _onAmountChanged() {
+    if (_totalFromShares && _amount.text != _autoTotal) _totalFromShares = false;
+    _rebuild();
+  }
+
+  /// Fills the total in from the typed shares (exact, or custom's ticked
+  /// people) while it's empty or was filled in this way.
+  void _syncFromShares() {
+    if (_several || (_mode != ExpenseSplitMode.exact && _mode != ExpenseSplitMode.custom)) return;
+    if (!_totalFromShares && _amount.text.isNotEmpty) return;
+    final sum = [
+      for (final MapEntry(:key, :value) in _exact.entries)
+        if (_mode == ExpenseSplitMode.exact || (_chosen?.contains(key) ?? true))
+          parseMoney(value.text) ?? 0,
+    ].fold(0, (a, b) => a + b);
+    final text = sum > 0 ? moneyInput(sum) : '';
+    _totalFromShares = sum > 0;
+    _autoTotal = text;
+    if (_amount.text != text) _amount.text = text;
   }
 
   TextEditingController _paidFor(String profileId) => _paid.putIfAbsent(profileId, () {
@@ -385,7 +412,10 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
 
   TextEditingController _exactFor(String profileId) => _exact.putIfAbsent(profileId, () {
     final controller = TextEditingController();
-    controller.addListener(_rebuild);
+    controller.addListener(() {
+      _syncFromShares();
+      _rebuild();
+    });
     return controller;
   });
 
@@ -842,7 +872,13 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             const SizedBox(height: 14),
             Text('SPLIT', style: AppTextStyles.label(color: squadMuted)),
             const SizedBox(height: 6),
-            _ModeTabs(mode: _mode, onChanged: (mode) => setState(() => _mode = mode)),
+            _ModeTabs(
+              mode: _mode,
+              onChanged: (mode) {
+                setState(() => _mode = mode);
+                _syncFromShares();
+              },
+            ),
             const SizedBox(height: 8),
             if (_mode == ExpenseSplitMode.treat)
               Container(
@@ -889,6 +925,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                             for (final g in _guests) g.key,
                           };
                           if (!chosen.remove(member.profileId)) chosen.add(member.profileId);
+                          _syncFromShares();
                         })
                       : null,
                   // Custom: a box only for the ticked people.
@@ -933,6 +970,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                             for (final g in _guests) g.key,
                           };
                           if (!chosen.remove(guest.key)) chosen.add(guest.key);
+                          _syncFromShares();
                         })
                       : null,
                   exactController:
@@ -951,6 +989,11 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                   onRemove: () => setState(() {
                     _guests.remove(guest);
                     _chosen?.remove(guest.key);
+                    // Out of the sum now; disposed once its row is gone.
+                    if (_exact.remove(guest.key) case final controller?) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+                    }
+                    _syncFromShares();
                   }),
                 ),
               Align(
@@ -1006,18 +1049,28 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
 
   String _footnote(ExpenseSplit split, int amount, SquadLedger ledger, String mainPayer) {
     if (amount == 0) {
-      return _several ? 'Type what each person paid first.' : 'Enter the amount first.';
+      return _several
+          ? 'Type what each person paid first.'
+          : switch (_mode) {
+              ExpenseSplitMode.exact ||
+              ExpenseSplitMode.custom => 'Enter the amount, or type each share to add it up.',
+              _ => 'Enter the amount first.',
+            };
     }
     final total = formatMoney(amount, ledger.currency);
+    final entered = split.shares.values.fold(0, (a, b) => a + b);
     return switch (_mode) {
       ExpenseSplitMode.treat => 'Treats still show in the squad’s spending.',
       ExpenseSplitMode.custom when split.shares.isEmpty && !split.isValid => split.error!,
       ExpenseSplitMode.exact || ExpenseSplitMode.custom =>
         split.isValid
-            ? 'Shares add up to $total.'
+            ? _totalFromShares
+                  ? 'Total added up from the shares: $total. Type a total to check against it.'
+                  : 'Shares add up to $total.'
             : 'Shares must add up to $total · '
-                  '${formatMoney(split.shares.values.fold(0, (a, b) => a + b), ledger.currency)} entered, '
-                  '${formatMoney(amount - split.shares.values.fold(0, (a, b) => a + b), ledger.currency)} left.',
+                  '${formatMoney(entered, ledger.currency)} entered, '
+                  '${formatMoney((amount - entered).abs(), ledger.currency)} '
+                  '${entered > amount ? 'over' : 'left'}.',
       _ when !split.isValid => split.error!,
       _ when split.roundedCents != null =>
         '$total ÷ ${split.shares.length} = ${formatMoneyExact(split.exactCents!, ledger.currency)}. '

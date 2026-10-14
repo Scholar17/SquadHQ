@@ -1667,6 +1667,91 @@ void main() {
     expect(find.text('Owner'), findsOneWidget);
   });
 
+  testWidgets('Exact with no total typed: the total adds up the shares as they are typed',
+      (tester) async {
+    TextField amountBox() =>
+        tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Exact'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter the amount, or type each share to add it up.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '200');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '200');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '300');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '500');
+    expect(
+      find.text('Total added up from the shares: ฿500. Type a total to check against it.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Snacks');
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    expect(fakeSquad.expenses.single.amountCents, 50000);
+    expect(fakeSquad.expenses.single.shares, {'test-1': 20000, 'aung': 30000});
+  });
+
+  testWidgets('A typed total stays put, and shares must add up to it', (tester) async {
+    TextField amountBox() =>
+        tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Exact'));
+    await tester.pumpAndSettle();
+
+    // Typed first: never changed by the shares.
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '600');
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '200');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '600');
+    expect(find.textContaining('Total added up'), findsNothing);
+    expect(find.textContaining('Shares must add up to ฿600'), findsOneWidget);
+
+    // Shares over a typed total: it still stays, and says how much over.
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '500');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '600');
+    expect(find.text('Shares must add up to ฿600 · ฿700 entered, ฿100 over.'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '');
+
+    // Typed over a filled-in total: also stays.
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '300');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '500');
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '700');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '400');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '700');
+  });
+
+  testWidgets('Custom: the filled-in total counts only the ticked people', (tester) async {
+    TextField amountBox() =>
+        tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Custom'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '200');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '300');
+    await tester.enterText(find.byKey(const ValueKey('share-ko')), '100');
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '600');
+
+    // Untick Ko: their ฿100 leaves the total.
+    await tester.tap(find.bySemanticsLabel('Include Ko'));
+    await tester.pumpAndSettle();
+    expect(amountBox().controller!.text, '500');
+  });
+
   testWidgets(
       'Adding ฿1,000 split equally between 3 shows ฿334 (exact ฿333.33) each; the payer covers ฿332',
       (tester) async {
