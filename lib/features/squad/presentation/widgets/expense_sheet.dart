@@ -870,7 +870,20 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               ),
             ],
             const SizedBox(height: 14),
-            Text('SPLIT', style: AppTextStyles.label(color: squadMuted)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('SPLIT', style: AppTextStyles.label(color: squadMuted)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tap a type to choose how it’s shared',
+                    style: AppTextStyles.body(size: 12, color: squadMuted),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             _ModeTabs(
               mode: _mode,
@@ -879,6 +892,11 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                 _syncFromShares();
               },
             ),
+            // What the picked type does (a treat explains itself below).
+            if (_modeHint(_mode) case final hint?) ...[
+              const SizedBox(height: 6),
+              Text(hint, style: AppTextStyles.body(size: 12.5, color: squadMuted)),
+            ],
             const SizedBox(height: 8),
             if (_mode == ExpenseSplitMode.treat)
               Container(
@@ -1046,6 +1064,14 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
       },
     );
   }
+
+  static String? _modeHint(ExpenseSplitMode mode) => switch (mode) {
+    ExpenseSplitMode.equal => 'Equal: everyone pays the same.',
+    ExpenseSplitMode.chosen => 'Chosen: tick who’s in — they pay the same.',
+    ExpenseSplitMode.exact => 'Exact: type what each person pays.',
+    ExpenseSplitMode.custom => 'Custom: tick who’s in, then type what each pays.',
+    ExpenseSplitMode.treat => null,
+  };
 
   String _footnote(ExpenseSplit split, int amount, SquadLedger ledger, String mainPayer) {
     if (amount == 0) {

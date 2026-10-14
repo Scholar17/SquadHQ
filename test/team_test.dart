@@ -1667,6 +1667,18 @@ void main() {
     expect(find.text('Owner'), findsOneWidget);
   });
 
+  testWidgets('The split types explain themselves', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tap a type to choose how it’s shared'), findsOneWidget);
+    expect(find.text('Equal: everyone pays the same.'), findsOneWidget);
+    await tester.tap(find.text('Custom'));
+    await tester.pumpAndSettle();
+    expect(find.text('Custom: tick who’s in, then type what each pays.'), findsOneWidget);
+    expect(find.text('Equal: everyone pays the same.'), findsNothing);
+  });
+
   testWidgets('Exact with no total typed: the total adds up the shares as they are typed',
       (tester) async {
     TextField amountBox() =>
