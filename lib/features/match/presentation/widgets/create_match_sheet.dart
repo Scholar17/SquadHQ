@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
+import '../../../venue/presentation/widgets/venue_picker_sheet.dart';
 import '../../domain/entities/match.dart' as match_entity;
 import '../bloc/match_bloc.dart';
 import '../bloc/match_event.dart';
@@ -52,7 +53,10 @@ class _MatchFormSheet extends StatefulWidget {
 
 class _MatchFormSheetState extends State<_MatchFormSheet> {
   late final _opponentController = TextEditingController(text: widget.initial?.opponent);
-  late final _venueController = TextEditingController(text: widget.initial?.venue);
+  /// A saved venue (052), or — on a match from before them — a typed one
+  /// ([_venueId] null). Picked from [showVenuePicker].
+  late String? _venueId = widget.initial?.venueId;
+  late String? _venueName = widget.initial?.venue;
   late DateTime? _kickoffAt = widget.initial?.kickoffAt.toLocal();
   late final _playTimeController = TextEditingController(
     text: _formatHours(
@@ -113,7 +117,6 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
   @override
   void dispose() {
     _opponentController.dispose();
-    _venueController.dispose();
     _playTimeController.dispose();
     _playersNeededController.dispose();
     super.dispose();
@@ -160,7 +163,6 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
   void _submit() {
     if (!_isValid) return;
     final opponent = _opponentController.text.trim();
-    final venue = _venueController.text.trim().isEmpty ? null : _venueController.text.trim();
     final durationMinutes = (_playHours! * 60).round();
     final playersNeeded = _playersNeeded;
     final initial = widget.initial;
@@ -170,7 +172,8 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
               teamId: widget.teamId,
               opponent: opponent,
               kickoffAt: _kickoffAt!,
-              venue: venue,
+              venue: _venueName,
+              venueId: _venueId,
               durationMinutes: durationMinutes,
               playersNeeded: playersNeeded,
             )
@@ -178,11 +181,21 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
               matchId: initial.id,
               opponent: opponent,
               kickoffAt: _kickoffAt!,
-              venue: venue,
+              venue: _venueName,
+              venueId: _venueId,
               durationMinutes: durationMinutes,
               playersNeeded: playersNeeded,
             ),
     );
+  }
+
+  Future<void> _pickVenue() async {
+    final choice = await showVenuePicker(context, teamId: widget.teamId, selectedId: _venueId);
+    if (choice == null || !mounted) return;
+    setState(() {
+      _venueId = choice.venue?.id;
+      _venueName = choice.venue?.name;
+    });
   }
 
   @override
@@ -245,7 +258,36 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
               ),
             ),
           const SizedBox(height: 10),
-          _Field(controller: _venueController, hintText: 'Venue (optional)'),
+          InkWell(
+            borderRadius: AppRadius.pill,
+            onTap: _pickVenue,
+            child: Container(
+              height: 50,
+              padding: const EdgeInsets.only(left: 18, right: 12),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: AppRadius.pill,
+                border: Border.all(color: AppColors.text.withValues(alpha: 0.16)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _venueName ?? 'Venue (optional)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: _venueName == null ? AppColors.textMuted : AppColors.text,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.expand_more_rounded, color: AppColors.textMuted),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 10),
           _StepperField(
             label: 'Play time',

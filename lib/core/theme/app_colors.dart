@@ -266,6 +266,10 @@ abstract final class AppColors {
   /// The unread dot on a notification.
   static const unread = Color(0xFFD93A2E);
 
+  /// Alarm red for words on the dark hero cards ([neutral900]) — e.g.
+  /// unhealthy air at kickoff.
+  static const alertOnDark = Color(0xFFF0A598);
+
   /// Golden Goal FC's own brand colour — the team identity, not the
   /// product accent.
   static const teamGold = Color(0xFFD9A13C);

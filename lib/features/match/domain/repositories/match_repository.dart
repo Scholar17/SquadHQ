@@ -16,6 +16,7 @@ abstract interface class MatchRepository {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   });
@@ -27,6 +28,7 @@ abstract interface class MatchRepository {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   });

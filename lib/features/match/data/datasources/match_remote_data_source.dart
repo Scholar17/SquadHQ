@@ -14,6 +14,7 @@ abstract interface class MatchRemoteDataSource {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   });
@@ -23,6 +24,7 @@ abstract interface class MatchRemoteDataSource {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   });
@@ -84,6 +86,7 @@ class MatchRemoteDataSourceImpl implements MatchRemoteDataSource {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   }) async {
@@ -93,6 +96,9 @@ class MatchRemoteDataSourceImpl implements MatchRemoteDataSource {
         'p_opponent': opponent,
         'p_kickoff_at': kickoffAt.toUtc().toIso8601String(),
         'p_venue': venue,
+        // Only with a saved venue picked, so a typed venue still works on
+        // a database without 052.
+        'p_venue_id': ?venueId,
         'p_duration_minutes': durationMinutes,
         'p_players_needed': playersNeeded,
       }) as Map<String, dynamic>;
@@ -108,6 +114,7 @@ class MatchRemoteDataSourceImpl implements MatchRemoteDataSource {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   }) async {
@@ -117,6 +124,9 @@ class MatchRemoteDataSourceImpl implements MatchRemoteDataSource {
         'p_opponent': opponent,
         'p_kickoff_at': kickoffAt.toUtc().toIso8601String(),
         'p_venue': venue,
+        // Only with a saved venue picked, so a typed venue still works on
+        // a database without 052.
+        'p_venue_id': ?venueId,
         'p_duration_minutes': durationMinutes,
         'p_players_needed': playersNeeded,
       }) as Map<String, dynamic>;

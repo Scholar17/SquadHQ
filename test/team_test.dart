@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,6 +20,11 @@ import 'package:squad_hq/features/comments/domain/entities/mention.dart';
 import 'package:squad_hq/features/comments/domain/repositories/match_comments_repository.dart';
 import 'package:squad_hq/features/comments/domain/repositories/mention_members_repository.dart';
 import 'package:squad_hq/features/player_rating/domain/repositories/player_rating_repository.dart';
+import 'package:squad_hq/features/venue/domain/repositories/venue_repository.dart';
+import 'package:squad_hq/features/weather/domain/entities/kickoff_forecast.dart';
+import 'package:squad_hq/features/weather/domain/repositories/air_quality_repository.dart';
+import 'package:squad_hq/features/weather/domain/repositories/forecast_repository.dart';
+import 'package:squad_hq/features/weather/presentation/temperature_unit_controller.dart';
 import 'package:squad_hq/features/match/domain/entities/match.dart';
 import 'package:squad_hq/features/match/domain/entities/matchday_player.dart';
 import 'package:squad_hq/features/match/domain/entities/match_history.dart';
@@ -71,6 +77,9 @@ import 'fake_notification_repository.dart';
 import 'fake_player_rating_repository.dart';
 import 'fake_squad_repository.dart';
 import 'fake_team_changes.dart';
+import 'fake_air_quality_repository.dart';
+import 'fake_forecast_repository.dart';
+import 'fake_venue_repository.dart';
 import 'fake_match_repository.dart';
 import 'fake_wallet_repository.dart';
 import 'test_helpers.dart';
@@ -126,6 +135,9 @@ void main() {
   final fakeMatchComments = FakeMatchCommentsRepository(userId: 'test-1');
   final fakeMentionMembers = FakeMentionMembersRepository();
   final fakeRatings = FakePlayerRatingRepository(userId: 'test-1');
+  final fakeVenues = FakeVenueRepository();
+  final fakeForecasts = FakeForecastRepository();
+  final fakeAir = FakeAirQualityRepository();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -149,6 +161,12 @@ void main() {
       ..registerLazySingleton<MentionMembersRepository>(() => fakeMentionMembers)
       ..unregister<PlayerRatingRepository>()
       ..registerLazySingleton<PlayerRatingRepository>(() => fakeRatings)
+      ..unregister<VenueRepository>()
+      ..registerLazySingleton<VenueRepository>(() => fakeVenues)
+      ..unregister<ForecastRepository>()
+      ..registerLazySingleton<ForecastRepository>(() => fakeForecasts)
+      ..unregister<AirQualityRepository>()
+      ..registerLazySingleton<AirQualityRepository>(() => fakeAir)
       ..unregister<TeamChanges>()
       ..registerLazySingleton<TeamChanges>(FakeTeamChanges.new);
   });
@@ -161,6 +179,9 @@ void main() {
     fakeMatchComments.reset();
     fakeMentionMembers.reset();
     fakeRatings.reset();
+    fakeVenues.reset();
+    fakeForecasts.reset();
+    fakeAir.reset();
   });
 
   const user = AppUser(
@@ -1176,6 +1197,259 @@ void main() {
 
     expect(fakeMatches.matches.first.durationMinutes, 120);
     expect(find.textContaining('· 2 hr'), findsOneWidget);
+  });
+
+  testWidgets('A match picks a saved venue, and its details open from the match', (tester) async {
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    // Typed before saved venues: shown as it was (the form's, over the
+    // match page's).
+    await tester.tap(find.text('Lumpini Park Pitch 2').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Polo Football Park'), findsOneWidget);
+    await tester.tap(find.text('Arena 5 Rama 9'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(fakeMatches.matches.first.venueId, 'v-arena');
+    expect(fakeMatches.matches.first.venue, 'Arena 5 Rama 9');
+    // Its Google Maps link, straight from the match.
+    expect(find.text('Directions'), findsOneWidget);
+
+    // On the match: notes, price and Google Maps, a tap away.
+    await tester.tap(find.text('Arena 5 Rama 9'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pitch 3 — park behind the 7-Eleven'), findsOneWidget);
+    expect(find.text('฿1,200 per hour'), findsOneWidget);
+    expect(find.text('Open in Google Maps'), findsOneWidget);
+  });
+
+  testWidgets('A venue is edited from the picker without picking it', (tester) async {
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lumpini Park Pitch 2').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit Polo Football Park'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit venue'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Polo Football Park'), 'Polo Park Pitch 1');
+    await tester.pump();
+    await tester.tap(find.text('Save changes').last);
+    await tester.pumpAndSettle();
+
+    // Back in the picker, renamed, and the match keeps its venue.
+    expect(find.text('Polo Park Pitch 1'), findsOneWidget);
+    expect(find.byTooltip('Edit Polo Park Pitch 1'), findsOneWidget);
+    expect(fakeVenues.venues.firstWhere((venue) => venue.id == 'v-polo').name, 'Polo Park Pitch 1');
+  });
+
+  testWidgets('A new venue added from the picker is picked for the match', (tester) async {
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lumpini Park Pitch 2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add new venue'));
+    await tester.pumpAndSettle();
+
+    // A name the team has already: refused, with why.
+    await tester.enterText(find.widgetWithText(TextField, 'e.g. Arena 5 Rama 9'), 'polo football park');
+    await tester.pump();
+    await tester.tap(find.text('Save venue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your team already has a venue with that name.'), findsOneWidget);
+
+    // Not a Maps link: says how to get one.
+    await tester.enterText(find.widgetWithText(TextField, 'polo football park'), 'Kickhub Onnut');
+    await tester.enterText(find.widgetWithText(TextField, 'Paste the Share link'), 'kickhub onnut');
+    await tester.pump();
+    expect(find.textContaining('Paste a Google Maps link'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'kickhub onnut'), 'https://maps.app.goo.gl/kick');
+    await tester.pump();
+    await tester.tap(find.text('Save venue'));
+    await tester.pumpAndSettle();
+
+    // Straight back to the match form, with it picked.
+    expect(find.text('Kickhub Onnut'), findsOneWidget);
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(fakeMatches.matches.first.venue, 'Kickhub Onnut');
+    expect(fakeVenues.venues.last.mapsUrl, 'https://maps.app.goo.gl/kick');
+  });
+
+  /// match-1 at Arena 5 Rama 9 (located), kicking off in two days.
+  void arenaMatchSoon() {
+    final match = fakeMatches.matches.first;
+    fakeMatches.matches.first = Match(
+      id: match.id,
+      teamId: match.teamId,
+      opponent: match.opponent,
+      kickoffAt: DateTime.now().add(const Duration(days: 2)),
+      venue: 'Arena 5 Rama 9',
+      venueId: 'v-arena',
+      createdBy: match.createdBy,
+    );
+  }
+
+  testWidgets('The hub shows kickoff conditions as chips, in °C or °F', (tester) async {
+    arenaMatchSoon();
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+
+    expect(find.text('31°C'), findsOneWidget);
+    expect(find.text('40%'), findsOneWidget);
+    expect(find.text('AQI 72'), findsOneWidget);
+    expect(find.text('CONDITIONS'), findsNothing);
+    expect(fakeForecasts.asked.last.latitude, 13.7563);
+
+    // Each person's own unit, from Profile.
+    await sl<TemperatureUnitController>().select(TemperatureUnit.fahrenheit);
+    await tester.pump();
+    expect(find.text('89°F'), findsOneWidget);
+    await sl<TemperatureUnitController>().select(TemperatureUnit.celsius);
+    await tester.pump();
+
+    // A tap explains it, crediting Open-Meteo.
+    await tester.tap(find.text('31°C'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('At kickoff: 31°C, cloudy, 40% chance of rain.'), findsOneWidget);
+    expect(find.textContaining('Weather data: Open-Meteo.com.'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 12));
+  });
+
+  testWidgets("The venue's details keep the bigger tiles, closed from the top", (tester) async {
+    arenaMatchSoon();
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Arena 5 Rama 9'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('CONDITIONS'), findsOneWidget);
+    expect(find.text('40% rain'), findsOneWidget);
+    expect(find.text('Moderate'), findsOneWidget);
+    expect(find.textContaining('Updated '), findsOneWidget);
+    expect(find.textContaining('km away'), findsNothing);
+    expect(find.textContaining('Open-Meteo.com ·'), findsNothing);
+
+    // The close button sits above everything else in the sheet.
+    final close = tester.getTopLeft(find.byTooltip('Close'));
+    expect(close.dy, lessThan(tester.getTopLeft(find.text('Pitch 3 — park behind the 7-Eleven')).dy));
+    expect(close.dy, lessThan(tester.getTopLeft(find.text('CONDITIONS')).dy));
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('CONDITIONS'), findsNothing);
+  });
+
+  testWidgets('Unhealthy air is flagged red, with advice a tap away', (tester) async {
+    arenaMatchSoon();
+    fakeAir.air = fakeAir.reading(usAqi: 162);
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    final aqi = find.text('AQI 162');
+    expect(tester.widget<Text>(aqi).style?.color, AppColors.alertOnDark);
+
+    await tester.tap(aqi);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Unhealthy (US AQI 162). Consider masks'), findsOneWidget);
+    expect(find.textContaining('at Chulalongkorn Hospital station, 1.4 km from the venue'), findsOneWidget);
+    expect(find.textContaining('World Air Quality Index Project (waqi.info)'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 12));
+  });
+
+  testWidgets('The chips fit a small phone', (tester) async {
+    tester.view.physicalSize = const Size(360 * 3, 800 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    arenaMatchSoon();
+    fakeForecasts.forecast = const KickoffForecast(temperatureC: 27, weatherCode: 99, rainChance: 100);
+    fakeAir.air = fakeAir.reading(usAqi: 130);
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('AQI 130'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Likely rain turns the rain chip gold', (tester) async {
+    arenaMatchSoon();
+    fakeForecasts.forecast = const KickoffForecast(temperatureC: 27, weatherCode: 63, rainChance: 70);
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.text('70%')).style?.color, AppColors.teamGold);
+  });
+
+  testWidgets('A kickoff past the 16-day forecast says when the forecast comes', (tester) async {
+    // match-1 as it is: years away.
+    final match = fakeMatches.matches.first;
+    fakeMatches.matches.first = Match(
+      id: match.id,
+      teamId: match.teamId,
+      opponent: match.opponent,
+      kickoffAt: match.kickoffAt,
+      venue: 'Arena 5 Rama 9',
+      venueId: 'v-arena',
+      createdBy: match.createdBy,
+    );
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Forecast from'), findsOneWidget);
+    expect(fakeForecasts.asked, isEmpty);
+  });
+
+  testWidgets('A full Maps link fills the venue location; otherwise the admin types it', (
+    tester,
+  ) async {
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lumpini Park Pitch 2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add new venue'));
+    await tester.pumpAndSettle();
+    expect(find.text('LOCATION · FOR WEATHER FORECAST · OPTIONAL'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'e.g. Arena 5 Rama 9'), 'Kickhub Onnut');
+    // A share link carries no location: nothing is filled, nothing is fetched.
+    await tester.enterText(find.widgetWithText(TextField, 'Paste the Share link'), 'https://maps.app.goo.gl/kick');
+    await tester.pump();
+    expect(find.textContaining('touch and hold the pitch'), findsOneWidget);
+
+    // A full link carries it: both fields filled on the device.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'https://maps.app.goo.gl/kick'),
+      'https://www.google.com/maps/place/Polo/@13.7303951,100.5504902,17z',
+    );
+    await tester.pump();
+    expect(find.widgetWithText(TextField, '13.730395'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '100.55049'), findsOneWidget);
+
+    // Pasted as Google Maps copies them, both at once.
+    await tester.enterText(find.widgetWithText(TextField, '13.730395'), '13.75, 100.6');
+    await tester.pump();
+    expect(find.widgetWithText(TextField, '13.75'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '100.6'), findsOneWidget);
+
+    // Half a location doesn't save.
+    await tester.enterText(find.widgetWithText(TextField, '100.6'), '');
+    await tester.pump();
+    expect(find.text('Add the longitude too.'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, '100.5018'), '100.6');
+    await tester.pump();
+
+    await tester.tap(find.text('Save venue'));
+    await tester.pumpAndSettle();
+    expect(fakeVenues.venues.last.latitude, 13.75);
+    expect(fakeVenues.venues.last.longitude, 100.6);
   });
 
   testWidgets('Match history lists past matches with their Man of the Match', (tester) async {

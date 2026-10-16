@@ -19,6 +19,7 @@ import '../../../wallet/domain/repositories/wallet_repository.dart';
 import '../../../wallet/presentation/bloc/wallet_qr_bloc.dart';
 import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
+import '../../../weather/presentation/temperature_unit_controller.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/validators/onboarding_validators.dart';
 import '../bloc/auth_bloc.dart';
@@ -363,6 +364,10 @@ class ProfilePage extends StatelessWidget {
               Text('APPEARANCE', style: AppTextStyles.label(color: AppColors.textMuted)),
               const SizedBox(height: 10),
               const _AppearanceSection(),
+              const SizedBox(height: 20),
+              Text('TEMPERATURE', style: AppTextStyles.label(color: AppColors.textMuted)),
+              const SizedBox(height: 10),
+              const _TemperatureUnitSection(),
               const SizedBox(height: 20),
               Text('NOTIFICATIONS', style: AppTextStyles.label(color: AppColors.textMuted)),
               const SizedBox(height: 10),
@@ -977,71 +982,106 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection();
 
-  static const _options = [
-    (mode: ThemeMode.system, label: 'System', icon: Icons.brightness_auto_rounded),
-    (mode: ThemeMode.light, label: 'Light', icon: Icons.light_mode_rounded),
-    (mode: ThemeMode.dark, label: 'Dark', icon: Icons.dark_mode_rounded),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final controller = sl<ThemeController>();
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: controller,
-      builder: (context, current, _) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-          borderRadius: AppRadius.lg,
-        ),
-        child: Row(
-          children: [
-            for (final option in _options)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: option.mode == current,
-                  child: Material(
-                    color: option.mode == current ? AppColors.neutral900 : Colors.transparent,
+      builder: (context, current, _) => _ChoiceBar<ThemeMode>(
+        options: const [
+          (value: ThemeMode.system, label: 'System', icon: Icons.brightness_auto_rounded),
+          (value: ThemeMode.light, label: 'Light', icon: Icons.light_mode_rounded),
+          (value: ThemeMode.dark, label: 'Dark', icon: Icons.dark_mode_rounded),
+        ],
+        current: current,
+        onSelect: controller.select,
+      ),
+    );
+  }
+}
+
+/// °C / °F for match forecasts — saved on this device.
+class _TemperatureUnitSection extends StatelessWidget {
+  const _TemperatureUnitSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = sl<TemperatureUnitController>();
+    return ValueListenableBuilder<TemperatureUnit>(
+      valueListenable: controller,
+      builder: (context, current, _) => _ChoiceBar<TemperatureUnit>(
+        options: const [
+          (value: TemperatureUnit.celsius, label: 'Celsius °C', icon: Icons.thermostat_rounded),
+          (value: TemperatureUnit.fahrenheit, label: 'Fahrenheit °F', icon: Icons.thermostat_rounded),
+        ],
+        current: current,
+        onSelect: controller.select,
+      ),
+    );
+  }
+}
+
+/// A row of options, one picked — the Appearance and Temperature choices.
+class _ChoiceBar<T> extends StatelessWidget {
+  const _ChoiceBar({required this.options, required this.current, required this.onSelect});
+
+  final List<({T value, String label, IconData icon})> options;
+  final T current;
+  final ValueChanged<T> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        borderRadius: AppRadius.lg,
+      ),
+      child: Row(
+        children: [
+          for (final option in options)
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: option.value == current,
+                child: Material(
+                  color: option.value == current ? AppColors.neutral900 : Colors.transparent,
+                  borderRadius: AppRadius.md,
+                  child: InkWell(
                     borderRadius: AppRadius.md,
-                    child: InkWell(
-                      borderRadius: AppRadius.md,
-                      onTap: () {
-                        if (option.mode == current) return;
-                        HapticFeedback.selectionClick();
-                        controller.select(option.mode);
-                      },
-                      child: SizedBox(
-                        height: 44,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              option.icon,
-                              size: 17,
-                              color: option.mode == current
-                                  ? AppColors.onDark
-                                  : AppColors.textMuted,
+                    onTap: () {
+                      if (option.value == current) return;
+                      HapticFeedback.selectionClick();
+                      onSelect(option.value);
+                    },
+                    child: SizedBox(
+                      height: 44,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            option.icon,
+                            size: 17,
+                            color: option.value == current ? AppColors.onDark : AppColors.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            option.label,
+                            style: AppTextStyles.body(
+                              size: 13,
+                              weight: FontWeight.w700,
+                              color: option.value == current ? AppColors.onDark : AppColors.text,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              option.label,
-                              style: AppTextStyles.body(
-                                size: 13,
-                                weight: FontWeight.w700,
-                                color: option.mode == current ? AppColors.onDark : AppColors.text,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

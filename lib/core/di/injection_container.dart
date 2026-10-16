@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../realtime/team_changes.dart';
@@ -89,6 +90,23 @@ import '../../features/team_membership/domain/usecases/set_team_timezone.dart';
 import '../../features/team_membership/domain/usecases/switch_active_team.dart';
 import '../../features/team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../features/team_membership/presentation/bloc/team_roster_bloc.dart';
+import '../../features/venue/data/datasources/venue_remote_data_source.dart';
+import '../../features/venue/data/repositories/venue_repository_impl.dart';
+import '../../features/venue/domain/repositories/venue_repository.dart';
+import '../../features/venue/domain/usecases/archive_venue.dart';
+import '../../features/venue/domain/usecases/get_team_venues.dart';
+import '../../features/venue/domain/usecases/get_venue.dart';
+import '../../features/venue/domain/usecases/save_venue.dart';
+import '../../features/weather/data/datasources/open_meteo_data_source.dart';
+import '../../features/weather/data/datasources/waqi_data_source.dart';
+import '../../features/weather/data/repositories/air_quality_repository_impl.dart';
+import '../../features/weather/data/repositories/forecast_repository_impl.dart';
+import '../../features/weather/domain/repositories/air_quality_repository.dart';
+import '../../features/weather/domain/repositories/forecast_repository.dart';
+import '../../features/weather/domain/usecases/get_live_air_quality.dart';
+import '../../features/weather/domain/usecases/get_kickoff_forecast.dart';
+import '../../features/weather/presentation/temperature_unit_controller.dart';
+import '../env.dart';
 import '../theme/theme_controller.dart';
 
 final sl = GetIt.instance;
@@ -97,6 +115,7 @@ final sl = GetIt.instance;
 Future<void> initDependencies() async {
   // Core - the light / dark choice, read before the first frame.
   sl.registerSingleton<ThemeController>(await ThemeController.load());
+  sl.registerSingleton<TemperatureUnitController>(await TemperatureUnitController.load());
 
   // Core - live updates, one Realtime channel per team shared by the
   // Match, Home and Wallet blocs.
@@ -319,6 +338,31 @@ Future<void> initDependencies() async {
         watchNotifications: sl(),
       ),
     );
+
+  // Features - Venues (a team's saved venues, picked on a new match)
+  sl
+    ..registerLazySingleton<VenueRemoteDataSource>(
+      () => VenueRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<VenueRepository>(() => VenueRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetTeamVenues(sl()))
+    ..registerLazySingleton(() => GetVenue(sl()))
+    ..registerLazySingleton(() => SaveVenue(sl()))
+    ..registerLazySingleton(() => ArchiveVenue(sl()));
+
+  // Features - Weather (the forecast at a venue for kickoff, from Open-Meteo)
+  sl
+    ..registerLazySingleton<ForecastRemoteDataSource>(
+      () => OpenMeteoDataSource(client: http.Client()),
+    )
+    ..registerLazySingleton<ForecastRepository>(() => ForecastRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetKickoffForecast(sl()))
+    // Live air quality near a venue, from WAQI (waqi.info)
+    ..registerLazySingleton<AirQualityRemoteDataSource>(
+      () => WaqiDataSource(client: http.Client(), token: Env.optional('WAQI_TOKEN')),
+    )
+    ..registerLazySingleton<AirQualityRepository>(() => AirQualityRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetLiveAirQuality(sl()));
 
   // Features - Wallet (match bills, split payments, wallet QR codes)
   sl

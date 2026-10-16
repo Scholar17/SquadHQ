@@ -112,6 +112,7 @@ class FakeMatchRepository implements MatchRepository {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   }) async {
@@ -121,6 +122,7 @@ class FakeMatchRepository implements MatchRepository {
       opponent: opponent,
       kickoffAt: kickoffAt,
       venue: venue,
+      venueId: venueId,
       durationMinutes: durationMinutes,
       playersNeeded: playersNeeded,
     );
@@ -136,6 +138,7 @@ class FakeMatchRepository implements MatchRepository {
     required String opponent,
     required DateTime kickoffAt,
     String? venue,
+    String? venueId,
     required int durationMinutes,
     int? playersNeeded,
   }) async {
@@ -146,6 +149,7 @@ class FakeMatchRepository implements MatchRepository {
       opponent: opponent,
       kickoffAt: kickoffAt,
       venue: venue,
+      venueId: venueId,
       durationMinutes: durationMinutes,
       playersNeeded: playersNeeded,
     );

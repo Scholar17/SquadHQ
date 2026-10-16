@@ -9,6 +9,7 @@ class Match extends Equatable {
     required this.opponent,
     required this.kickoffAt,
     this.venue,
+    this.venueId,
     this.durationMinutes = defaultDurationMinutes,
     this.playersNeeded,
     this.lastNudgedAt,
@@ -22,6 +23,10 @@ class Match extends Equatable {
   final String opponent;
   final DateTime kickoffAt;
   final String? venue;
+
+  /// The team's saved venue it's at (052) — [venue] holds a copy of its
+  /// name. Null for a typed venue, or none.
+  final String? venueId;
 
   /// Play time — 1 hour unless set when the match is created or edited.
   final int durationMinutes;
@@ -62,6 +67,7 @@ class Match extends Equatable {
         opponent,
         kickoffAt,
         venue,
+        venueId,
         durationMinutes,
         playersNeeded,
         lastNudgedAt,

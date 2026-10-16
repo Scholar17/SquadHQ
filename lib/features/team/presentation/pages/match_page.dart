@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/routing/app_router.dart';
@@ -30,12 +31,17 @@ import '../../../match/presentation/widgets/create_match_sheet.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
+import '../../../venue/domain/entities/venue.dart';
+import '../../../venue/presentation/widgets/venue_details_sheet.dart';
+import '../../../venue/presentation/widgets/venue_builder.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../../wallet/presentation/bloc/wallet_event.dart';
 import '../../../wallet/presentation/bloc/wallet_state.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
+import '../../../weather/presentation/widgets/kickoff_conditions.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole;
 import '../view_role.dart';
+import '../widgets/profile_corner.dart';
 
 /// The matchday hub for the active team's next match — RSVP, the match
 /// bill, squad list, and (for admins in the Manager view) edit/cancel.
@@ -88,11 +94,14 @@ class MatchPage extends StatelessWidget {
             builder: (context, membershipState) {
               final active = _activeTeam(membershipState);
               if (active == null) {
-                return _EmptyMatchday(
-                  title: "You're not on a team yet",
-                  body: 'Create or join a team to see its matchday here.',
-                  actionLabel: 'Create or join a team',
-                  onAction: () => context.push(AppRoutes.team),
+                return ProfileCorner(
+                  user: user,
+                  child: _EmptyMatchday(
+                    title: "You're not on a team yet",
+                    body: 'Create or join a team to see its matchday here.',
+                    actionLabel: 'Create or join a team',
+                    onAction: () => context.push(AppRoutes.team),
+                  ),
                 );
               }
               final isManager =
@@ -540,68 +549,247 @@ class _HubHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final venue = match.venue;
+    final venueId = match.venueId;
+    if (venueId == null) return _hero(context);
+    return VenueBuilder(
+      venueId: venueId,
+      builder: (context, venue, reload) => _hero(context, venue: venue, reload: reload),
+    );
+  }
+
+  /// The dark hero card; with a saved [venue]'s photo behind it, under a
+  /// dark scrim so the light text reads on any photo.
+  Widget _hero(BuildContext context, {Venue? venue, VoidCallback? reload}) {
+    final venueName = match.venue;
+    final photoUrl = venue?.photoUrl;
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: AppDecorations.darkHero(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Text(
-                'MATCHDAY HUB',
-                style: AppTextStyles.body(
-                  size: 11,
-                  weight: FontWeight.w700,
-                  color: AppColors.teamGold,
-                ).copyWith(letterSpacing: 1.4),
+          if (photoUrl != null) ...[
+            Positioned.fill(
+              child: Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                // Fades in over the plain card; nothing if it fails.
+                frameBuilder: (_, child, frame, wasSynchronouslyLoaded) => AnimatedOpacity(
+                  opacity: frame == null && !wasSynchronouslyLoaded ? 0 : 1,
+                  duration: const Duration(milliseconds: 300),
+                  child: child,
+                ),
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
-              const SizedBox(width: 8),
-              Flexible(child: _KickoffChip(kickoffAt: match.kickoffAt)),
-              const Spacer(),
-              if (isManager)
-                OutlinedButton(
-                  onPressed: onEdit,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.onDark,
-                    side: const BorderSide(color: Color(0x47F9F4ED)),
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(horizontal: 13),
-                    minimumSize: const Size(0, 28),
-                  ),
-                  child: Text(
-                    'Edit details',
-                    style: AppTextStyles.title(size: 11.5, color: AppColors.onDark),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.neutral900.withValues(alpha: 0.62),
+                      AppColors.neutral900.withValues(alpha: 0.9),
+                    ],
                   ),
                 ),
+              ),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _content(context, venueName: venueName, venue: venue, reload: reload),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(
+    BuildContext context, {
+    required String? venueName,
+    required Venue? venue,
+    required VoidCallback? reload,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'MATCHDAY HUB',
+              style: AppTextStyles.body(
+                size: 11,
+                weight: FontWeight.w700,
+                color: AppColors.teamGold,
+              ).copyWith(letterSpacing: 1.4),
+            ),
+            const SizedBox(width: 8),
+            Flexible(child: _KickoffChip(kickoffAt: match.kickoffAt)),
+            const Spacer(),
+            if (isManager)
+              OutlinedButton(
+                onPressed: onEdit,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.onDark,
+                  side: const BorderSide(color: Color(0x47F9F4ED)),
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  minimumSize: const Size(0, 28),
+                ),
+                child: Text(
+                  'Edit details',
+                  style: AppTextStyles.title(size: 11.5, color: AppColors.onDark),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        RichText(
+          text: TextSpan(
+            style: AppTextStyles.heading(size: 24, color: AppColors.onDark),
+            children: [
+              TextSpan(text: '$teamName '),
+              TextSpan(
+                text: 'vs',
+                style: TextStyle(color: AppColors.onDarkMuted),
+              ),
+              TextSpan(text: ' ${match.opponent}'),
             ],
           ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
-              style: AppTextStyles.heading(size: 24, color: AppColors.onDark),
-              children: [
-                TextSpan(text: '$teamName '),
-                TextSpan(
-                  text: 'vs',
-                  style: TextStyle(color: AppColors.onDarkMuted),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(Icons.schedule_rounded, size: 15, color: AppColors.teamGold),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                '${formatMatchDateTime(match.kickoffAt)} · ${formatPlayTime(match.durationMinutes)}',
+                style: AppTextStyles.body(
+                  size: 12.5,
+                  weight: FontWeight.w500,
+                  color: AppColors.onDark,
+                  height: 1.6,
                 ),
-                TextSpan(text: ' ${match.opponent}'),
-              ],
+              ),
+            ),
+          ],
+        ),
+        if (venueName != null)
+          _VenueLine(
+            match: match,
+            name: venueName,
+            isManager: isManager,
+            venue: venue,
+            onChanged: reload,
+          ),
+        if (venue case Venue(:final latitude?, :final longitude?))
+          KickoffConditions(
+            latitude: latitude,
+            longitude: longitude,
+            kickoffAt: match.kickoffAt,
+            onDark: true,
+            compact: true,
+          ),
+      ],
+    );
+  }
+}
+
+/// Where the match is. A saved venue (052) opens its details — photo,
+/// notes, price, Google Maps; a typed one is just its name.
+class _VenueLine extends StatelessWidget {
+  const _VenueLine({
+    required this.match,
+    required this.name,
+    required this.isManager,
+    this.venue,
+    this.onChanged,
+  });
+
+  final match_entity.Match match;
+  final String name;
+  final bool isManager;
+
+  /// The saved venue, once loaded — for its Google Maps link.
+  final Venue? venue;
+
+  /// After its details were open (an admin may have edited it).
+  final VoidCallback? onChanged;
+
+  Future<void> _openMaps(BuildContext context, String url) async {
+    final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text("Couldn't open Google Maps.")));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final venueId = match.venueId;
+    final style = AppTextStyles.body(
+      size: 12.5,
+      weight: FontWeight.w500,
+      color: AppColors.onDarkMuted,
+      height: 1.6,
+    );
+    if (venueId == null) return Text(name, style: style);
+    final mapsUrl = venue?.mapsUrl;
+    final nameLink = InkWell(
+      onTap: () async {
+        await showVenueDetails(
+          context,
+          venueId: venueId,
+          canManage: isManager,
+          kickoffAt: match.kickoffAt,
+        );
+        onChanged?.call();
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.place_outlined, size: 15, color: AppColors.teamGold),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style.copyWith(
+                color: AppColors.onDark,
+                decoration: TextDecoration.underline,
+                decorationColor: AppColors.onDarkMuted,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            [
-              '${formatMatchDateTime(match.kickoffAt)} · ${formatPlayTime(match.durationMinutes)}',
-              ?venue,
-            ].join('\n'),
-            style: AppTextStyles.body(
-              size: 12.5,
-              weight: FontWeight.w500,
-              color: AppColors.onDarkMuted,
-              height: 1.6,
+          Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.onDarkMuted),
+        ],
+      ),
+    );
+    if (mapsUrl == null) return nameLink;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          Flexible(child: nameLink),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => _openMaps(context, mapsUrl),
+            icon: const Icon(Icons.directions_rounded, size: 16),
+            label: Text(
+              'Directions',
+              style: AppTextStyles.title(size: 11.5, color: AppColors.onDark),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.onDark,
+              side: const BorderSide(color: Color(0x47F9F4ED)),
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: const Size(0, 28),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ],

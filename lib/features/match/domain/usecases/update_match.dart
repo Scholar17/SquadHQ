@@ -12,6 +12,7 @@ class UpdateMatchParams extends Equatable {
     required this.opponent,
     required this.kickoffAt,
     this.venue,
+    this.venueId,
     required this.durationMinutes,
     this.playersNeeded,
   });
@@ -20,11 +21,12 @@ class UpdateMatchParams extends Equatable {
   final String opponent;
   final DateTime kickoffAt;
   final String? venue;
+  final String? venueId;
   final int durationMinutes;
   final int? playersNeeded;
 
   @override
-  List<Object?> get props => [matchId, opponent, kickoffAt, venue, durationMinutes, playersNeeded];
+  List<Object?> get props => [matchId, opponent, kickoffAt, venue, venueId, durationMinutes, playersNeeded];
 }
 
 class UpdateMatch implements UseCase<Match, UpdateMatchParams> {
@@ -39,6 +41,7 @@ class UpdateMatch implements UseCase<Match, UpdateMatchParams> {
         opponent: params.opponent,
         kickoffAt: params.kickoffAt,
         venue: params.venue,
+        venueId: params.venueId,
         durationMinutes: params.durationMinutes,
         playersNeeded: params.playersNeeded,
       );

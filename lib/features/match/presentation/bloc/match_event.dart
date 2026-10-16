@@ -38,6 +38,7 @@ final class MatchCreateRequested extends MatchEvent {
     required this.opponent,
     required this.kickoffAt,
     this.venue,
+    this.venueId,
     required this.durationMinutes,
     this.playersNeeded,
   });
@@ -46,11 +47,12 @@ final class MatchCreateRequested extends MatchEvent {
   final String opponent;
   final DateTime kickoffAt;
   final String? venue;
+  final String? venueId;
   final int durationMinutes;
   final int? playersNeeded;
 
   @override
-  List<Object?> get props => [teamId, opponent, kickoffAt, venue, durationMinutes, playersNeeded];
+  List<Object?> get props => [teamId, opponent, kickoffAt, venue, venueId, durationMinutes, playersNeeded];
 }
 
 /// Admin-only edit of an existing match — see `update_match` in
@@ -61,6 +63,7 @@ final class MatchUpdateRequested extends MatchEvent {
     required this.opponent,
     required this.kickoffAt,
     this.venue,
+    this.venueId,
     required this.durationMinutes,
     this.playersNeeded,
   });
@@ -69,11 +72,12 @@ final class MatchUpdateRequested extends MatchEvent {
   final String opponent;
   final DateTime kickoffAt;
   final String? venue;
+  final String? venueId;
   final int durationMinutes;
   final int? playersNeeded;
 
   @override
-  List<Object?> get props => [matchId, opponent, kickoffAt, venue, durationMinutes, playersNeeded];
+  List<Object?> get props => [matchId, opponent, kickoffAt, venue, venueId, durationMinutes, playersNeeded];
 }
 
 /// Admin-only "Remind players to vote", once per day per match.
