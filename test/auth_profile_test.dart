@@ -223,4 +223,63 @@ void main() {
     await expectLater(bloc.stream, emitsInOrder([isA<AuthLoading>(), isA<AuthInitial>()]));
     expect(repo.deleted, isTrue);
   });
+
+  group('Opening the app', () {
+    const player = AppUser(
+      id: 'u-1',
+      name: 'Tester',
+      provider: AuthProvider.google,
+      phone: '+66812345678',
+      username: 'tester',
+    );
+
+    AuthBloc bloc(_FakeAuthRepository repo) {
+      final bloc = AuthBloc(
+        signInWithFacebook: SignInWithFacebook(repo),
+        signInWithGoogle: SignInWithGoogle(repo),
+        completeOnboarding: CompleteOnboarding(repo),
+        signOut: SignOut(repo),
+        watchAuthState: WatchAuthState(repo),
+        updateProfile: UpdateProfile(repo),
+        deleteAccount: DeleteAccount(repo),
+      );
+      addTearDown(bloc.close);
+      return bloc;
+    }
+
+    test('a saved session goes straight in, never by the login screen', () async {
+      final repo = _FakeAuthRepository(player);
+      final auth = bloc(repo);
+      expect(auth.state, isA<AuthRestoring>());
+      repo.signIn();
+      await expectLater(auth.stream, emits(isA<AuthAuthenticated>()));
+    });
+
+    test('no saved session: the login screen', () async {
+      final repo = _FakeAuthRepository(player);
+      final auth = bloc(repo);
+      repo.signedOut();
+      await expectLater(auth.stream, emits(isA<AuthInitial>()));
+    });
+
+    test("a session that can't load: the login screen, saying why", () async {
+      final repo = _FakeAuthRepository(player);
+      final auth = bloc(repo);
+      repo.failToLoad();
+      await expectLater(
+        auth.stream,
+        emits(isA<AuthFailure>().having((state) => state.previous, 'previous', isA<AuthInitial>())),
+      );
+    });
+
+    // testWidgets for its fake clock.
+    testWidgets('a session check that never answers gives up after 10 seconds', (tester) async {
+      final repo = _FakeAuthRepository(player);
+      final auth = bloc(repo);
+      await tester.pump(const Duration(seconds: 9));
+      expect(auth.state, isA<AuthRestoring>());
+      await tester.pump(const Duration(seconds: 2));
+      expect(auth.state, isA<AuthInitial>());
+    });
+  });
 }

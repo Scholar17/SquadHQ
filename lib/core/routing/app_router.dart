@@ -38,6 +38,7 @@ import '../../features/team_membership/presentation/pages/team_roster_page.dart'
 import '../../features/wallet/presentation/pages/wallet_bills_page.dart';
 import '../notifications/notification_routing.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 
 /// Route paths, named so push sites don't hand-type strings.
 abstract final class AppRoutes {
@@ -148,6 +149,10 @@ String? _authRedirect(GoRouterState state, AuthBloc authBloc) {
     };
   }
 
+  // Still restoring the saved session: stay put (the splash shows) until
+  // it's known where to go.
+  if (settled is AuthRestoring) return null;
+
   final onLogin = state.matchedLocation == AppRoutes.login;
   final onOnboarding = state.matchedLocation == AppRoutes.onboarding;
 
@@ -172,7 +177,16 @@ GoRouter createAppRouter(AuthBloc authBloc) {
     routes: [
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const LoginPage(),
+        // Rebuilt by the auth state itself: when restoring ends signed out,
+        // the location stays /login, so the router wouldn't rebuild it.
+        builder: (context, state) => BlocBuilder<AuthBloc, AuthState>(
+          buildWhen: (previous, current) =>
+              (_settledAuthState(previous) is AuthRestoring) !=
+              (_settledAuthState(current) is AuthRestoring),
+          builder: (context, authState) => _settledAuthState(authState) is AuthRestoring
+              ? const _SettlingPage()
+              : const LoginPage(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.onboarding,
@@ -382,8 +396,10 @@ class _TeamGateState extends State<_TeamGate> {
   }
 }
 
-/// Shown for a frame or two while auth/onboarding state is mid-transition
-/// and the router is about to redirect somewhere settled.
+/// Shown while the saved session restores at start, while teams load, and
+/// for a frame or two while auth state is mid-transition. Drawn like the
+/// web page's own splash (web/index.html: the GG badge over a spinner), so
+/// opening the app is one splash, then the app.
 class _SettlingPage extends StatelessWidget {
   const _SettlingPage();
 
@@ -392,7 +408,31 @@ class _SettlingPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Center(
-        child: CircularProgressIndicator(color: AppColors.accent),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: AppColors.teamGold, shape: BoxShape.circle),
+              child: Text(
+                'GG',
+                style: AppTextStyles.heading(size: 20, color: AppColors.onLight, height: 1),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.accent,
+                backgroundColor: AppColors.text.withValues(alpha: 0.08),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

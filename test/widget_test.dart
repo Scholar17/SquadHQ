@@ -17,6 +17,8 @@ void main() {
   testWidgets('shows the login screen with both social sign-in doors',
       (tester) async {
     await tester.pumpWidget(const SquadHqApp());
+    // No saved session: the check is over at once, straight to login.
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('Continue with Facebook'), findsOneWidget);

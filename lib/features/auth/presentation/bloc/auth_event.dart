@@ -90,3 +90,9 @@ final class AuthStateErrored extends AuthEvent {
 final class AuthAppResumed extends AuthEvent {
   const AuthAppResumed();
 }
+
+/// Restoring the saved session at start took too long — give up on it and
+/// show the login screen rather than the splash forever.
+final class AuthRestoreTimedOut extends AuthEvent {
+  const AuthRestoreTimedOut();
+}

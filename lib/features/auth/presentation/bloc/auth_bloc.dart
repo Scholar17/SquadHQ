@@ -31,7 +31,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         _signInWithGoogle = signInWithGoogle,
         _completeOnboarding = completeOnboarding,
         _signOut = signOut,
-        super(const AuthInitial()) {
+        super(const AuthRestoring()) {
     on<AuthFacebookSignInRequested>(_onFacebookSignIn);
     on<AuthGoogleSignInRequested>(_onGoogleSignIn);
     on<AuthOnboardingSubmitted>(_onOnboardingSubmitted);
@@ -41,6 +41,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthUserChanged>(_onUserChanged);
     on<AuthStateErrored>(_onStateErrored);
     on<AuthAppResumed>(_onAppResumed);
+    on<AuthRestoreTimedOut>(_onRestoreTimedOut);
+    _restoreTimeout = Timer(_restoreGrace, () => add(const AuthRestoreTimedOut()));
     _authStateSubscription = watchAuthState().listen(
       (user) => add(AuthUserChanged(user)),
       // E.g. the OAuth redirect came back with an error, or loading the
@@ -62,6 +64,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final UpdateProfile _updateProfile;
   final DeleteAccount _deleteAccount;
   late final StreamSubscription<AppUser?> _authStateSubscription;
+  late final Timer _restoreTimeout;
+
+  /// The session (and its profile) normally restores in well under a
+  /// second; this only catches it never arriving.
+  static const _restoreGrace = Duration(seconds: 10);
 
   /// A Facebook/Google sign-in was launched and its session hasn't arrived
   /// yet — the login screen shows AuthLoading meanwhile.
@@ -73,6 +80,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   @override
   Future<void> close() {
+    _restoreTimeout.cancel();
     _authStateSubscription.cancel();
     return super.close();
   }
@@ -198,6 +206,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   void _onStateErrored(AuthStateErrored event, Emitter<AuthState> emit) {
     final current = state;
+    // The saved session couldn't be restored (e.g. its profile didn't
+    // load): to the login screen, saying why, rather than a stuck splash.
+    if (current is AuthRestoring) {
+      _restoreTimeout.cancel();
+      emit(AuthFailure(event.message, const AuthInitial()));
+      return;
+    }
     if (!_awaitingRedirect || current is! AuthLoading) return;
     _awaitingRedirect = false;
     emit(AuthFailure(event.message, current.previous));
@@ -215,7 +230,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(current.previous);
   }
 
+  void _onRestoreTimedOut(AuthRestoreTimedOut event, Emitter<AuthState> emit) {
+    if (state is AuthRestoring) emit(const AuthInitial());
+  }
+
   void _onUserChanged(AuthUserChanged event, Emitter<AuthState> emit) {
+    _restoreTimeout.cancel();
     final user = event.user;
     if (user != null) _awaitingRedirect = false;
     if (user == null) {

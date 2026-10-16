@@ -9,6 +9,13 @@ sealed class AuthState extends Equatable {
   List<Object?> get props => [];
 }
 
+/// At app start, while the saved session is restored (and its profile
+/// loaded) — a splash, so a signed-in player never sees the login screen
+/// flash by on the way in.
+final class AuthRestoring extends AuthState {
+  const AuthRestoring();
+}
+
 /// Not signed in yet — shows the login screen.
 final class AuthInitial extends AuthState {
   const AuthInitial();
