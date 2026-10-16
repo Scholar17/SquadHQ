@@ -27,6 +27,7 @@ import '../../../wallet/presentation/widgets/bill_card.dart';
 import '../../../wallet/presentation/widgets/pay_bill_sheet.dart';
 import '../../domain/entities/team_snapshot.dart' show SquadRole;
 import '../view_role.dart';
+import '../widgets/profile_corner.dart';
 
 /// The team's match bills: what's still owed to whoever paid, what you
 /// owe, and every bill's split. Backed by supabase/sql/008. The same bills
@@ -58,11 +59,14 @@ class WalletPage extends StatelessWidget {
           builder: (context, membershipState) {
             final active = _activeTeam(membershipState);
             if (active == null) {
-              return _EmptyWallet(
-                title: "You're not on a team yet",
-                body: 'Create or join a team to split match costs here.',
-                actionLabel: 'Create or join a team',
-                onAction: () => context.push(AppRoutes.team),
+              return ProfileCorner(
+                user: user,
+                child: _EmptyWallet(
+                  title: "You're not on a team yet",
+                  body: 'Create or join a team to split match costs here.',
+                  actionLabel: 'Create or join a team',
+                  onAction: () => context.push(AppRoutes.team),
+                ),
               );
             }
             final isManager =

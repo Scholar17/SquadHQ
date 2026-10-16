@@ -101,6 +101,16 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- Chrome's install offer, kept for Profile → "Install app" (it can
+       arrive before Flutter has loaded). preventDefault stops Chrome showing
+       its own install banner as well — otherwise there are two prompts to
+       dismiss. -->
+  <script>
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__pwaInstallPrompt = e;
+    });
+  </script>
   <script>
     {{flutter_js}}
     {{flutter_build_config}}

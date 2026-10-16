@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/clock/clock_scope.dart';
-import '../../../../core/notifications/web_push_prompt.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -37,6 +36,7 @@ import '../../domain/entities/team_snapshot.dart' show SquadRole, TeamInfo;
 import '../bloc/team_bloc.dart';
 import '../pending_actions.dart';
 import '../view_role.dart';
+import '../widgets/profile_corner.dart';
 import '../widgets/team_header.dart';
 
 /// The "Home" tab — the app's daily HQ. Team header and upcoming matches
@@ -121,10 +121,9 @@ class DashboardPage extends StatelessWidget {
             }
             final active = _activeTeam(membershipState);
             if (active == null) {
-              return _EmptyHome(
-                profileInitials: _profileInitials,
-                onProfileTap: () => context.push(AppRoutes.profile, extra: user),
-                onCreateOrJoin: () => context.push(AppRoutes.team),
+              return ProfileCorner(
+                user: user,
+                child: _EmptyHome(onCreateOrJoin: () => context.push(AppRoutes.team)),
               );
             }
             final canCreateMatch = viewRoleFor(active.role) == SquadRole.manager;
@@ -186,60 +185,27 @@ class DashboardPage extends StatelessWidget {
 /// straight from the app shell (see app.dart's _TeamGate) rather than a
 /// separate full-screen gate, so the bottom nav stays visible.
 class _EmptyHome extends StatelessWidget {
-  const _EmptyHome({
-    required this.profileInitials,
-    required this.onProfileTap,
-    required this.onCreateOrJoin,
-  });
+  const _EmptyHome({required this.onCreateOrJoin});
 
-  final String profileInitials;
-  final VoidCallback onProfileTap;
   final VoidCallback onCreateOrJoin;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GestureDetector(
-                onTap: onProfileTap,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(color: AppColors.neutral300, shape: BoxShape.circle),
-                  alignment: Alignment.center,
-                  child: Text(
-                    profileInitials,
-                    style: AppTextStyles.body(size: 12, weight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: EmptyState(
-            icon: Icons.groups_rounded,
-            title: "You're not on a team yet",
-            body:
-                'Create a squad of your own, or join one with an invite '
-                'code, to see fixtures and squad stats here.',
-            steps: const [
-              (icon: Icons.add_circle_outline_rounded, text: "Create a team — you'll be its admin"),
-              (
-                icon: Icons.vpn_key_outlined,
-                text: 'Or join with the invite code your captain shares',
-              ),
-            ],
-            actionLabel: 'Create or join a team',
-            onAction: onCreateOrJoin,
-          ),
+    return EmptyState(
+      icon: Icons.groups_rounded,
+      title: "You're not on a team yet",
+      body:
+          'Create a squad of your own, or join one with an invite '
+          'code, to see fixtures and squad stats here.',
+      steps: const [
+        (icon: Icons.add_circle_outline_rounded, text: "Create a team — you'll be its admin"),
+        (
+          icon: Icons.vpn_key_outlined,
+          text: 'Or join with the invite code your captain shares',
         ),
       ],
+      actionLabel: 'Create or join a team',
+      onAction: onCreateOrJoin,
     );
   }
 }
@@ -290,7 +256,6 @@ class _DashboardContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           sliver: SliverList.list(
             children: [
-              const WebPushPrompt(),
               const OtherGroupsActivity(padding: EdgeInsets.only(bottom: 20)),
               UpcomingMatchesSection(
                 matches: matches,

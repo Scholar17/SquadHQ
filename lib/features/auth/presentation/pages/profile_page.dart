@@ -8,6 +8,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/legal_links.dart';
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../../core/notifications/push_notifications.dart';
+import '../../../../core/pwa/pwa_install.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -393,6 +394,50 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              // The web app in a browser tab: install it (hidden once installed).
+              ListenableBuilder(
+                listenable: pwaInstallChanges,
+                builder: (context, _) {
+                  if (!canInstallPwa) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text('APP', style: AppTextStyles.label(color: AppColors.textMuted)),
+                      const SizedBox(height: 10),
+                      Material(
+                        color: AppColors.card,
+                        borderRadius: AppRadius.lg,
+                        child: InkWell(
+                          borderRadius: AppRadius.lg,
+                          onTap: () => installPwa(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                              borderRadius: AppRadius.lg,
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Install app',
+                                  style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
+                                ),
+                                const Spacer(),
+                                Icon(
+                                  Icons.install_mobile_rounded,
+                                  size: 18,
+                                  color: AppColors.textMuted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
               Text('LEGAL', style: AppTextStyles.label(color: AppColors.textMuted)),

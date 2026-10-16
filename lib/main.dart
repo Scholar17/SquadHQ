@@ -8,6 +8,7 @@ import 'core/env.dart';
 import 'core/notifications/local_notifications.dart';
 import 'core/notifications/notification_routing.dart';
 import 'core/notifications/push_notifications.dart';
+import 'core/pwa/pwa_install.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,5 +25,7 @@ Future<void> main() async {
     onOpen: NotificationRouting.open,
     onForeground: NotificationRouting.showBanner,
   );
+  // Web only: catches Chrome's install offer for Profile's "Install app".
+  initPwaInstall();
   runApp(const SquadHqApp());
 }

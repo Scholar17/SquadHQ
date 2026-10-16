@@ -266,7 +266,8 @@ class _MatchTabHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+      // Same 20 from the top as Wallet's and Members' titles.
+      padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
       child: Row(
         children: [
           Expanded(child: Text('Match', style: AppTextStyles.heading(size: 22))),

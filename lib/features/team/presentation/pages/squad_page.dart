@@ -20,6 +20,7 @@ import '../../../squad/presentation/active_group.dart';
 import '../../../squad/presentation/widgets/squad_widgets.dart' show SquadAvatar;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
+import '../widgets/profile_corner.dart';
 
 /// The team's squad with real ratings (supabase/sql/045_player_ratings.sql):
 /// the team's average OVR, then everyone best-first. Your own row's
@@ -40,12 +41,15 @@ class SquadPage extends StatelessWidget {
       return Scaffold(
         backgroundColor: AppColors.bg,
         body: SafeArea(
-          child: EmptyState(
-            icon: Icons.groups_rounded,
-            title: "You're not on a team yet",
-            body: 'Create or join a team to see its squad and player ratings here.',
-            actionLabel: 'Create or join a team',
-            onAction: () => context.push(AppRoutes.team),
+          child: ProfileCorner(
+            user: user,
+            child: EmptyState(
+              icon: Icons.groups_rounded,
+              title: "You're not on a team yet",
+              body: 'Create or join a team to see its squad and player ratings here.',
+              actionLabel: 'Create or join a team',
+              onAction: () => context.push(AppRoutes.team),
+            ),
           ),
         ),
       );

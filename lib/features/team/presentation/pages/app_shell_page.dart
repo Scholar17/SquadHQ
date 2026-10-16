@@ -10,6 +10,7 @@ import '../../../../core/clock/clock_scope.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/notifications/notification_routing.dart';
 import '../../../../core/notifications/push_notifications.dart';
+import '../../../../core/notifications/web_push_prompt.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -199,11 +200,13 @@ class _ActiveTeamSyncState extends State<_ActiveTeamSync> with WidgetsBindingObs
   }
 
   /// Registers this device for push. Android asks for permission (once);
-  /// web only registers if it's already allowed — browsers need a tap to
-  /// ask, which is the Profile page's "Turn on".
+  /// web registers if it's already allowed, and otherwise asks with a
+  /// "Turn on notifications?" dialog — browsers need a tap to prompt.
   Future<void> _turnOnPush() async {
     if (!kIsWeb || await PushNotifications.isAllowed()) {
       await PushNotifications.enable();
+    } else if (mounted) {
+      await askToTurnOnPush(context);
     }
   }
 
