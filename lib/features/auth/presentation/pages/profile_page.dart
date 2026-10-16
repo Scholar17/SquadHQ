@@ -23,6 +23,7 @@ import '../../domain/validators/onboarding_validators.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../widgets/username_input_formatter.dart';
 import 'delete_account_page.dart';
 
 /// "Your profile" — reached from Squad and the dashboard avatar. Your photo,
@@ -108,11 +109,7 @@ class ProfilePage extends StatelessWidget {
         title: 'Your name',
         initial: user.name,
         hint: 'How your squad sees you',
-        validate: (value) => switch (value.trim().length) {
-          0 => 'Enter your name.',
-          > 40 => 'Keep it to 40 characters.',
-          _ => null,
-        },
+        validate: OnboardingValidators.nameError,
       ),
     );
     if (name == null || name.trim() == user.name || !context.mounted) return;
@@ -120,7 +117,8 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _editUsername(BuildContext context, AppUser user) async {
-    final username = await showDialog<String>(
+    final bloc = context.read<AuthBloc>();
+    await showDialog<String>(
       context: context,
       builder: (_) => _EditFieldDialog(
         title: 'Mention name',
@@ -129,11 +127,25 @@ class ProfilePage extends StatelessWidget {
         prefix: '@',
         note: 'Teammates type @ and this to mention you in comments. Old mentions switch to the new one.',
         textCapitalization: TextCapitalization.none,
+        inputFormatters: const [UsernameInputFormatter()],
         validate: (value) => OnboardingValidators.usernameError(value.trim()),
+        save: (value) async {
+          final username = value.trim();
+          if (username == user.username) return null;
+          // Saved with the dialog still open, so "taken" lands under the
+          // field; anything else closes it and shows as a snackbar.
+          final result = bloc.stream.firstWhere(
+            (state) => state is AuthAuthenticated || state is AuthFailure,
+          );
+          bloc.add(AuthProfileUpdateRequested(username: username));
+          return switch (await result) {
+            AuthFailure(:final message) when message == OnboardingValidators.usernameTaken =>
+              message,
+            _ => null,
+          };
+        },
       ),
     );
-    if (username == null || username.trim() == user.username || !context.mounted) return;
-    context.read<AuthBloc>().add(AuthProfileUpdateRequested(username: username.trim()));
   }
 
   Future<void> _editPhone(BuildContext context, AppUser user) async {
@@ -166,7 +178,9 @@ class ProfilePage extends StatelessWidget {
     final saving = authState is AuthLoading;
     return BlocListener<AuthBloc, AuthState>(
       listenWhen: (previous, current) =>
-          current is AuthFailure || (previous is AuthLoading && current is AuthAuthenticated),
+          // A taken username shows in the edit dialog instead.
+          (current is AuthFailure && current.message != OnboardingValidators.usernameTaken) ||
+          (previous is AuthLoading && current is AuthAuthenticated),
       listener: (context, state) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -305,6 +319,13 @@ class ProfilePage extends StatelessWidget {
                 child: Column(
                   children: [
                     _InfoRow(
+                      label: 'Name',
+                      note: 'How your squad sees you',
+                      value: user.name,
+                      onTap: saving ? null : () => _editName(context, user),
+                    ),
+                    _InfoRow(
+                      showTopBorder: true,
                       label: 'Mention name',
                       note: 'Teammates type it after @ to mention you in comments',
                       value: user.username == null ? 'Not set' : '@${user.username}',
@@ -318,6 +339,8 @@ class ProfilePage extends StatelessWidget {
                     ),
                     _InfoRow(
                       label: 'Signed in with',
+                      // The account to pick next time — handy with more than one.
+                      note: user.email,
                       value: _providerLabel(user.provider),
                       showTopBorder: true,
                     ),
@@ -553,7 +576,15 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Text(value, style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700)),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
+              ),
+            ),
             if (onTap != null) ...[
               const SizedBox(width: 8),
               Icon(Icons.edit_outlined, size: 16, color: AppColors.textMuted),
@@ -576,6 +607,8 @@ class _EditFieldDialog extends StatefulWidget {
     this.note,
     this.keyboardType,
     this.textCapitalization = TextCapitalization.words,
+    this.inputFormatters,
+    this.save,
   });
 
   final String title;
@@ -588,6 +621,12 @@ class _EditFieldDialog extends StatefulWidget {
   final String? note;
   final TextInputType? keyboardType;
   final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// Saves from inside the dialog: an error message keeps it open with
+  /// that under the field, null closes it. Without it, the dialog just
+  /// returns the text.
+  final Future<String?> Function(String value)? save;
 
   @override
   State<_EditFieldDialog> createState() => _EditFieldDialogState();
@@ -596,6 +635,7 @@ class _EditFieldDialog extends StatefulWidget {
 class _EditFieldDialogState extends State<_EditFieldDialog> {
   late final _controller = TextEditingController(text: widget.initial);
   String? _error;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -603,11 +643,27 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving) return;
     final error = widget.validate(_controller.text);
     if (error != null) {
       setState(() => _error = error);
       return;
+    }
+    if (widget.save case final save?) {
+      setState(() {
+        _saving = true;
+        _error = null;
+      });
+      final saveError = await save(_controller.text);
+      if (!mounted) return;
+      if (saveError != null) {
+        setState(() {
+          _saving = false;
+          _error = saveError;
+        });
+        return;
+      }
     }
     Navigator.of(context).pop(_controller.text);
   }
@@ -621,6 +677,8 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
         key: const ValueKey('edit-field'),
         controller: _controller,
         autofocus: true,
+        enabled: !_saving,
+        inputFormatters: widget.inputFormatters,
         keyboardType: widget.keyboardType,
         textCapitalization: widget.textCapitalization,
         autocorrect: widget.textCapitalization != TextCapitalization.none,
@@ -635,7 +693,7 @@ class _EditFieldDialogState extends State<_EditFieldDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        TextButton(onPressed: _save, child: const Text('Save')),
+        TextButton(onPressed: _saving ? null : _save, child: Text(_saving ? 'Saving…' : 'Save')),
       ],
     );
   }

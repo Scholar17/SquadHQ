@@ -9,16 +9,20 @@ import '../repositories/auth_repository.dart';
 class CompleteOnboardingParams extends Equatable {
   const CompleteOnboardingParams({
     required this.userId,
+    required this.name,
     required this.phone,
     required this.username,
   });
 
   final String userId;
+
+  /// How the squad sees them — starts as the Google/Facebook name.
+  final String name;
   final String phone;
   final String username;
 
   @override
-  List<Object?> get props => [userId, phone, username];
+  List<Object?> get props => [userId, name, phone, username];
 }
 
 class CompleteOnboarding
@@ -31,6 +35,7 @@ class CompleteOnboarding
   Future<Either<Failure, AppUser>> call(CompleteOnboardingParams params) =>
       _repository.completeOnboarding(
         userId: params.userId,
+        name: params.name,
         phone: params.phone,
         username: params.username,
       );

@@ -135,7 +135,7 @@ class TeamMembershipRemoteDataSourceImpl
     try {
       final rows = await _supabase
           .from('team_members')
-          .select('profile_id, role, profiles(name, avatar_url)')
+          .select('profile_id, role, profiles(name, username, avatar_url)')
           .eq('team_id', teamId);
       return (rows as List<dynamic>)
           .cast<Map<String, dynamic>>()

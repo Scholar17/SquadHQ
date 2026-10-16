@@ -107,6 +107,7 @@ class RatedPlayer extends Equatable {
   const RatedPlayer({
     required this.profileId,
     required this.name,
+    this.username,
     this.avatarUrl,
     this.rating,
     this.apps = 0,
@@ -123,6 +124,9 @@ class RatedPlayer extends Equatable {
 
   final String profileId;
   final String name;
+
+  /// Their @mention name; null if not set (or not loaded).
+  final String? username;
   final String? avatarUrl;
 
   /// Null until they've filled it in.
@@ -150,6 +154,7 @@ class RatedPlayer extends Equatable {
   List<Object?> get props => [
     profileId,
     name,
+    username,
     avatarUrl,
     rating,
     apps,

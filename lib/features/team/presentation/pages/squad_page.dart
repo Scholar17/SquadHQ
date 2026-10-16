@@ -435,10 +435,17 @@ class _RosterRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    rating == null
-                        ? 'No rating yet'
-                        : '${rating.positions.join(' · ')} · ${player.apps} '
-                              '${player.apps == 1 ? 'app' : 'apps'}',
+                    [
+                      if (player.username case final username?) '@$username',
+                      if (rating == null)
+                        'No rating yet'
+                      else ...[
+                        rating.positions.join(' · '),
+                        '${player.apps} ${player.apps == 1 ? 'app' : 'apps'}',
+                      ],
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.body(size: 11.5, color: AppColors.textMuted),
                   ),
                 ],

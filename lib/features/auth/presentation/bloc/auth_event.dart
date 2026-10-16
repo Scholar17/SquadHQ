@@ -20,13 +20,18 @@ final class AuthGoogleSignInRequested extends AuthEvent {
 }
 
 final class AuthOnboardingSubmitted extends AuthEvent {
-  const AuthOnboardingSubmitted({required this.phone, required this.username});
+  const AuthOnboardingSubmitted({
+    required this.name,
+    required this.phone,
+    required this.username,
+  });
 
+  final String name;
   final String phone;
   final String username;
 
   @override
-  List<Object?> get props => [phone, username];
+  List<Object?> get props => [name, phone, username];
 }
 
 /// Edit your profile: any of name, username, phone and photo (null =

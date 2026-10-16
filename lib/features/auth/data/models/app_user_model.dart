@@ -10,6 +10,7 @@ class AppUserModel extends AppUser {
     super.avatarUrl,
     super.phone,
     super.username,
+    super.email,
   });
 
   factory AppUserModel.fromEntity(AppUser user) => AppUserModel(
@@ -19,6 +20,7 @@ class AppUserModel extends AppUser {
         avatarUrl: user.avatarUrl,
         phone: user.phone,
         username: user.username,
+        email: user.email,
       );
 
   /// Builds the app's user from a Supabase auth [User] plus its optional
@@ -43,6 +45,7 @@ class AppUserModel extends AppUser {
           (metadata['avatar_url'] ?? metadata['picture']) as String?,
       phone: profileRow?['phone'] as String?,
       username: profileRow?['username'] as String?,
+      email: authUser.email?.isEmpty ?? true ? null : authUser.email,
     );
   }
 }

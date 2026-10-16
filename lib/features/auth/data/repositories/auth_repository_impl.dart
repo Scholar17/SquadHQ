@@ -40,12 +40,14 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, AppUser>> completeOnboarding({
     required String userId,
+    required String name,
     required String phone,
     required String username,
   }) async {
     try {
       return Right(await _remoteDataSource.completeOnboarding(
         userId: userId,
+        name: name,
         phone: phone,
         username: username,
       ));

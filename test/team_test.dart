@@ -650,7 +650,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('mention-suggestions')), findsOneWidget);
     expect(find.byKey(const ValueKey('mention-test-1')), findsNothing); // not yourself
-    await tester.tap(find.byKey(const ValueKey('mention-${FakeMentionMembersRepository.aungKo}')));
+    // A mouse tap: like a touch on web, a tap outside the field takes its
+    // focus — the list counts as inside, so the pick still lands. A frame
+    // between press and release, as on a phone.
+    final press = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('mention-${FakeMentionMembersRepository.aungKo}'))),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump();
+    await press.up();
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).controller!.text, 'Bibs @aungko ');
     expect(find.byKey(const ValueKey('mention-suggestions')), findsNothing);
@@ -986,7 +994,8 @@ void main() {
     await tester.tap(find.text('Your profile'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Test Player'), findsOneWidget);
+    // At the top, and as the Account section's Name row.
+    expect(find.text('Test Player'), findsNWidgets(2));
     expect(find.text('+66812345678'), findsOneWidget);
     expect(find.text('Google'), findsOneWidget);
 
@@ -1012,7 +1021,7 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('edit-field')), 'ab');
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
-    expect(find.text('Username must be at least 3 characters.'), findsOneWidget);
+    expect(find.text('Mention name must be at least 3 characters.'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 

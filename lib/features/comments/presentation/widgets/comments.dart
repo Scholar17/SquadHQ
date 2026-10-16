@@ -297,6 +297,15 @@ class _CommentComposerState extends State<CommentComposer> {
     if (query == null || !widget.focusNode.hasFocus) return const SizedBox.shrink();
     final matches = mentionSuggestions(members, query.query, me: widget.me).toList();
     if (matches.isEmpty) return const SizedBox.shrink();
+    // Part of the text field's tap region: on web a touch outside the
+    // field takes its focus, which would hide this list before the tap
+    // on a name lands.
+    return TextFieldTapRegion(
+      child: _suggestionList(matches, query.start),
+    );
+  }
+
+  Widget _suggestionList(List<MentionMember> matches, int start) {
     return Column(
       key: const ValueKey('mention-suggestions'),
       mainAxisSize: MainAxisSize.min,
@@ -313,7 +322,7 @@ class _CommentComposerState extends State<CommentComposer> {
                 InkWell(
                   key: ValueKey('mention-${member.id}'),
                   borderRadius: AppRadius.sm,
-                  onTap: () => _mention(member, query.start),
+                  onTap: () => _mention(member, start),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(

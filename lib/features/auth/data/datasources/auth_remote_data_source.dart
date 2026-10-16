@@ -7,13 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase show AuthExc
 import '../../../../core/error/error_messages.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/usecases/update_profile.dart';
+import '../../domain/validators/onboarding_validators.dart';
 import '../models/app_user_model.dart';
 
 /// Postgres' code for a unique index refusing a row — on profiles, a
 /// username someone already has (any case, 049_mentions.sql).
 const _uniqueViolation = '23505';
-
-const usernameTakenMessage = 'That username is taken. Try another one.';
 
 abstract interface class AuthRemoteDataSource {
   /// Launches Facebook's browser sign-in; the result arrives later through
@@ -33,6 +32,7 @@ abstract interface class AuthRemoteDataSource {
 
   Future<AppUserModel> completeOnboarding({
     required String userId,
+    required String name,
     required String phone,
     required String username,
   });
@@ -123,13 +123,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<AppUserModel> completeOnboarding({
     required String userId,
+    required String name,
     required String phone,
     required String username,
   }) async {
     try {
       final row = await _supabase
           .from('profiles')
-          .update({'phone': phone, 'username': username})
+          .update({'name': name, 'phone': phone, 'username': username})
           .eq('id', userId)
           .select()
           .single();
@@ -141,7 +142,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on ServerException {
       rethrow;
     } on PostgrestException catch (e) {
-      if (e.code == _uniqueViolation) throw const ServerException(usernameTakenMessage);
+      if (e.code == _uniqueViolation) throw const ServerException(OnboardingValidators.usernameTaken);
       throw ServerException('Could not save your details: $e');
     } catch (e) {
       throw ServerException('Could not save your details: $e');
@@ -184,7 +185,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on ServerException {
       rethrow;
     } on PostgrestException catch (e) {
-      if (e.code == _uniqueViolation) throw const ServerException(usernameTakenMessage);
+      if (e.code == _uniqueViolation) throw const ServerException(OnboardingValidators.usernameTaken);
       throw ServerException('Could not save your profile: ${friendlyErrorMessage(e)}');
     } on StorageException catch (e) {
       throw ServerException('Could not upload your photo: ${e.message}');

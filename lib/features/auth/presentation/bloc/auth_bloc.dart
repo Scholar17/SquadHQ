@@ -116,16 +116,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
+  /// Where things stand, looking past a failed save — so after an error
+  /// (e.g. a taken mention name) the next try goes through instead of
+  /// being ignored.
+  AuthState get _settled => switch (state) {
+        AuthFailure(:final previous) => previous,
+        final state => state,
+      };
+
   Future<void> _onOnboardingSubmitted(
     AuthOnboardingSubmitted event,
     Emitter<AuthState> emit,
   ) async {
-    final current = state;
+    final current = _settled;
     if (current is! AuthNeedsOnboarding) return;
     emit(AuthLoading(current));
     final result = await _completeOnboarding(
       CompleteOnboardingParams(
         userId: current.user.id,
+        name: event.name,
         phone: event.phone,
         username: event.username,
       ),
@@ -142,7 +151,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthProfileUpdateRequested event,
     Emitter<AuthState> emit,
   ) async {
-    final current = state;
+    final current = _settled;
     if (current is! AuthAuthenticated) return;
     emit(AuthLoading(current));
     final result = await _updateProfile(
@@ -167,7 +176,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthAccountDeletionRequested event,
     Emitter<AuthState> emit,
   ) async {
-    final current = state;
+    final current = _settled;
     if (current is! AuthAuthenticated) return;
     emit(AuthLoading(current));
     final result = await _deleteAccount(const NoParams());

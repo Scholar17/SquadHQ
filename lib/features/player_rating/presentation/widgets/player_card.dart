@@ -51,6 +51,17 @@ class PlayerCardView extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(name, style: AppTextStyles.heading(size: 28, color: AppColors.onDark)),
+                    if (player?.username case final username?) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '@$username',
+                        style: AppTextStyles.body(
+                          size: 13,
+                          weight: FontWeight.w600,
+                          color: AppColors.onDarkMuted,
+                        ),
+                      ),
+                    ],
                     if (caption case final caption?) ...[
                       const SizedBox(height: 6),
                       Text(

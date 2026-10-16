@@ -65,7 +65,7 @@ class PlayerCardPage extends StatelessWidget {
                   caption: ratingCaption(rating),
                 )
               else
-                _Unrated(name: player.name, isMe: isMe),
+                _Unrated(name: player.name, username: player.username, isMe: isMe),
               if (isMe && rating != null) ...[
                 const SizedBox(height: 16),
                 _LevelUp(player: player, improving: state.improving),
@@ -79,9 +79,10 @@ class PlayerCardPage extends StatelessWidget {
 }
 
 class _Unrated extends StatelessWidget {
-  const _Unrated({required this.name, required this.isMe});
+  const _Unrated({required this.name, this.username, required this.isMe});
 
   final String name;
+  final String? username;
   final bool isMe;
 
   @override
@@ -96,6 +97,11 @@ class _Unrated extends StatelessWidget {
       child: Column(
         children: [
           Text(name, style: AppTextStyles.heading(size: 24)),
+          if (username case final username?)
+            Text(
+              '@$username',
+              style: AppTextStyles.body(size: 13, weight: FontWeight.w600, color: AppColors.textMuted),
+            ),
           const SizedBox(height: 6),
           Text(
             isMe

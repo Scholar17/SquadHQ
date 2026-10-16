@@ -9,6 +9,7 @@ import '../../domain/validators/onboarding_validators.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../widgets/username_input_formatter.dart';
 
 /// "One last thing" — collected right after social sign-in. The phone
 /// number is never a login method; it's how the squad and payment
@@ -23,23 +24,32 @@ class OnboardingPage extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
+  // Starts as the Google/Facebook name — fix it before the squad sees it.
+  late final _nameController = TextEditingController(text: widget.user.name);
   final _phoneController = TextEditingController();
   final _usernameController = TextEditingController();
 
+  String? _nameError;
   String? _phoneError;
   String? _usernameError;
   bool _touchedPhone = false;
   bool _touchedUsername = false;
 
   bool get _isValid =>
+      OnboardingValidators.nameError(_nameController.text) == null &&
       OnboardingValidators.phoneError(_phoneController.text) == null &&
       OnboardingValidators.usernameError(_usernameController.text) == null;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _phoneController.dispose();
     _usernameController.dispose();
     super.dispose();
+  }
+
+  void _onNameChanged(String value) {
+    setState(() => _nameError = OnboardingValidators.nameError(value));
   }
 
   void _onPhoneChanged(String value) {
@@ -58,6 +68,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   void _submit(BuildContext context) {
     setState(() {
+      _nameError = OnboardingValidators.nameError(_nameController.text);
       _touchedPhone = true;
       _touchedUsername = true;
       _phoneError = OnboardingValidators.phoneError(_phoneController.text);
@@ -67,8 +78,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (!_isValid) return;
     context.read<AuthBloc>().add(
           AuthOnboardingSubmitted(
+            name: _nameController.text.trim(),
             phone: '+66${_phoneController.text.replaceAll(RegExp(r'\D'), '')}',
-            username: _usernameController.text,
+            username: _usernameController.text.trim(),
           ),
         );
   }
@@ -79,6 +91,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
       listenWhen: (previous, current) => current is AuthFailure,
       listener: (context, state) {
         if (state case AuthFailure(:final message)) {
+          // Taken: under the username, where it can be fixed.
+          if (message == OnboardingValidators.usernameTaken) {
+            setState(() {
+              _touchedUsername = true;
+              _usernameError = message;
+            });
+            return;
+          }
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(content: Text(message)));
@@ -164,6 +184,45 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
+                        'YOUR NAME',
+                        style: AppTextStyles.label(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      SizedBox(
+                        height: 50,
+                        child: TextField(
+                          controller: _nameController,
+                          onChanged: _onNameChanged,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: InputDecoration(
+                            hintText: 'How your squad sees you',
+                            filled: true,
+                            fillColor: AppColors.bg,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 18),
+                            border: OutlineInputBorder(
+                              borderRadius: AppRadius.pill,
+                              borderSide: BorderSide(
+                                color: AppColors.text.withValues(alpha: 0.16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_nameError != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _nameError!,
+                          style: AppTextStyles.body(
+                            size: 11.5,
+                            color: AppColors.accent700,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text(
                         'MOBILE NUMBER',
                         style: AppTextStyles.label(
                           color: AppColors.textMuted,
@@ -230,8 +289,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ],
                       const SizedBox(height: 16),
                       Text(
-                        'USERNAME',
+                        'MENTION NAME',
                         style: AppTextStyles.label(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Teammates type @ and this to mention you in comments.',
+                        style: AppTextStyles.body(
+                          size: 11.5,
                           color: AppColors.textMuted,
                         ),
                       ),
@@ -241,6 +308,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         child: TextField(
                           controller: _usernameController,
                           onChanged: _onUsernameChanged,
+                          inputFormatters: const [UsernameInputFormatter()],
+                          autocorrect: false,
                           decoration: InputDecoration(
                             hintText: 'yourname',
                             filled: true,

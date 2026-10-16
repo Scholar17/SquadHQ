@@ -57,15 +57,17 @@ class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
 
   @override
   Future<List<RatedPlayer>> getTeamRatings(String teamId) => _guard(() async {
-    final rows = await _supabase.rpc<List<dynamic>>(
+    final rows = (await _supabase.rpc<List<dynamic>>(
       'get_team_ratings',
       params: {'p_team_id': teamId},
-    );
+    )).cast<Map<String, dynamic>>();
+    final usernames = await _usernames([for (final row in rows) row['profile_id'] as String]);
     return [
-      for (final row in rows.cast<Map<String, dynamic>>())
+      for (final row in rows)
         RatedPlayer(
           profileId: row['profile_id'] as String,
           name: row['name'] as String,
+          username: usernames[row['profile_id']],
           avatarUrl: row['avatar_url'] as String?,
           rating: _rating(row),
           apps: _int(row['apps']),
@@ -78,6 +80,24 @@ class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
         ),
     ];
   });
+
+  /// @mention names by profile id — get_team_ratings doesn't return them,
+  /// and teammates' profiles are readable. Optional: none if it fails.
+  Future<Map<String, String>> _usernames(List<String> profileIds) async {
+    if (profileIds.isEmpty) return const {};
+    try {
+      final rows = await _supabase
+          .from('profiles')
+          .select('id, username')
+          .inFilter('id', profileIds);
+      return {
+        for (final row in rows)
+          if (row['username'] case final String username) row['id'] as String: username,
+      };
+    } on PostgrestException {
+      return const {};
+    }
+  }
 
   @override
   Future<PlayerRating?> getMyRating() => _guard(() async {

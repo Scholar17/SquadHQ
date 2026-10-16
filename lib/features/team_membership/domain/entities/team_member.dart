@@ -9,14 +9,18 @@ class TeamMember extends Equatable {
     required this.profileId,
     required this.name,
     required this.role,
+    this.username,
     this.avatarUrl,
   });
 
   final String profileId;
   final String name;
   final TeamRole role;
+
+  /// Their @mention name; null if not set.
+  final String? username;
   final String? avatarUrl;
 
   @override
-  List<Object?> get props => [profileId, name, role, avatarUrl];
+  List<Object?> get props => [profileId, name, role, username, avatarUrl];
 }

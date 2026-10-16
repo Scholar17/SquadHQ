@@ -101,7 +101,7 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
           .from('team_members')
           .select(
             // '*': reminder_day only exists once 044 runs.
-            '*, profiles(name, avatar_url, wallet_qr_path, '
+            '*, profiles(name, username, avatar_url, wallet_qr_path, '
             'bank_name, bank_account_name, bank_account_no)',
           )
           .eq('team_id', teamId),
@@ -320,6 +320,7 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
       profileId: row['profile_id'] as String,
       name: profile['name'] as String? ?? 'Member',
       role: teamRoleFromDb(row['role'] as String),
+      username: profile['username'] as String?,
       avatarUrl: profile['avatar_url'] as String?,
       walletQrPath: profile['wallet_qr_path'] as String?,
       bankName: profile['bank_name'] as String?,

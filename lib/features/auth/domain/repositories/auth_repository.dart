@@ -15,6 +15,7 @@ abstract interface class AuthRepository {
 
   Future<Either<Failure, AppUser>> completeOnboarding({
     required String userId,
+    required String name,
     required String phone,
     required String username,
   });

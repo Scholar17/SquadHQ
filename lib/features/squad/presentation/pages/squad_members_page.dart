@@ -264,7 +264,12 @@ class _MemberRow extends StatelessWidget {
                   style: AppTextStyles.title(size: 15, height: 1.3),
                 ),
                 Text(
-                  member.roleLabel,
+                  [
+                    if (member.username case final username?) '@$username',
+                    member.roleLabel,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.body(size: 12, color: squadMuted, height: 1.3),
                 ),
               ],

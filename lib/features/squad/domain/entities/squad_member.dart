@@ -8,6 +8,7 @@ class SquadMember extends Equatable {
     required this.profileId,
     required this.name,
     required this.role,
+    this.username,
     this.avatarUrl,
     this.walletQrPath,
     this.bankName,
@@ -19,6 +20,9 @@ class SquadMember extends Equatable {
   final String profileId;
   final String name;
   final TeamRole role;
+
+  /// Their @mention name; null if not set.
+  final String? username;
   final String? avatarUrl;
   final String? walletQrPath;
   final String? bankName;
@@ -49,6 +53,7 @@ class SquadMember extends Equatable {
     profileId,
     name,
     role,
+    username,
     avatarUrl,
     walletQrPath,
     bankName,
