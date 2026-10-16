@@ -134,19 +134,19 @@ class _LoginPageState extends State<LoginPage> {
                                   final isLoading = state is AuthLoading;
                                   return Column(
                                     children: [
-                                      SocialLoginButton.facebook(
-                                        onPressed: isLoading
-                                            ? null
-                                            : () => context.read<AuthBloc>().add(
-                                                const AuthFacebookSignInRequested(),
-                                              ),
-                                      ),
-                                      const SizedBox(height: 10),
                                       SocialLoginButton.google(
                                         onPressed: isLoading
                                             ? null
                                             : () => context.read<AuthBloc>().add(
                                                 const AuthGoogleSignInRequested(),
+                                              ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      SocialLoginButton.facebook(
+                                        onPressed: isLoading
+                                            ? null
+                                            : () => context.read<AuthBloc>().add(
+                                                const AuthFacebookSignInRequested(),
                                               ),
                                       ),
                                       if (isLoading) ...[
