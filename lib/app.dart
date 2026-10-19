@@ -7,16 +7,19 @@ import 'package:go_router/go_router.dart';
 import 'core/di/injection_container.dart';
 import 'core/notifications/notification_routing.dart';
 import 'core/routing/app_router.dart';
+import 'core/splash/kickoff_splash.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/widgets/responsive_frame.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/presentation/bloc/auth_state.dart';
 import 'features/match/presentation/bloc/match_bloc.dart';
 import 'features/match/presentation/bloc/match_history_bloc.dart';
 import 'features/notifications/presentation/bloc/notification_bloc.dart';
 import 'features/squad/presentation/bloc/squad_ledger_bloc.dart';
 import 'features/team_membership/presentation/bloc/team_membership_bloc.dart';
+import 'features/team_membership/presentation/bloc/team_membership_state.dart';
 import 'features/wallet/presentation/bloc/wallet_bloc.dart';
 
 class SquadHqApp extends StatefulWidget {
@@ -108,7 +111,15 @@ class _SquadHqAppState extends State<SquadHqApp> with WidgetsBindingObserver {
         routerConfig: _router,
         scaffoldMessengerKey: NotificationRouting.messengerKey,
         // Tablets and desktop web: one readable column, not edge to edge.
-        builder: (context, child) => ResponsiveFrame(child: child ?? const SizedBox.shrink()),
+        // The opening splash plays over everything until the app has loaded.
+        builder: (context, child) => BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, auth) => BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
+            builder: (context, teams) => KickoffSplash(
+              loaded: startupLoaded(auth, teams),
+              child: ResponsiveFrame(child: child ?? const SizedBox.shrink()),
+            ),
+          ),
+        ),
       ),
     );
   }

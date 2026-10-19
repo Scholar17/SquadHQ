@@ -364,6 +364,15 @@ GoRouter createAppRouter(AuthBloc authBloc) {
 /// loaded — whether or not it actually has a team yet. Home itself shows
 /// an empty state with a "create or join" prompt when it doesn't; there's
 /// no separate full-screen gate for that (see DashboardPage).
+/// Whether opening the app is done: the saved session is restored and,
+/// when signed in, the team list has loaded (as [_TeamGate] waits for).
+bool startupLoaded(AuthState auth, TeamMembershipState teams) =>
+    switch (_settledAuthState(auth)) {
+      AuthRestoring() => false,
+      AuthAuthenticated() => teams is TeamMembershipLoaded,
+      _ => true,
+    };
+
 class _TeamGate extends StatefulWidget {
   const _TeamGate({required this.user, required this.navigationShell});
 
@@ -401,10 +410,6 @@ class _TeamGateState extends State<_TeamGate> {
   }
 }
 
-/// Shown while the saved session restores at start, while teams load, and
-/// for a frame or two while auth state is mid-transition. Drawn like the
-/// web page's own splash (web/index.html: the GG badge over a spinner), so
-/// opening the app is one splash, then the app.
 /// A full-screen push's [GoRouterState.extra], or — when it's gone (a
 /// reload, a typed URL) — back to Home rather than crash.
 Widget _withExtra<T>(GoRouterState state, Widget Function(T extra) build) {
@@ -433,6 +438,11 @@ class _BackHomeState extends State<_BackHome> {
   Widget build(BuildContext context) => const _SettlingPage();
 }
 
+/// Shown while the saved session restores at start, while teams load, and
+/// for a frame or two while auth state is mid-transition. Drawn like the
+/// web page's own splash (web/index.html: the GG badge over a spinner).
+/// At start it's under the KickoffSplash, which lifts once
+/// [startupLoaded].
 class _SettlingPage extends StatelessWidget {
   const _SettlingPage();
 
