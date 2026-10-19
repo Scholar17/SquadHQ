@@ -6,6 +6,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/usecases/usecase.dart';
+import '../../../notifications/domain/entities/app_notification.dart';
+import '../../../notifications/presentation/bloc/notification_bloc.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart' show formatNotificationTime;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_event.dart';
@@ -48,6 +50,22 @@ class _InvitationsPageState extends State<InvitationsPage> {
         },
       );
     });
+    _markAnsweredRead();
+  }
+
+  /// Invitation notifications for groups with nothing left to answer
+  /// (answered here or on another device, or cancelled by an admin) are
+  /// marked read, so the bell's count drops with them.
+  void _markAnsweredRead() {
+    final invites = _invites;
+    if (invites == null) return;
+    final open = {for (final invite in invites) invite.teamId};
+    final notifications = context.read<NotificationBloc>();
+    for (final item in notifications.state.items) {
+      if (item.kind == NotificationKind.groupInvite && !item.isRead && !open.contains(item.teamId)) {
+        notifications.add(NotificationOpened(item.id));
+      }
+    }
   }
 
   Future<void> _respond(GroupInvite invite, {required bool accept}) async {
@@ -63,6 +81,7 @@ class _InvitationsPageState extends State<InvitationsPage> {
         ..showSnackBar(SnackBar(content: Text(failure.message))),
       (_) {
         setState(() => _invites = [...?_invites]..remove(invite));
+        _markAnsweredRead();
         // Joined: the group list reloads with it as the active group.
         if (accept) membership.add(const TeamMembershipRefreshRequested());
         messenger
@@ -79,41 +98,46 @@ class _InvitationsPageState extends State<InvitationsPage> {
   @override
   Widget build(BuildContext context) {
     final invites = _invites;
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
+    // Notifications still loading when this opened: catch them as they come.
+    return BlocListener<NotificationBloc, NotificationState>(
+      listenWhen: (previous, current) => previous.items.length != current.items.length,
+      listener: (_, _) => _markAnsweredRead(),
+      child: Scaffold(
         backgroundColor: AppColors.bg,
-        elevation: 0,
-        foregroundColor: AppColors.text,
-        title: Text('Invitations', style: AppTextStyles.title(size: 16)),
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.accent,
-          onRefresh: _load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            children: [
-              if (invites == null && _error == null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (invites == null)
-                _Message(_error!)
-              else if (invites.isEmpty)
-                const _Message('No invitations right now.')
-              else
-                for (final invite in invites) ...[
-                  _InviteCard(
-                    invite: invite,
-                    busy: _busy == invite.id,
-                    onAccept: _busy == null ? () => _respond(invite, accept: true) : null,
-                    onDecline: _busy == null ? () => _respond(invite, accept: false) : null,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-            ],
+        appBar: AppBar(
+          backgroundColor: AppColors.bg,
+          elevation: 0,
+          foregroundColor: AppColors.text,
+          title: Text('Invitations', style: AppTextStyles.title(size: 16)),
+        ),
+        body: SafeArea(
+          child: RefreshIndicator(
+            color: AppColors.accent,
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              children: [
+                if (invites == null && _error == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (invites == null)
+                  _Message(_error!)
+                else if (invites.isEmpty)
+                  const _Message('No invitations right now.')
+                else
+                  for (final invite in invites) ...[
+                    _InviteCard(
+                      invite: invite,
+                      busy: _busy == invite.id,
+                      onAccept: _busy == null ? () => _respond(invite, accept: true) : null,
+                      onDecline: _busy == null ? () => _respond(invite, accept: false) : null,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+              ],
+            ),
           ),
         ),
       ),

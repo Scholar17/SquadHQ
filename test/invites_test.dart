@@ -9,14 +9,18 @@ import 'package:squad_hq/features/invites/presentation/pages/invitations_page.da
 import 'package:squad_hq/features/invites/presentation/widgets/group_invite_actions.dart';
 import 'package:squad_hq/features/invites/presentation/widgets/invite_people_sheet.dart';
 import 'package:squad_hq/features/notifications/domain/entities/app_notification.dart';
+import 'package:squad_hq/features/notifications/domain/repositories/notification_repository.dart';
+import 'package:squad_hq/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:squad_hq/features/team_membership/domain/entities/team.dart';
 import 'package:squad_hq/features/team_membership/presentation/bloc/team_membership_bloc.dart';
 
 import 'fake_invite_repository.dart';
+import 'fake_notification_repository.dart';
 import 'test_helpers.dart';
 
 void main() {
   final fakeInvites = FakeInviteRepository();
+  final fakeNotifications = FakeNotificationRepository();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -24,13 +28,28 @@ void main() {
     await initDependencies();
     sl
       ..unregister<InviteRepository>()
-      ..registerLazySingleton<InviteRepository>(() => fakeInvites);
+      ..registerLazySingleton<InviteRepository>(() => fakeInvites)
+      ..unregister<NotificationRepository>()
+      ..registerLazySingleton<NotificationRepository>(() => fakeNotifications);
   });
 
-  setUp(fakeInvites.reset);
+  setUp(() {
+    fakeInvites.reset();
+    fakeNotifications.reset();
+  });
 
-  Widget app(Widget child) => BlocProvider(
-    create: (_) => sl<TeamMembershipBloc>(),
+  Widget app(Widget child) => MultiBlocProvider(
+    providers: [
+      BlocProvider(create: (_) => sl<TeamMembershipBloc>()),
+      // A fresh one per test (the app's is a singleton that closing would end).
+      BlocProvider(
+        create: (_) => NotificationBloc(
+          getNotifications: sl(),
+          markNotificationsRead: sl(),
+          watchNotifications: sl(),
+        )..add(const NotificationsStarted()),
+      ),
+    ],
     child: MaterialApp(home: child),
   );
 
@@ -89,6 +108,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(fakeInvites.answers.last, ('2', false));
     expect(find.text('No invitations right now.'), findsOneWidget);
+  });
+
+  testWidgets("Answering marks the invitation's notification read, so the bell drops", (tester) async {
+    fakeInvites.invites.addAll([invite('1', 'Sunday FC'), invite('2', 'Hua Hin trip')]);
+    AppNotification notice(String id, String teamId) => AppNotification(
+      id: id,
+      kind: NotificationKind.groupInvite,
+      title: 'Aung Ko invited you',
+      body: '',
+      createdAt: DateTime.now(),
+      teamId: teamId,
+    );
+    fakeNotifications.items.addAll([notice('n-1', 'team-1'), notice('n-2', 'team-2')]);
+    await tester.pumpWidget(app(const InvitationsPage()));
+    await tester.pumpAndSettle();
+    // Both still open: both still unread.
+    expect(fakeNotifications.items.where((n) => n.isRead), isEmpty);
+
+    await tester.tap(find.text('Decline').first);
+    await tester.pumpAndSettle();
+    expect(fakeNotifications.items.firstWhere((n) => n.id == 'n-1').isRead, isTrue);
+    expect(fakeNotifications.items.firstWhere((n) => n.id == 'n-2').isRead, isFalse);
   });
 
   testWidgets('A refused answer (say, already in 3 teams) keeps the invitation', (tester) async {
