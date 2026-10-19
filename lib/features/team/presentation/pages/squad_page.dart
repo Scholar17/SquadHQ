@@ -153,7 +153,7 @@ class _SquadViewState extends State<_SquadView> {
                   if (mine != null && mine.canImprove) ...[
                     _Callout(
                       title: '${RatedPlayer.boostEvery} matches played',
-                      body: 'Level up your card from the goals, assists and saves you logged.',
+                      body: 'Level up your card from your after-match answers, wins and MOTM votes.',
                       action: state.improving ? 'Levelling up…' : 'Level up',
                       onAction: state.improving
                           ? null

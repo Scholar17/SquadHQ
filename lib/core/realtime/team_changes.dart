@@ -30,6 +30,9 @@ enum TeamTable {
   matchComments('match_comments'),
   paymentPromises('payment_promises'),
 
+  /// Game scores inside a match (053). Unfiltered, like matchComments.
+  matchGames('match_games'),
+
   /// Someone left or was removed (051). Emitted as [teamMembers]: Realtime
   /// doesn't send team_members deletes to a team-filtered listener, so this
   /// insert is how they arrive.
@@ -39,7 +42,7 @@ enum TeamTable {
 
   final String dbName;
 
-  /// Added by later migrations (032, 036, 037, 043, 044, 051): each on its own channel, so
+  /// Added by later migrations (032, 036, 037, 043, 044, 051, 053): each on its own channel, so
   /// one not yet enabled for Realtime on a server can't stop the rest — a
   /// channel with any unknown table fails as a whole.
   static const separate = {
@@ -49,6 +52,7 @@ enum TeamTable {
     matchComments,
     paymentPromises,
     memberDepartures,
+    matchGames,
   };
 }
 

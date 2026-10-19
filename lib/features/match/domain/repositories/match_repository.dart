@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../entities/match.dart';
 import '../entities/match_history.dart';
+import '../entities/match_questions.dart';
 import '../entities/matchday_player.dart';
 
 abstract interface class MatchRepository {
@@ -33,7 +34,8 @@ abstract interface class MatchRepository {
     int? playersNeeded,
   });
 
-  /// Same admin-only rule as [updateMatch] — see `delete_match`.
+  /// Any team admin, at any time — even after the match (053's
+  /// `delete_match`). Its RSVPs, games, answers, votes and bill go too.
   Future<Either<Failure, Unit>> deleteMatch(String matchId);
 
   /// Every member of [teamId], each with their RSVP to [matchId] (null if
@@ -52,13 +54,31 @@ abstract interface class MatchRepository {
   /// [teamId]'s matches that have kicked off, newest first.
   Future<Either<Failure, MatchHistory>> getMatchHistory(String teamId);
 
-  /// Admin-only, and only once the match has kicked off — see
-  /// `set_match_score` in supabase/sql/009_match_scores_and_motm.sql.
-  Future<Either<Failure, Unit>> setMatchScore({
+  /// Saves game [gameNo] of [matchId] — null adds the next game. Null
+  /// scores = "Not sure". Players in the match, from kickoff until the
+  /// questions close (`save_match_game`, 053).
+  Future<Either<Failure, Unit>> saveMatchGame({
     required String matchId,
-    required int ourScore,
-    required int theirScore,
+    int? gameNo,
+    int? ourScore,
+    int? theirScore,
   });
+
+  /// Removes the last game (`remove_match_game`).
+  Future<Either<Failure, Unit>> removeMatchGame({required String matchId, required int gameNo});
+
+  /// A Maybe player's "Did you play today?" (`set_match_played`).
+  Future<Either<Failure, Unit>> setMatchPlayed({required String matchId, required bool played});
+
+  /// Saves or changes the caller's after-match answers
+  /// (`submit_match_answers`).
+  Future<Either<Failure, Unit>> submitMatchAnswers({
+    required String matchId,
+    required MatchAnswers answers,
+  });
+
+  /// The caller's answers to [matchId] so far, or null.
+  Future<Either<Failure, MatchAnswers?>> getMyMatchAnswers(String matchId);
 
   /// The caller's Man of the Match vote — see `vote_motm`.
   Future<Either<Failure, Unit>> voteMotm({

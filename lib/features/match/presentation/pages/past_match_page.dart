@@ -6,20 +6,26 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../comments/domain/entities/match_topic.dart';
 import '../../../comments/presentation/widgets/match_comments.dart';
-import '../../../player_rating/presentation/widgets/match_stats_card.dart';
+import '../../../../core/clock/clock_scope.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
+import '../../../wallet/presentation/bloc/wallet_event.dart';
 import '../../../wallet/presentation/bloc/wallet_state.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_history.dart';
+import '../../domain/entities/match_questions.dart';
 import '../../domain/entities/matchday_player.dart';
 import '../bloc/match_history_bloc.dart';
 import '../match_formatting.dart';
+import '../widgets/cancel_match_dialog.dart';
+import '../widgets/match_games_card.dart';
 import '../widgets/match_history_widgets.dart';
+import 'match_questions_page.dart';
 
-/// One past match: its score (admins in the Manager view can record it),
-/// the Man of the Match vote, who played, and its bill. Reads the
-/// [MatchHistoryBloc] the history page hands down.
+/// One match that has kicked off: its games (anyone in it fills in the
+/// scores), "Rate your game", the Man of the Match vote, who played, and
+/// its bill. Admins in the Manager view can cancel it. Reads the app-root
+/// [MatchHistoryBloc].
 class PastMatchPage extends StatelessWidget {
   const PastMatchPage({
     super.key,
@@ -34,6 +40,19 @@ class PastMatchPage extends StatelessWidget {
   final String userId;
   final bool isManager;
 
+  Future<void> _cancel(BuildContext context) async {
+    final pastMatch = context.read<MatchHistoryBloc>().state.history?.forMatch(matchId);
+    if (pastMatch == null) return;
+    final confirmed = await confirmCancelMatch(
+      context,
+      opponent: pastMatch.match.opponent,
+      walletMatch: context.read<WalletBloc>().state.wallet?.forMatch(matchId),
+    );
+    if (confirmed && context.mounted) {
+      context.read<MatchHistoryBloc>().add(PastMatchCancelled(matchId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -43,15 +62,32 @@ class PastMatchPage extends StatelessWidget {
         elevation: 0,
         foregroundColor: AppColors.text,
         title: Text('Match details', style: AppTextStyles.title(size: 16)),
+        actions: [
+          if (isManager)
+            PopupMenuButton<void>(
+              tooltip: 'More',
+              itemBuilder: (_) => [
+                PopupMenuItem(onTap: () => _cancel(context), child: const Text('Cancel match')),
+              ],
+            ),
+        ],
       ),
       body: BlocConsumer<MatchHistoryBloc, MatchHistoryState>(
-        listenWhen: (previous, current) => current is MatchHistoryFailure,
+        listenWhen: (previous, current) =>
+            current is MatchHistoryFailure ||
+            // Cancelled (here, or by another admin): nothing left to show.
+            (previous.history?.forMatch(matchId) != null &&
+                current is MatchHistoryLoaded &&
+                current.history.forMatch(matchId) == null),
         listener: (context, state) {
           if (state case MatchHistoryFailure(:final message)) {
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
               ..showSnackBar(SnackBar(content: Text(message)));
+            return;
           }
+          context.read<WalletBloc>().add(const WalletRefreshRequested());
+          Navigator.of(context).maybePop();
         },
         builder: (context, state) {
           final history = state.history;
@@ -66,12 +102,17 @@ class PastMatchPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             children: [
-              _ScoreHeader(
-                pastMatch: pastMatch,
-                teamName: teamName,
-                canEdit: isManager,
-              ),
+              _ScoreHeader(pastMatch: pastMatch, teamName: teamName),
               const SizedBox(height: 16),
+              MatchGamesCard(
+                pastMatch: pastMatch,
+                history: history,
+                teamName: teamName,
+                userId: userId,
+              ),
+              const SizedBox(height: 12),
+              _RateYourGame(pastMatch: pastMatch, history: history, userId: userId),
+              const SizedBox(height: 12),
               _MotmCard(
                 // Keyed by match so its edit state never leaks between matches.
                 key: ValueKey('motm-$matchId'),
@@ -88,7 +129,7 @@ class PastMatchPage extends StatelessWidget {
               const SizedBox(height: 10),
               if (played.isEmpty)
                 Text(
-                  'No one RSVP\'d "In" for this match.',
+                  'No one said they played this match.',
                   style: AppTextStyles.body(
                     size: 12.5,
                     color: AppColors.textMuted,
@@ -112,12 +153,6 @@ class PastMatchPage extends StatelessWidget {
                       ),
                   ],
                 ),
-              // Played and finished: log your goals / assists / saves.
-              if (pastMatch.playedIds.contains(userId) &&
-                  pastMatch.match.endsAt.isBefore(DateTime.now())) ...[
-                const SizedBox(height: 16),
-                MatchStatsCard(key: ValueKey('stats-$matchId'), matchId: matchId),
-              ],
               _PastMatchBill(matchId: matchId, userId: userId, isManager: isManager),
               const SizedBox(height: 16),
               MatchCommentsButton(
@@ -137,21 +172,18 @@ class PastMatchPage extends StatelessWidget {
 }
 
 class _ScoreHeader extends StatelessWidget {
-  const _ScoreHeader({
-    required this.pastMatch,
-    required this.teamName,
-    required this.canEdit,
-  });
+  const _ScoreHeader({required this.pastMatch, required this.teamName});
 
   final PastMatch pastMatch;
   final String teamName;
-  final bool canEdit;
 
   @override
   Widget build(BuildContext context) {
     final match = pastMatch.match;
-    final result = match.result;
+    // An old match's one score, from before games (009).
+    final result = pastMatch.games.isEmpty ? match.result : null;
     final muted = AppColors.onDarkMuted;
+    final now = ClockScope.now(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -212,185 +244,82 @@ class _ScoreHeader extends StatelessWidget {
             )
           else
             Text(
-              canEdit ? 'No score yet — add it below.' : 'No score recorded yet.',
-              style: AppTextStyles.body(size: 12.5, weight: FontWeight.w600, color: muted),
+              pastMatch.games.isNotEmpty
+                  ? gamesSummary(pastMatch.games, shown: 4)
+                  : now.isBefore(match.endsAt)
+                  ? 'Playing now'
+                  : 'No game scores yet',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: AppColors.onDark),
             ),
-          if (canEdit) ...[
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: () => _showScoreSheet(context, pastMatch, teamName),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.onDark,
-                side: const BorderSide(color: Color(0x47F9F4ED)),
-                shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                minimumSize: const Size(0, 34),
-              ),
-              child: Text(
-                result == null ? 'Add score' : 'Edit score',
-                style: AppTextStyles.title(size: 12.5, color: AppColors.onDark),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-Future<void> _showScoreSheet(BuildContext context, PastMatch pastMatch, String teamName) {
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: AppRadius.sheet,
-    ),
-    builder: (_) => BlocProvider.value(
-      value: context.read<MatchHistoryBloc>(),
-      child: _ScoreSheet(pastMatch: pastMatch, teamName: teamName),
-    ),
-  );
-}
-
-class _ScoreSheet extends StatefulWidget {
-  const _ScoreSheet({required this.pastMatch, required this.teamName});
+/// RATE YOUR GAME: the after-match questions for a Yes / Maybe player —
+/// "Start", then "Done" with a way to change the answers until they close.
+class _RateYourGame extends StatelessWidget {
+  const _RateYourGame({required this.pastMatch, required this.history, required this.userId});
 
   final PastMatch pastMatch;
-  final String teamName;
-
-  @override
-  State<_ScoreSheet> createState() => _ScoreSheetState();
-}
-
-class _ScoreSheetState extends State<_ScoreSheet> {
-  late int _ours = widget.pastMatch.match.ourScore ?? 0;
-  late int _theirs = widget.pastMatch.match.theirScore ?? 0;
+  final MatchHistory history;
+  final String userId;
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<MatchHistoryBloc, MatchHistoryState>(
-      listenWhen: (previous, current) =>
-          current is MatchHistoryFailure ||
-          (previous is MatchHistorySubmitting && current is MatchHistoryLoaded),
-      listener: (context, state) {
-        if (state case MatchHistoryFailure(:final message)) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(message)));
-          return;
-        }
-        Navigator.of(context).pop();
-      },
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Final score', style: AppTextStyles.title(size: 18)),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ScoreStepper(
-                      label: widget.teamName,
-                      value: _ours,
-                      onChanged: (value) => setState(() => _ours = value),
-                    ),
-                  ),
-                  Text('–', style: AppTextStyles.heading(size: 26)),
-                  Expanded(
-                    child: _ScoreStepper(
-                      label: widget.pastMatch.match.opponent,
-                      value: _theirs,
-                      onChanged: (value) => setState(() => _theirs = value),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              BlocBuilder<MatchHistoryBloc, MatchHistoryState>(
-                builder: (context, state) {
-                  final isSubmitting = state is MatchHistorySubmitting;
-                  return SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () => context.read<MatchHistoryBloc>().add(
-                                MatchScoreSubmitted(
-                                  matchId: widget.pastMatch.match.id,
-                                  ourScore: _ours,
-                                  theirScore: _theirs,
-                                ),
-                              ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.onDark,
-                        disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        isSubmitting ? 'Saving…' : 'Save score',
-                        style: AppTextStyles.title(size: 14, color: AppColors.onDark),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+    final now = ClockScope.now(context);
+    final open = history.canAnswerQuestions(pastMatch, userId, now);
+    final answered = pastMatch.answeredByMe;
+    if (!open && !answered) return const SizedBox.shrink();
+    final closes = history.questionsCloseAt(pastMatch);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: answered ? AppColors.card : AppColors.accent100,
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
       ),
-    );
-  }
-}
-
-class _ScoreStepper extends StatelessWidget {
-  const _ScoreStepper({required this.label, required this.value, required this.onChanged});
-
-  final String label;
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton.filledTonal(
-              onPressed: value > 0 ? () => onChanged(value - 1) : null,
-              icon: const Icon(Icons.remove_rounded),
-              tooltip: 'Minus one for $label',
+      child: Row(
+        children: [
+          Icon(
+            answered ? Icons.check_circle_rounded : Icons.quiz_rounded,
+            size: 20,
+            color: answered ? AppColors.accent2_700 : AppColors.accent700,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(answered ? 'Rate your game · Done' : 'Rate your game', style: AppTextStyles.title(size: 14)),
+                Text(
+                  open
+                      ? '4 quick questions · open until ${formatMatchDate(closes.subtract(const Duration(minutes: 1)))}'
+                      : 'Counts toward your next level-up.',
+                  style: AppTextStyles.body(size: 12, color: AppColors.textMuted),
+                ),
+              ],
             ),
-            SizedBox(
-              width: 44,
+          ),
+          if (open)
+            TextButton(
+              onPressed: () => showMatchQuestions(context, matchId: pastMatch.match.id, userId: userId),
+              style: TextButton.styleFrom(
+                foregroundColor: answered ? AppColors.text : AppColors.onDark,
+                backgroundColor: answered ? AppColors.neutral200 : AppColors.accent,
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                minimumSize: const Size(0, 32),
+              ),
               child: Text(
-                '$value',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.heading(size: 30),
+                answered ? 'Change' : 'Start',
+                style: AppTextStyles.title(size: 12.5, color: answered ? AppColors.text : AppColors.onDark),
               ),
             ),
-            IconButton.filledTonal(
-              onPressed: value < 99 ? () => onChanged(value + 1) : null,
-              icon: const Icon(Icons.add_rounded),
-              tooltip: 'Plus one for $label',
-            ),
-          ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

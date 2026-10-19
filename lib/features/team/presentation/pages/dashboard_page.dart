@@ -17,8 +17,10 @@ import '../../../match/domain/entities/matchday_player.dart' show RsvpAnswer;
 import '../../../match/presentation/bloc/match_bloc.dart';
 import '../../../match/presentation/bloc/match_history_bloc.dart';
 import '../../../match/presentation/match_formatting.dart';
+import '../../../match/domain/entities/match_questions.dart';
 import '../../../match/presentation/pages/match_history_page.dart'
     show MatchHistoryArgs, ResultScore;
+import '../../../match/presentation/pages/match_questions_page.dart';
 import '../../../match/presentation/pages/past_match_page.dart';
 import '../../../match/presentation/bloc/match_state.dart';
 import '../../../match/presentation/widgets/create_match_sheet.dart';
@@ -275,9 +277,9 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-/// Home's "After the match" section: a recap per match that finished in
-/// the last week (kick-off + play time has passed) — result, Man of the
-/// Match vote, and the viewer's unpaid fee. Shows up to [previewCount],
+/// Home's "After the match" section: a recap per match from kickoff until
+/// a week after it finished — game scores, the Man of the Match vote,
+/// "Rate your game" and the viewer's unpaid fee. Shows up to [previewCount],
 /// with "See all matches" (the match history) once there are more.
 class _AfterTheMatch extends StatelessWidget {
   const _AfterTheMatch({
@@ -309,8 +311,8 @@ class _AfterTheMatch extends StatelessWidget {
             label,
             const SizedBox(height: 8),
             Text(
-              'Once a match finishes, its result, the Man of the Match vote and '
-              'your match fee show up here.',
+              'Once a match kicks off, its game scores show up here — then the '
+              'Man of the Match vote, your after-match questions and your match fee.',
               style: AppTextStyles.body(
                 size: 12.5,
                 weight: FontWeight.w500,
@@ -347,9 +349,13 @@ class _AfterTheMatch extends StatelessWidget {
                 ),
               ),
             ),
+            onRate: () => showMatchQuestions(
+              context,
+              matchId: recap.pastMatch.match.id,
+              userId: userId,
+            ),
             // Paying lives in the Wallet tab only.
             onPay: () => context.go(AppRoutes.wallet),
-            canAddScore: isManager,
           ),
         ],
         if (recaps.length > previewCount) ...[
@@ -386,15 +392,15 @@ class _RecapCard extends StatelessWidget {
     required this.recap,
     required this.history,
     required this.onOpen,
+    required this.onRate,
     required this.onPay,
-    required this.canAddScore,
   });
 
   final MatchRecap recap;
   final MatchHistory history;
   final VoidCallback onOpen;
+  final VoidCallback onRate;
   final VoidCallback onPay;
-  final bool canAddScore;
 
   @override
   Widget build(BuildContext context) {
@@ -453,16 +459,24 @@ class _RecapCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (match.result != null)
+                  if (pastMatch.games.isNotEmpty)
+                    Text(gamesSummary(pastMatch.games), style: AppTextStyles.title(size: 14))
+                  else if (match.result != null)
                     ResultScore(match: match)
-                  else if (canAddScore)
-                    _PillButton(label: 'Add score', onPressed: onOpen)
                   else
                     Text('No score yet', style: muted),
                 ],
               ),
               const SizedBox(height: 12),
-              if (recap.needsMotmVote)
+              if (now.isBefore(match.endsAt))
+                _ActionRow(
+                  icon: Icons.sports_soccer_rounded,
+                  iconColor: AppColors.accent700,
+                  text: 'Playing now — fill in the game scores',
+                  highlight: true,
+                  action: _PillButton(label: 'Scores', onPressed: onOpen),
+                )
+              else if (recap.needsMotmVote)
                 _ActionRow(
                   icon: Icons.emoji_events_rounded,
                   iconColor: AppColors.teamGold,
@@ -476,6 +490,23 @@ class _RecapCard extends StatelessWidget {
                   iconColor: AppColors.teamGold,
                   text: motmText,
                 ),
+              if (recap.needsAnswers) ...[
+                const SizedBox(height: 8),
+                _ActionRow(
+                  icon: Icons.quiz_rounded,
+                  iconColor: AppColors.accent700,
+                  text: 'Rate your game — 4 quick questions',
+                  highlight: true,
+                  action: _PillButton(label: 'Start', primary: true, onPressed: onRate),
+                ),
+              ] else if (pastMatch.answeredByMe && !now.isBefore(match.endsAt)) ...[
+                const SizedBox(height: 8),
+                _ActionRow(
+                  icon: Icons.check_circle_rounded,
+                  iconColor: AppColors.accent2_700,
+                  text: 'Rate your game · Done',
+                ),
+              ],
               if (owed != null) ...[
                 const SizedBox(height: 8),
                 _ActionRow(

@@ -18,13 +18,10 @@ abstract interface class PlayerRatingRemoteDataSource {
   });
 
   Future<PlayerRating> improveRating();
-
-  Future<MatchStats> getMyMatchStats(String matchId);
-
-  Future<void> logMatchStats(String matchId, MatchStats stats);
 }
 
-/// supabase/sql/045_player_ratings.sql and 046_fair_level_ups.sql.
+/// supabase/sql/045_player_ratings.sql, 046_fair_level_ups.sql and
+/// 053_match_questions.sql.
 class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
   PlayerRatingRemoteDataSourceImpl({required SupabaseClient supabaseClient})
     : _supabase = supabaseClient;
@@ -52,6 +49,19 @@ class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
       ovr: _int(row['ovr']),
       ratedAt: DateTime.parse(row['rated_at'] as String),
       improvements: _int(row['improvements']),
+      lastBoost: [
+        for (final part in (row['last_boost'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>())
+          if (StatKey.values.where((key) => key.name == part['stat']).firstOrNull case final stat?)
+            BoostPart(
+              stat: stat,
+              points: _int(part['points']),
+              source: BoostSource.fromDb(part['source'] as String?),
+            ),
+      ],
+      droppedAt: switch (row['dropped_at']) {
+        final String at => DateTime.parse(at),
+        _ => null,
+      },
     );
   }
 
@@ -76,6 +86,8 @@ class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
           saves: _int(row['saves']),
           tackles: _int(row['tackles']),
           cleanSheets: _int(row['clean_sheets']),
+          motmWins: _int(row['motm_wins']),
+          gamesWon: _int(row['games_won']),
           progress: _int(row['progress']),
         ),
     ];
@@ -156,40 +168,4 @@ class PlayerRatingRemoteDataSourceImpl implements PlayerRatingRemoteDataSource {
     final row = await _supabase.rpc<Map<String, dynamic>>('improve_player_rating');
     return _rating(row)!;
   });
-
-  @override
-  Future<MatchStats> getMyMatchStats(String matchId) => _guard(() async {
-    final rows = await _supabase.rpc<List<dynamic>>(
-      'get_my_match_stats',
-      params: {'p_match_id': matchId},
-    );
-    if (rows.isEmpty) return const MatchStats();
-    final row = rows.first as Map<String, dynamic>;
-    return MatchStats(
-      goals: _int(row['goals']),
-      assists: _int(row['assists']),
-      saves: _int(row['saves']),
-      tackles: _int(row['tackles']),
-      logged: row['logged'] as bool? ?? false,
-      cleanSheet: row['clean_sheet'] as bool?,
-      group: switch (row['position_group']) {
-        final String group => PositionGroup.fromDb(group),
-        _ => null,
-      },
-    );
-  });
-
-  @override
-  Future<void> logMatchStats(String matchId, MatchStats stats) => _guard(
-    () => _supabase.rpc(
-      'log_match_stats',
-      params: {
-        'p_match_id': matchId,
-        'p_goals': stats.goals,
-        'p_assists': stats.assists,
-        'p_saves': stats.saves,
-        'p_tackles': stats.tackles,
-      },
-    ),
-  );
 }

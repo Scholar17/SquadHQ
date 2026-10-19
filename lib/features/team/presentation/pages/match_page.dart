@@ -26,6 +26,7 @@ import '../../../match/presentation/bloc/matchday_event.dart';
 import '../../../match/presentation/bloc/matchday_state.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../../match/presentation/pages/match_history_page.dart';
+import '../../../match/presentation/widgets/cancel_match_dialog.dart';
 import '../../../match/presentation/widgets/match_history_widgets.dart';
 import '../../../match/presentation/widgets/create_match_sheet.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
@@ -321,24 +322,12 @@ class _MatchdayView extends StatelessWidget {
   };
 
   Future<void> _confirmCancel(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel match?'),
-        content: Text('This removes the match vs ${match.opponent} and everyone\'s RSVPs.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Cancel match'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmCancelMatch(
+      context,
+      opponent: match.opponent,
+      walletMatch: context.read<WalletBloc>().state.wallet?.forMatch(match.id),
     );
-    if (confirmed == true && context.mounted) {
+    if (confirmed && context.mounted) {
       context.read<MatchBloc>().add(MatchDeleteRequested(match.id));
     }
   }
@@ -451,9 +440,8 @@ class _MatchdayView extends StatelessWidget {
                 ),
               ),
             ],
-            // Only the admin who created the match can cancel it
-            // (`delete_match` enforces the same).
-            if (isManager && match.createdBy == userId) ...[
+            // Any team admin can cancel (`delete_match`, 053).
+            if (isManager) ...[
               const SizedBox(height: 20),
               Center(
                 child: TextButton(

@@ -14,15 +14,24 @@ import '../../wallet/domain/entities/team_wallet.dart';
 import '../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../wallet/presentation/bloc/wallet_state.dart';
 
-/// A finished match worth recapping on Home: its result, the Man of the
-/// Match vote, and the viewer's unpaid share of its bill, if any.
+/// A match worth recapping on Home, from kickoff: its game scores, the
+/// Man of the Match vote, the after-match questions, and the viewer's
+/// unpaid share of its bill, if any.
 class MatchRecap {
-  const MatchRecap({required this.pastMatch, required this.needsMotmVote, this.owed});
+  const MatchRecap({
+    required this.pastMatch,
+    required this.needsMotmVote,
+    this.needsAnswers = false,
+    this.owed,
+  });
 
   final PastMatch pastMatch;
 
   /// Voting is open, and the viewer played but hasn't voted yet.
   final bool needsMotmVote;
+
+  /// The questions are open, and the viewer hasn't answered them yet.
+  final bool needsAnswers;
 
   /// The viewer's unpaid share of this match's bill.
   final (WalletMatch, BillSplit)? owed;
@@ -36,13 +45,15 @@ class PendingActions {
     this.recaps = const [],
     this.rsvpNeeded = false,
     this.motmVotesNeeded = 0,
+    this.answersNeeded = 0,
     this.feesOwed = 0,
   });
 
   /// How long after a match ends it stays in Home's recaps.
   static const recapWindow = Duration(days: 7);
 
-  /// Finished matches within [recapWindow], newest first.
+  /// Matches from kickoff until [recapWindow] after they finish, newest
+  /// first.
   final List<MatchRecap> recaps;
 
   /// The next match still needs the viewer's RSVP (Player view only).
@@ -51,17 +62,21 @@ class PendingActions {
   /// Recapped matches whose Man of the Match the viewer can still vote on.
   final int motmVotesNeeded;
 
+  /// Recapped matches whose questions the viewer still has to answer.
+  final int answersNeeded;
+
   /// Bills for finished matches (of any age) the viewer hasn't paid their
   /// share of. A bill for a match that hasn't finished doesn't nag yet.
   final int feesOwed;
 
-  int get total => (rsvpNeeded ? 1 : 0) + motmVotesNeeded + feesOwed;
+  int get total => (rsvpNeeded ? 1 : 0) + motmVotesNeeded + answersNeeded + feesOwed;
 
   /// Match tab: only the next match's RSVP.
   bool get matchTabAlert => rsvpNeeded;
 
-  /// Home tab: anything to do after a match — vote MOTM or pay a fee.
-  bool get homeTabAlert => motmVotesNeeded > 0 || feesOwed > 0;
+  /// Home tab: anything to do after a match — vote MOTM, rate your game
+  /// or pay a fee.
+  bool get homeTabAlert => motmVotesNeeded > 0 || answersNeeded > 0 || feesOwed > 0;
 
   /// Wallet tab: a fee to pay (the only place with a Pay button).
   bool get walletTabAlert => feesOwed > 0;
@@ -111,13 +126,15 @@ class PendingActions {
     if (history != null) {
       for (final pastMatch in history.matches) {
         final endsAt = pastMatch.match.endsAt;
-        if (endsAt.isAfter(now) || now.difference(endsAt) > recapWindow) continue;
+        if (now.isBefore(pastMatch.match.kickoffAt) || now.difference(endsAt) > recapWindow) continue;
         recaps.add(
           MatchRecap(
             pastMatch: pastMatch,
             needsMotmVote:
                 !pastMatch.motmVotes.containsKey(userId) &&
                 history.canVoteMotm(pastMatch, userId, now),
+            needsAnswers:
+                !pastMatch.answeredByMe && history.canAnswerQuestions(pastMatch, userId, now),
             owed: owedByMatch[pastMatch.match.id],
           ),
         );
@@ -136,6 +153,7 @@ class PendingActions {
       recaps: recaps,
       rsvpNeeded: rsvpNeeded,
       motmVotesNeeded: recaps.where((recap) => recap.needsMotmVote).length,
+      answersNeeded: recaps.where((recap) => recap.needsAnswers).length,
       feesOwed: owed.length,
     );
   }

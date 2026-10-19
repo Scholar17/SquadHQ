@@ -1,13 +1,16 @@
 import 'dart:async';
 
+import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/error/failures.dart';
 import '../../../../core/realtime/team_changes.dart';
 
 import '../../domain/entities/match_history.dart';
+import '../../domain/usecases/delete_match.dart';
 import '../../domain/usecases/get_match_history.dart';
-import '../../domain/usecases/set_match_score.dart';
+import '../../domain/usecases/match_after_game.dart';
 import '../../domain/usecases/vote_motm.dart';
 
 sealed class MatchHistoryEvent extends Equatable {
@@ -39,19 +42,37 @@ final class MatchHistoryStarted extends MatchHistoryEvent {
   List<Object?> get props => [done];
 }
 
-final class MatchScoreSubmitted extends MatchHistoryEvent {
-  const MatchScoreSubmitted({
-    required this.matchId,
-    required this.ourScore,
-    required this.theirScore,
-  });
+/// Saves game [gameNo] (null adds the next one); null scores = Not sure.
+final class MatchGameSaved extends MatchHistoryEvent {
+  const MatchGameSaved({required this.matchId, this.gameNo, this.ourScore, this.theirScore});
 
   final String matchId;
-  final int ourScore;
-  final int theirScore;
+  final int? gameNo;
+  final int? ourScore;
+  final int? theirScore;
 
   @override
-  List<Object?> get props => [matchId, ourScore, theirScore];
+  List<Object?> get props => [matchId, gameNo, ourScore, theirScore];
+}
+
+final class MatchGameRemoved extends MatchHistoryEvent {
+  const MatchGameRemoved({required this.matchId, required this.gameNo});
+
+  final String matchId;
+  final int gameNo;
+
+  @override
+  List<Object?> get props => [matchId, gameNo];
+}
+
+/// An admin cancels a match that has already kicked off.
+final class PastMatchCancelled extends MatchHistoryEvent {
+  const PastMatchCancelled(this.matchId);
+
+  final String matchId;
+
+  @override
+  List<Object?> get props => [matchId];
 }
 
 final class MotmVoteSubmitted extends MatchHistoryEvent {
@@ -122,11 +143,15 @@ extension MatchHistoryStateX on MatchHistoryState {
 class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
   MatchHistoryBloc({
     required GetMatchHistory getMatchHistory,
-    required SetMatchScore setMatchScore,
+    required SaveMatchGame saveMatchGame,
+    required RemoveMatchGame removeMatchGame,
+    required DeleteMatch deleteMatch,
     required VoteMotm voteMotm,
     required TeamChanges teamChanges,
   }) : _getMatchHistory = getMatchHistory,
-       _setMatchScore = setMatchScore,
+       _saveMatchGame = saveMatchGame,
+       _removeMatchGame = removeMatchGame,
+       _deleteMatch = deleteMatch,
        _voteMotm = voteMotm,
        super(const MatchHistoryLoading()) {
     _serverChanges = TeamChangeWatcher(
@@ -137,6 +162,7 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
         TeamTable.matches,
         TeamTable.matchRsvps,
         TeamTable.motmVotes,
+        TeamTable.matchGames,
       },
       onChange: () {
         if (!isClosed) add(const MatchHistoryStarted());
@@ -144,16 +170,20 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     );
     on<MatchHistoryTeamSelected>(_onTeamSelected);
     on<MatchHistoryStarted>(_onStarted);
-    on<MatchScoreSubmitted>(_onScoreSubmitted);
+    on<MatchGameSaved>(_onGameSaved);
+    on<MatchGameRemoved>(_onGameRemoved);
+    on<PastMatchCancelled>(_onCancelled);
     on<MotmVoteSubmitted>(_onMotmVoteSubmitted);
   }
 
   String? _teamId;
   final GetMatchHistory _getMatchHistory;
-  final SetMatchScore _setMatchScore;
+  final SaveMatchGame _saveMatchGame;
+  final RemoveMatchGame _removeMatchGame;
+  final DeleteMatch _deleteMatch;
   final VoteMotm _voteMotm;
 
-  /// Reloads when a score, MOTM vote, RSVP or the squad changes.
+  /// Reloads when a game score, MOTM vote, RSVP or the squad changes.
   late final TeamChangeWatcher _serverChanges;
 
   @override
@@ -200,21 +230,35 @@ class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
     }
   }
 
-  Future<void> _onScoreSubmitted(MatchScoreSubmitted event, Emitter<MatchHistoryState> emit) async {
+  /// Runs [action] behind a Submitting state, then reloads.
+  Future<void> _submit(
+    Emitter<MatchHistoryState> emit,
+    Future<Either<Failure, Unit>> Function() action,
+  ) async {
     final fallback = _fallback;
     emit(MatchHistorySubmitting(fallback));
-    final result = await _setMatchScore(
-      SetMatchScoreParams(
-        matchId: event.matchId,
-        ourScore: event.ourScore,
-        theirScore: event.theirScore,
-      ),
-    );
+    final result = await action();
     await result.fold(
       (failure) async => emit(MatchHistoryFailure(failure.message, fallback)),
       (_) => _reload(emit),
     );
   }
+
+  Future<void> _onGameSaved(MatchGameSaved event, Emitter<MatchHistoryState> emit) => _submit(
+    emit,
+    () => _saveMatchGame((
+      matchId: event.matchId,
+      gameNo: event.gameNo,
+      ourScore: event.ourScore,
+      theirScore: event.theirScore,
+    )),
+  );
+
+  Future<void> _onGameRemoved(MatchGameRemoved event, Emitter<MatchHistoryState> emit) =>
+      _submit(emit, () => _removeMatchGame((matchId: event.matchId, gameNo: event.gameNo)));
+
+  Future<void> _onCancelled(PastMatchCancelled event, Emitter<MatchHistoryState> emit) =>
+      _submit(emit, () => _deleteMatch(event.matchId));
 
   Future<void> _onMotmVoteSubmitted(
     MotmVoteSubmitted event,

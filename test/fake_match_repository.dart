@@ -3,6 +3,7 @@ import 'package:dartz/dartz.dart';
 import 'package:squad_hq/core/error/failures.dart';
 import 'package:squad_hq/features/match/domain/entities/match.dart';
 import 'package:squad_hq/features/match/domain/entities/match_history.dart';
+import 'package:squad_hq/features/match/domain/entities/match_questions.dart';
 import 'package:squad_hq/features/match/domain/entities/matchday_player.dart';
 import 'package:squad_hq/features/match/domain/repositories/match_repository.dart';
 
@@ -27,6 +28,15 @@ class FakeMatchRepository implements MatchRepository {
   final motmVotes = <String, Map<String, String>>{};
   late List<MatchdayPlayer> _squad;
   final _answers = <(String, String), RsvpAnswer>{};
+
+  /// Game scores: match id → its games, in order.
+  final games = <String, List<MatchGame>>{};
+
+  /// Maybe players' "Did you play?": (match id, profile id) → answer.
+  final played = <(String, String), bool>{};
+
+  /// The signed-in player's after-match answers, by match id.
+  final myAnswers = <String, MatchAnswers>{};
 
   /// Read by FakeWalletRepository, which (like the real wallet) sees the
   /// same matches, squad and RSVPs.
@@ -59,6 +69,9 @@ class FakeMatchRepository implements MatchRepository {
 
   void reset() {
     nudged.clear();
+    games.clear();
+    played.clear();
+    myAnswers.clear();
     _matches = [
       Match(
         id: 'match-1',
@@ -162,6 +175,7 @@ class FakeMatchRepository implements MatchRepository {
   @override
   Future<Either<Failure, Unit>> deleteMatch(String matchId) async {
     _matches = _matches.where((match) => match.id != matchId).toList();
+    pastMatches = pastMatches.where((match) => match.id != matchId).toList();
     return const Right(unit);
   }
 
@@ -201,34 +215,71 @@ class FakeMatchRepository implements MatchRepository {
                 match: match,
                 answers: answersFor(match.id),
                 motmVotes: {...?motmVotes[match.id]},
+                played: {
+                  for (final MapEntry(key: (id, profileId), :value) in played.entries)
+                    if (id == match.id) profileId: value,
+                },
+                games: [...?games[match.id]],
+                answeredByMe: myAnswers.containsKey(match.id),
               ),
           ],
         ),
       );
 
   @override
-  Future<Either<Failure, Unit>> setMatchScore({
+  Future<Either<Failure, Unit>> saveMatchGame({
     required String matchId,
-    required int ourScore,
-    required int theirScore,
+    int? gameNo,
+    int? ourScore,
+    int? theirScore,
   }) async {
-    pastMatches = [
-      for (final match in pastMatches)
-        match.id == matchId
-            ? Match(
-                id: match.id,
-                teamId: match.teamId,
-                opponent: match.opponent,
-                kickoffAt: match.kickoffAt,
-                venue: match.venue,
-                durationMinutes: match.durationMinutes,
-                ourScore: ourScore,
-                theirScore: theirScore,
-              )
-            : match,
-    ];
+    final list = games[matchId] ??= [];
+    final number = gameNo ?? list.length + 1;
+    final game = MatchGame(
+      gameNo: number,
+      ourScore: ourScore,
+      theirScore: theirScore,
+      updatedBy: userId,
+      updatedAt: DateTime.now(),
+    );
+    if (number <= list.length) {
+      list[number - 1] = game;
+    } else {
+      list.add(game);
+    }
     return const Right(unit);
   }
+
+  @override
+  Future<Either<Failure, Unit>> removeMatchGame({required String matchId, required int gameNo}) async {
+    games[matchId]?.removeWhere((game) => game.gameNo == gameNo);
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, Unit>> setMatchPlayed({required String matchId, required bool played}) async {
+    this.played[(matchId, userId)] = played;
+    if (!played) {
+      myAnswers.remove(matchId);
+      motmVotes[matchId]?.removeWhere((voter, nominee) => voter == userId || nominee == userId);
+    }
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, Unit>> submitMatchAnswers({
+    required String matchId,
+    required MatchAnswers answers,
+  }) async {
+    if (answers.pickId == userId) return const Left(ServerFailure("You can't pick yourself"));
+    if (_answers[(matchId, userId)] == RsvpAnswer.maybe) played[(matchId, userId)] = true;
+    myAnswers[matchId] = answers;
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, MatchAnswers?>> getMyMatchAnswers(String matchId) async =>
+      Right(myAnswers[matchId]);
 
   @override
   Future<Either<Failure, Unit>> voteMotm({

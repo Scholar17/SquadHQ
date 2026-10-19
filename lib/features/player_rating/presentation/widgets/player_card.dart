@@ -7,7 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/player_rating.dart';
 
 /// The dark player card: positions, name, OVR, the six stat bars, and
-/// (when given) apps / goals / assists. The numbers count up and the bars
+/// (when given) apps / MOTM / clean sheets or games won. The numbers count up and the bars
 /// fill on first show — the reveal after rating, and opening a card.
 class PlayerCardView extends StatelessWidget {
   const PlayerCardView({
@@ -21,7 +21,7 @@ class PlayerCardView extends StatelessWidget {
   final String name;
   final PlayerRating rating;
 
-  /// For the footer's apps / goals / assists (saves for a keeper).
+  /// For the footer's apps / MOTM / clean sheets (games won up front).
   final RatedPlayer? player;
 
   /// A line under the name, e.g. "Self-rated · levelled up twice".
@@ -116,21 +116,13 @@ class PlayerCardView extends StatelessWidget {
               child: Row(
                 children: [
                   _FooterStat(value: player.apps, label: 'Apps'),
+                  _FooterStat(value: player.motmWins, label: 'MOTM'),
                   // What their position is judged on — a defender's clean
-                  // sheets, not their (few) goals.
-                  ...switch (rating.group) {
-                    PositionGroup.goalkeeper => [
+                  // sheets, a striker's wins.
+                  switch (rating.group) {
+                    PositionGroup.goalkeeper || PositionGroup.defender =>
                       _FooterStat(value: player.cleanSheets, label: 'Clean sheets'),
-                      _FooterStat(value: player.saves, label: 'Saves'),
-                    ],
-                    PositionGroup.defender => [
-                      _FooterStat(value: player.cleanSheets, label: 'Clean sheets'),
-                      _FooterStat(value: player.tackles, label: 'Tackles'),
-                    ],
-                    _ => [
-                      _FooterStat(value: player.goals, label: 'Goals'),
-                      _FooterStat(value: player.assists, label: 'Assists'),
-                    ],
+                    _ => _FooterStat(value: player.gamesWon, label: 'Games won'),
                   },
                 ],
               ),

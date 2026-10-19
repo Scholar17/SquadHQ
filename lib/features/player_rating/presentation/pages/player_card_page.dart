@@ -165,18 +165,26 @@ class _LevelUp extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text(switch (player.rating?.group) {
-            PositionGroup.defender =>
-              'Your level-up is based on clean sheets (from the score) and the '
-                  'tackles & interceptions you log after each match.',
-            PositionGroup.goalkeeper =>
-              'Your level-up is based on clean sheets (from the score) and the '
-                  'saves you log after each match.',
-            PositionGroup.midfielder =>
-              'Your level-up is based on the assists, goals and tackles you log '
-                  'after each match.',
-            _ => 'Your level-up is based on the goals and assists you log after each match.',
-          }, style: AppTextStyles.body(size: 12, color: AppColors.textMuted, height: 1.4)),
+          Text(
+            'Your level-up comes from your after-match answers, teammates\' picks, '
+            'game wins, clean sheets and Man of the Match wins.',
+            style: AppTextStyles.body(size: 12, color: AppColors.textMuted, height: 1.4),
+          ),
+          if (player.rating?.lastBoost case final parts? when parts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('LAST LEVEL-UP', style: AppTextStyles.label(color: AppColors.textMuted)),
+            const SizedBox(height: 4),
+            Text(boostSummary(parts), style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700)),
+          ],
+          if (player.rating?.droppedAt case final droppedAt?
+              when DateTime.now().difference(droppedAt) < const Duration(days: 30)) ...[
+            const SizedBox(height: 12),
+            Text(
+              'PHY −2 · PAC −1: you played 1 or none of the team\'s last '
+              '${RatedPlayer.boostEvery} matches.',
+              style: AppTextStyles.body(size: 12, weight: FontWeight.w600, color: AppColors.accent700),
+            ),
+          ],
           if (ready) ...[
             const SizedBox(height: 14),
             SizedBox(

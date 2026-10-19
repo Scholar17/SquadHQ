@@ -82,6 +82,8 @@ class PlayerRating extends Equatable {
     required this.ovr,
     required this.ratedAt,
     this.improvements = 0,
+    this.lastBoost = const [],
+    this.droppedAt,
   });
 
   final List<String> positions;
@@ -92,6 +94,13 @@ class PlayerRating extends Equatable {
   /// How many 10-match boosts have landed.
   final int improvements;
 
+  /// What the last boost gave; empty before the first (or for one from
+  /// before 053).
+  final List<BoostPart> lastBoost;
+
+  /// When the rating last dropped for not playing (PHY −2, PAC −1).
+  final DateTime? droppedAt;
+
   String get mainPosition => positions.first;
 
   PositionGroup get group => PositionGroup.ofCode(mainPosition);
@@ -99,7 +108,7 @@ class PlayerRating extends Equatable {
   int stat(StatKey key) => stats[key] ?? 0;
 
   @override
-  List<Object?> get props => [positions, stats, ovr, ratedAt, improvements];
+  List<Object?> get props => [positions, stats, ovr, ratedAt, improvements, lastBoost, droppedAt];
 }
 
 /// One teammate on the Squad tab.
@@ -116,6 +125,8 @@ class RatedPlayer extends Equatable {
     this.saves = 0,
     this.tackles = 0,
     this.cleanSheets = 0,
+    this.motmWins = 0,
+    this.gamesWon = 0,
     this.progress = 0,
   });
 
@@ -141,8 +152,15 @@ class RatedPlayer extends Equatable {
   /// Tackles & interceptions they've logged.
   final int tackles;
 
-  /// Matches they played with nothing conceded — from the recorded score.
+  /// Games they played with nothing conceded (old matches: the score an
+  /// admin recorded).
   final int cleanSheets;
+
+  /// Man of the Match wins.
+  final int motmWins;
+
+  /// Games won in the matches they played.
+  final int gamesWon;
 
   /// Matches played towards the next boost, 0–[boostEvery].
   final int progress;
@@ -163,97 +181,56 @@ class RatedPlayer extends Equatable {
     saves,
     tackles,
     cleanSheets,
+    motmWins,
+    gamesWon,
     progress,
   ];
 }
 
-/// What a player logged for one match, plus what the server knows about
-/// it for them.
-class MatchStats extends Equatable {
-  const MatchStats({
-    this.goals = 0,
-    this.assists = 0,
-    this.saves = 0,
-    this.tackles = 0,
-    this.logged = false,
-    this.cleanSheet,
-    this.group,
-  });
+/// Where a level-up's points came from (053's improve_player_rating).
+enum BoostSource {
+  answers('questions'),
+  picks('teammates'),
+  wins('wins'),
+  cleanSheets('clean sheets'),
+  showingUp('showing up'),
+  motm('MOTM'),
+  other('other');
 
-  final int goals;
-  final int assists;
-  final int saves;
-
-  /// Tackles & interceptions.
-  final int tackles;
-
-  /// Whether they've saved anything for this match yet.
-  final bool logged;
-
-  /// Nothing conceded — null until the score's recorded.
-  final bool? cleanSheet;
-
-  /// Their main position's group — decides which stats to ask for. Null
-  /// before they've rated.
-  final PositionGroup? group;
-
-  int of(LoggedStat stat) => switch (stat) {
-    LoggedStat.goals => goals,
-    LoggedStat.assists => assists,
-    LoggedStat.tackles => tackles,
-    LoggedStat.saves => saves,
-  };
-
-  /// [stat] moved by [delta], kept in its range.
-  MatchStats step(LoggedStat stat, int delta) {
-    final value = (of(stat) + delta).clamp(0, stat.max);
-    return copyWith(
-      goals: stat == LoggedStat.goals ? value : null,
-      assists: stat == LoggedStat.assists ? value : null,
-      tackles: stat == LoggedStat.tackles ? value : null,
-      saves: stat == LoggedStat.saves ? value : null,
-    );
-  }
-
-  MatchStats copyWith({int? goals, int? assists, int? saves, int? tackles, bool? logged}) =>
-      MatchStats(
-        goals: goals ?? this.goals,
-        assists: assists ?? this.assists,
-        saves: saves ?? this.saves,
-        tackles: tackles ?? this.tackles,
-        logged: logged ?? this.logged,
-        cleanSheet: cleanSheet,
-        group: group,
-      );
-
-  @override
-  List<Object?> get props => [goals, assists, saves, tackles, logged, cleanSheet, group];
-}
-
-/// The per-match stats worth logging for a position group, most useful
-/// first — a keeper isn't asked about tackles, a striker not about saves.
-/// Not rated yet: all four.
-enum LoggedStat {
-  goals('Goals', 30),
-  assists('Assists', 30),
-  tackles('Tackles & interceptions', 60),
-  saves('Saves', 60);
-
-  const LoggedStat(this.label, this.max);
+  const BoostSource(this.label);
 
   final String label;
 
-  /// As log_match_stats allows.
-  final int max;
-
-  static List<LoggedStat> forGroup(PositionGroup? group) => switch (group) {
-    PositionGroup.attacker => const [goals, assists],
-    PositionGroup.midfielder => const [assists, goals, tackles],
-    PositionGroup.defender => const [tackles, goals, assists],
-    PositionGroup.goalkeeper => const [saves, assists],
-    null => const [goals, assists, tackles, saves],
+  static BoostSource fromDb(String? value) => switch (value) {
+    'answers' => answers,
+    'picks' => picks,
+    'wins' => wins,
+    'clean_sheets' => cleanSheets,
+    'showing_up' => showingUp,
+    'motm' => motm,
+    _ => other,
   };
 }
+
+/// One line of a level-up's breakdown: "+3 SHO from MOTM".
+class BoostPart extends Equatable {
+  const BoostPart({required this.stat, required this.points, required this.source});
+
+  final StatKey stat;
+  final int points;
+  final BoostSource source;
+
+  @override
+  String toString() => '+$points ${stat.short} from ${source.label}';
+
+  @override
+  List<Object?> get props => [stat, points, source];
+}
+
+/// "+3 SHO from MOTM · +2 SHO from teammates · +1 PHY from wins" —
+/// biggest first.
+String boostSummary(List<BoostPart> parts) =>
+    ([...parts]..sort((a, b) => b.points.compareTo(a.points))).join(' · ');
 
 /// The Squad tab's numbers: the average OVR of whoever's rated.
 extension SquadAverage on List<RatedPlayer> {

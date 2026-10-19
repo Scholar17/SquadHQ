@@ -8,6 +8,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_history.dart';
+import '../../domain/entities/match_questions.dart';
 import '../bloc/match_history_bloc.dart';
 import '../match_formatting.dart';
 import '../widgets/match_history_widgets.dart';
@@ -257,7 +258,9 @@ class _HistoryRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              if (match.result != null)
+              if (pastMatch.games.isNotEmpty)
+                Text(gamesSummary(pastMatch.games), style: AppTextStyles.title(size: 13.5))
+              else if (match.result != null)
                 ResultScore(match: match)
               else
                 Text(

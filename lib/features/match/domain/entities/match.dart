@@ -40,14 +40,15 @@ class Match extends Equatable {
   /// When an admin last sent "Remind players to vote" (once a day).
   final DateTime? lastNudgedAt;
 
-  /// The admin who created the match — the only one who can cancel it.
+  /// The admin who created the match.
   final String? createdBy;
 
   /// When the match finishes (kick-off + play time). Man of the Match
   /// voting opens then.
   DateTime get endsAt => kickoffAt.add(Duration(minutes: durationMinutes));
 
-  /// Final score, once a team admin records it (supabase/sql/009).
+  /// Final score an admin recorded before games came in (supabase/sql/009);
+  /// newer matches keep their scores per game (053's match_games).
   final int? ourScore;
   final int? theirScore;
 

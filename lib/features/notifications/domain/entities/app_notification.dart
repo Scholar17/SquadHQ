@@ -6,7 +6,8 @@ import 'package:equatable/equatable.dart';
 /// due_match_comment_push_notifications() (043_match_comments.sql), or
 /// due_rating_push_notifications() (045_player_ratings.sql), or
 /// due_mention_push_notifications() (049_mentions.sql), or
-/// due_member_removed_push_notifications() (051_leave_and_remove_members.sql).
+/// due_member_removed_push_notifications() (051_leave_and_remove_members.sql), or
+/// due_match_question_push_notifications() (053_match_questions.sql).
 enum NotificationKind {
   newMatch('new_match'),
   rsvpNudge('rsvp_nudge'),
@@ -54,6 +55,11 @@ enum NotificationKind {
 
   /// "You were removed from <group>" (051).
   memberRemoved('member_removed'),
+
+  /// "Vote MOTM and rate your game" 2 hours after a match, and "Last day
+  /// to rate your game" (053).
+  matchFollowup('match_followup'),
+  questionsLastDay('questions_last_day'),
   other('');
 
   const NotificationKind(this.dbName);
@@ -137,7 +143,10 @@ class AppNotification extends Equatable {
   };
 
   NotificationTarget get target => switch (kind) {
-    NotificationKind.motmVote || NotificationKind.motmResult => NotificationTarget.pastMatch,
+    NotificationKind.motmVote ||
+    NotificationKind.motmResult ||
+    NotificationKind.matchFollowup ||
+    NotificationKind.questionsLastDay => NotificationTarget.pastMatch,
     NotificationKind.feeDue ||
     NotificationKind.slip ||
     NotificationKind.payReminder ||

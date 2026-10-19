@@ -63,24 +63,3 @@ class ImproveRating implements UseCase<PlayerRating, NoParams> {
   @override
   Future<Either<Failure, PlayerRating>> call(NoParams params) => _repository.improveRating();
 }
-
-class GetMyMatchStats implements UseCase<MatchStats, String> {
-  const GetMyMatchStats(this._repository);
-
-  final PlayerRatingRepository _repository;
-
-  @override
-  Future<Either<Failure, MatchStats>> call(String matchId) => _repository.getMyMatchStats(matchId);
-}
-
-typedef LoggedStats = ({String matchId, MatchStats stats});
-
-class LogMatchStats implements UseCase<Unit, LoggedStats> {
-  const LogMatchStats(this._repository);
-
-  final PlayerRatingRepository _repository;
-
-  @override
-  Future<Either<Failure, Unit>> call(LoggedStats logged) =>
-      _repository.logMatchStats(logged.matchId, logged.stats);
-}

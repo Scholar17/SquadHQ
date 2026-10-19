@@ -35,7 +35,7 @@ import '../../features/match/domain/usecases/get_matchday_roster.dart';
 import '../../features/match/domain/usecases/get_upcoming_matches.dart';
 import '../../features/match/domain/usecases/nudge_match_rsvp.dart';
 import '../../features/match/domain/usecases/set_match_rsvp.dart';
-import '../../features/match/domain/usecases/set_match_score.dart';
+import '../../features/match/domain/usecases/match_after_game.dart';
 import '../../features/match/domain/usecases/update_match.dart';
 import '../../features/match/domain/usecases/vote_motm.dart';
 import '../../features/match/presentation/bloc/match_bloc.dart';
@@ -219,7 +219,11 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => GetMatchdayRoster(sl()))
     ..registerLazySingleton(() => SetMatchRsvp(sl()))
     ..registerLazySingleton(() => GetMatchHistory(sl()))
-    ..registerLazySingleton(() => SetMatchScore(sl()))
+    ..registerLazySingleton(() => SaveMatchGame(sl()))
+    ..registerLazySingleton(() => RemoveMatchGame(sl()))
+    ..registerLazySingleton(() => SetMatchPlayed(sl()))
+    ..registerLazySingleton(() => SubmitMatchAnswers(sl()))
+    ..registerLazySingleton(() => GetMyMatchAnswers(sl()))
     ..registerLazySingleton(() => VoteMotm(sl()))
     // Singleton, same reasoning as TeamMembershipBloc: provided once at the
     // app root so Home and the create-match sheet share it.
@@ -248,7 +252,9 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(
       () => MatchHistoryBloc(
         getMatchHistory: sl(),
-        setMatchScore: sl(),
+        saveMatchGame: sl(),
+        removeMatchGame: sl(),
+        deleteMatch: sl(),
         voteMotm: sl(),
         teamChanges: sl(),
       ),
@@ -440,8 +446,6 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => GetRatingQuestions(sl()))
     ..registerLazySingleton(() => SubmitRating(sl()))
     ..registerLazySingleton(() => ImproveRating(sl()))
-    ..registerLazySingleton(() => GetMyMatchStats(sl()))
-    ..registerLazySingleton(() => LogMatchStats(sl()))
     // Factories — one per Squad tab (per team) and per Fill rating.
     ..registerFactory(() => TeamRatingsBloc(getTeamRatings: sl(), improveRating: sl()))
     ..registerFactory(

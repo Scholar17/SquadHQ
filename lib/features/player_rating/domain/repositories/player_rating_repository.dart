@@ -24,10 +24,7 @@ abstract interface class PlayerRatingRepository {
     required List<String> answerIds,
   });
 
-  /// Every 10 matches played: a boost from what they've logged.
+  /// Every 10 matches played: a boost from the after-match questions,
+  /// teammates' picks, wins, clean sheets and MOTM wins (053).
   Future<Either<Failure, PlayerRating>> improveRating();
-
-  Future<Either<Failure, MatchStats>> getMyMatchStats(String matchId);
-
-  Future<Either<Failure, Unit>> logMatchStats(String matchId, MatchStats stats);
 }

@@ -45,14 +45,4 @@ class PlayerRatingRepositoryImpl implements PlayerRatingRepository {
 
   @override
   Future<Either<Failure, PlayerRating>> improveRating() => _guard(_remoteDataSource.improveRating);
-
-  @override
-  Future<Either<Failure, MatchStats>> getMyMatchStats(String matchId) =>
-      _guard(() => _remoteDataSource.getMyMatchStats(matchId));
-
-  @override
-  Future<Either<Failure, Unit>> logMatchStats(String matchId, MatchStats stats) => _guard(() async {
-    await _remoteDataSource.logMatchStats(matchId, stats);
-    return unit;
-  });
 }

@@ -12,7 +12,6 @@ class FakePlayerRatingRepository implements PlayerRatingRepository {
 
   final String userId;
   final ratings = <String, PlayerRating>{};
-  final matchStats = <String, MatchStats>{};
   final submitted = <({List<String> positions, List<String> answerIds})>[];
 
   static const _roster = {'test-1': 'Test Player', 'p-2': 'Aung Ko', 'p-3': 'Min Thu'};
@@ -30,8 +29,6 @@ class FakePlayerRatingRepository implements PlayerRatingRepository {
       ..clear()
       ..[userId] = ratingOf(74, ['CM'])
       ..['p-2'] = ratingOf(80, ['ST', 'W']);
-    matchStats.clear();
-    cleanSheets.clear();
     submitted.clear();
   }
 
@@ -84,35 +81,4 @@ class FakePlayerRatingRepository implements PlayerRatingRepository {
   @override
   Future<Either<Failure, PlayerRating>> improveRating() async =>
       const Left(ServerFailure('Play 30 matches to improve your rating'));
-
-  /// Matches that ended with nothing conceded, as their recorded score.
-  final cleanSheets = <String>{};
-
-  @override
-  Future<Either<Failure, MatchStats>> getMyMatchStats(String matchId) async {
-    final logged = matchStats[matchId] ?? const MatchStats();
-    return Right(
-      MatchStats(
-        goals: logged.goals,
-        assists: logged.assists,
-        saves: logged.saves,
-        tackles: logged.tackles,
-        logged: logged.logged,
-        cleanSheet: cleanSheets.contains(matchId),
-        group: ratings[userId]?.group,
-      ),
-    );
-  }
-
-  @override
-  Future<Either<Failure, Unit>> logMatchStats(String matchId, MatchStats stats) async {
-    matchStats[matchId] = MatchStats(
-      goals: stats.goals,
-      assists: stats.assists,
-      saves: stats.saves,
-      tackles: stats.tackles,
-      logged: true,
-    );
-    return const Right(unit);
-  }
 }

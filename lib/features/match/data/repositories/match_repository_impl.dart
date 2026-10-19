@@ -5,6 +5,7 @@ import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_history.dart';
+import '../../domain/entities/match_questions.dart';
 import '../../domain/entities/matchday_player.dart';
 import '../../domain/repositories/match_repository.dart';
 import '../datasources/match_remote_data_source.dart';
@@ -134,25 +135,58 @@ class MatchRepositoryImpl implements MatchRepository {
     }
   }
 
-  @override
-  Future<Either<Failure, Unit>> setMatchScore({
-    required String matchId,
-    required int ourScore,
-    required int theirScore,
-  }) async {
+  Future<Either<Failure, T>> _guard<T>(Future<T> Function() action) async {
     try {
-      await _remoteDataSource.setMatchScore(
-        matchId: matchId,
-        ourScore: ourScore,
-        theirScore: theirScore,
-      );
-      return const Right(unit);
+      return Right(await action());
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
       return Left(ServerFailure(friendlyErrorMessage(e)));
     }
   }
+
+  @override
+  Future<Either<Failure, Unit>> saveMatchGame({
+    required String matchId,
+    int? gameNo,
+    int? ourScore,
+    int? theirScore,
+  }) => _guard(() async {
+    await _remoteDataSource.saveMatchGame(
+      matchId: matchId,
+      gameNo: gameNo,
+      ourScore: ourScore,
+      theirScore: theirScore,
+    );
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, Unit>> removeMatchGame({required String matchId, required int gameNo}) =>
+      _guard(() async {
+        await _remoteDataSource.removeMatchGame(matchId: matchId, gameNo: gameNo);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, Unit>> setMatchPlayed({required String matchId, required bool played}) =>
+      _guard(() async {
+        await _remoteDataSource.setMatchPlayed(matchId: matchId, played: played);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, Unit>> submitMatchAnswers({
+    required String matchId,
+    required MatchAnswers answers,
+  }) => _guard(() async {
+    await _remoteDataSource.submitMatchAnswers(matchId: matchId, answers: answers);
+    return unit;
+  });
+
+  @override
+  Future<Either<Failure, MatchAnswers?>> getMyMatchAnswers(String matchId) =>
+      _guard(() => _remoteDataSource.getMyMatchAnswers(matchId));
 
   @override
   Future<Either<Failure, Unit>> voteMotm({

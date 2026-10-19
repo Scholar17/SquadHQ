@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +27,7 @@ import 'package:squad_hq/features/weather/domain/repositories/air_quality_reposi
 import 'package:squad_hq/features/weather/domain/repositories/forecast_repository.dart';
 import 'package:squad_hq/features/weather/presentation/temperature_unit_controller.dart';
 import 'package:squad_hq/features/match/domain/entities/match.dart';
+import 'package:squad_hq/features/match/domain/entities/match_questions.dart';
 import 'package:squad_hq/features/match/domain/entities/matchday_player.dart';
 import 'package:squad_hq/features/match/domain/entities/match_history.dart';
 import 'package:squad_hq/features/team/presentation/pending_actions.dart';
@@ -268,7 +270,9 @@ void main() {
           BlocProvider<MatchHistoryBloc>(
             create: (_) => MatchHistoryBloc(
               getMatchHistory: sl(),
-              setMatchScore: sl(),
+              saveMatchGame: sl(),
+              removeMatchGame: sl(),
+              deleteMatch: sl(),
               voteMotm: sl(),
               teamChanges: sl(),
             )..add(const MatchHistoryTeamSelected('team-1')),
@@ -415,9 +419,10 @@ void main() {
     expect(find.text('Golden Goal FC'), findsOneWidget);
     expect(find.text('Invite code · GOLD42'), findsOneWidget);
     expect(find.text('vs Sundown United'), findsOneWidget);
-    // Nothing finished recently yet, so just the hint.
+    // Riverside Rovers kicked off 10 minutes ago: on Home for its scores.
     expect(find.text('AFTER THE MATCH'), findsOneWidget);
-    expect(find.textContaining('Once a match finishes'), findsOneWidget);
+    expect(find.text('vs Riverside Rovers'), findsOneWidget);
+    expect(find.text('Playing now — fill in the game scores'), findsOneWidget);
   });
 
   testWidgets('Home always shows an admin the Manager view — no role pill', (tester) async {
@@ -573,7 +578,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Cancel match'), 200);
     await tester.tap(find.text('Cancel match'));
     await tester.pumpAndSettle();
-    expect(find.text('Cancel match?'), findsOneWidget);
+    expect(find.text('Cancel this match?'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, 'Cancel match').last);
     await tester.pumpAndSettle();
@@ -1326,6 +1331,70 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 12));
   });
 
+  testWidgets('On a narrow phone the hub countdown shows in full, beside "Edit"', (tester) async {
+    arenaMatchSoon();
+    await pumpHome(tester, const MatchPage(user: user));
+    tester.view.physicalSize = const Size(360, 1600);
+    await tester.pumpAndSettle();
+
+    final chip = find.text('IN 2 DAYS');
+    expect(chip, findsOneWidget);
+    final painted = tester.renderObject<RenderParagraph>(chip);
+    expect(painted.didExceedMaxLines, isFalse);
+    // The button is shortened to make room.
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Edit details'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('MATCHDAY HUB is never cut short — "Edit details" becomes "Edit" instead',
+      (tester) async {
+    arenaMatchSoon();
+    await pumpHome(tester, const MatchPage(user: user));
+    for (final scale in [1.0, 1.15]) {
+      for (final width in [360.0, 375.0, 390.0, 412.0, 430.0, 520.0, 700.0]) {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        tester.view.physicalSize = Size(width, 1600);
+        await tester.pumpAndSettle();
+        final title = tester.renderObject<RenderParagraph>(find.text('MATCHDAY HUB'));
+        final chip = tester.renderObject<RenderParagraph>(find.text('IN 2 DAYS'));
+        expect(chip.didExceedMaxLines, isFalse, reason: 'chip cut at $width × $scale');
+        // The long label only when the title has room for all of it. (The
+        // test font's square glyphs are far wider than the app's, so here
+        // even "Edit" can leave too little room on the narrowest phones.)
+        if (find.text('Edit details').evaluate().isNotEmpty) {
+          expect(title.didExceedMaxLines, isFalse, reason: 'title cut at $width × $scale');
+        } else {
+          expect(find.text('Edit'), findsOneWidget);
+        }
+      }
+    }
+    // Wide enough at normal text size: the full label.
+    tester.platformDispatcher.textScaleFactorTestValue = 1.0;
+    tester.view.physicalSize = const Size(700, 1600);
+    await tester.pumpAndSettle();
+    expect(find.text('Edit details'), findsOneWidget);
+    tester.platformDispatcher.clearTextScaleFactorTestValue();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A sunny kickoff shows the sun and no rain chip', (tester) async {
+    arenaMatchSoon();
+    fakeForecasts.forecast = const KickoffForecast(temperatureC: 33, weatherCode: 0, rainChance: 10);
+    await pumpHome(tester, const MatchPage(user: user));
+    await tester.pumpAndSettle();
+
+    expect(find.text('33°C'), findsOneWidget);
+    expect(find.byIcon(Icons.wb_sunny_outlined), findsOneWidget);
+    expect(find.text('10%'), findsNothing);
+    expect(find.byIcon(Icons.water_drop_outlined), findsNothing);
+
+    await tester.tap(find.text('33°C'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('At kickoff: 33°C, sunny, 10% chance of rain.'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 12));
+  });
+
   testWidgets("The venue's details keep the bigger tiles, closed from the top", (tester) async {
     arenaMatchSoon();
     await pumpHome(tester, const MatchPage(user: user));
@@ -1466,27 +1535,38 @@ void main() {
     expect(find.text('No score'), findsNWidgets(2));
   });
 
-  testWidgets('An admin records a past match score', (tester) async {
-    await pumpMatchTab(tester);
+  testWidgets('Players fill in game scores while the match is on', (tester) async {
+    await pumpMatchTab(tester, role: TeamRole.player);
     await tester.tap(find.byTooltip('Match history'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('vs Thai Group'));
+    await tester.tap(find.text('vs Riverside Rovers'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add score'));
+    // Game 1 is there from kickoff, before anyone saves it.
+    expect(find.text('Playing now'), findsOneWidget);
+    await tester.tap(find.text('Tap to add the score'));
     await tester.pumpAndSettle();
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.byTooltip('Plus one for Golden Goal FC'));
       await tester.pump();
     }
-    await tester.tap(find.byTooltip('Plus one for Thai Group'));
+    await tester.tap(find.byTooltip('Plus one for Riverside Rovers'));
     await tester.pump();
     await tester.tap(find.text('Save score'));
     await tester.pumpAndSettle();
 
-    expect(find.text('3 – 1'), findsOneWidget);
-    expect(find.text('Win'), findsOneWidget);
-    expect(find.text('Edit score'), findsOneWidget);
+    expect(fakeMatches.games['past-live']!.single.scoreLabel, '3–1');
+    expect(find.text('3–1'), findsWidgets);
+    expect(find.text('by you'), findsOneWidget);
+
+    // Game 2: nobody remembers.
+    await tester.tap(find.text('Add game'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Not sure'));
+    await tester.pumpAndSettle();
+    expect(fakeMatches.games['past-live']!.last.isNotSure, isTrue);
+    expect(find.text('Game 2'), findsOneWidget);
+    expect(find.text('3–1 · ?'), findsOneWidget);
   });
 
   /// A match that finished a minute ago (kicked off 61 minutes ago, 1 hr
@@ -1535,8 +1615,7 @@ void main() {
     expect(find.text('Change vote'), findsOneWidget);
   });
 
-  testWidgets('Players who played log their goals, assists and saves after the match',
-      (tester) async {
+  testWidgets('Players rate their game after the match, then vote MOTM', (tester) async {
     finishedJustNow();
     await pumpMatchTab(tester, role: TeamRole.player);
     await tester.tap(find.byTooltip('Match history'));
@@ -1544,48 +1623,89 @@ void main() {
     await tester.tap(find.text('vs Harbour City'));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('YOUR STATS'), 200);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('One more goals'));
-    await tester.tap(find.byTooltip('One more goals'));
-    await tester.tap(find.byTooltip('One more assists'));
-    await tester.pump();
-    await tester.scrollUntilVisible(find.text('Save my stats'), 100);
-    await tester.tap(find.text('Save my stats'));
+    await tester.tap(find.text('Start'));
     await tester.pumpAndSettle();
 
-    final logged = fakeRatings.matchStats['recent-1']!;
-    expect((logged.goals, logged.assists, logged.saves), (2, 1, 0));
-    expect(find.text('Logged'), findsOneWidget);
-    expect(find.text('Save my stats'), findsNothing);
+    // Prefilled with their main position (CM): Middle.
+    expect(find.text('Where did you play most today?'), findsOneWidget);
+    await tester.tap(find.text('Middle'));
+    await tester.pumpAndSettle();
+    expect(find.text('How many goals did you help make?'), findsOneWidget);
+    await tester.tap(find.text('1'));
+    await tester.pumpAndSettle();
+    expect(find.text('How many goals did you score?'), findsOneWidget);
+    await tester.tap(find.text('Not sure'));
+    await tester.pumpAndSettle();
+    expect(find.text('How often did you take the ball back?'), findsOneWidget);
+    await tester.tap(find.text('A lot'));
+    await tester.pumpAndSettle();
+
+    // Question 4: a teammate, never yourself.
+    expect(find.text('Who controlled the game best today?'), findsOneWidget);
+    expect(find.text('Test Player'), findsNothing);
+    await tester.tap(find.text('Aung Ko'));
+    await tester.pumpAndSettle();
+
+    final saved = fakeMatches.myAnswers['recent-1']!;
+    expect(saved.position, PlayedPosition.midfielder);
+    expect(saved.answers, [1, null, 2]);
+    expect(saved.pickId, 'p-2');
+
+    // Last step: Man of the Match.
+    expect(find.text('Who was Man of the Match?'), findsOneWidget);
+    await tester.tap(find.text('Min Thu'));
+    await tester.pumpAndSettle();
+    expect(fakeMatches.motmVotes['recent-1']?['test-1'], 'p-3');
+    expect(find.text('Thanks!'), findsOneWidget);
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rate your game · Done'), findsOneWidget);
   });
 
-  testWidgets('A defender logs tackles, not saves, and gets clean sheets from the score',
-      (tester) async {
-    fakeRatings.ratings['test-1'] = FakePlayerRatingRepository.ratingOf(72, ['CB']);
-    fakeRatings.cleanSheets.add('recent-1');
+  testWidgets("A Maybe player who didn't play says so, and is left out", (tester) async {
     finishedJustNow();
+    fakeMatches.answerAs('recent-1', 'test-1', RsvpAnswer.maybe);
     await pumpMatchTab(tester, role: TeamRole.player);
     await tester.tap(find.byTooltip('Match history'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('vs Harbour City'));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('YOUR STATS'), 200);
+    await tester.tap(find.text('Start'));
     await tester.pumpAndSettle();
-    expect(find.text('Clean sheet — counted for you automatically'), findsOneWidget);
-    expect(find.text('Tackles & interceptions'), findsOneWidget);
-    expect(find.text('Saves'), findsNothing);
-
-    await tester.tap(find.byTooltip('One more tackles & interceptions'));
-    await tester.pump();
-    await tester.tap(find.byTooltip('One more tackles & interceptions'));
-    await tester.pump();
-    await tester.scrollUntilVisible(find.text('Save my stats'), 100);
-    await tester.tap(find.text('Save my stats'));
+    expect(find.text('Did you play today?'), findsOneWidget);
+    await tester.tap(find.text("No, I didn't"));
     await tester.pumpAndSettle();
 
-    expect(fakeRatings.matchStats['recent-1']!.tackles, 2);
+    expect(fakeMatches.played[('recent-1', 'test-1')], isFalse);
+    expect(find.text("This match won't count for you."), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    // No longer in the vote or the questions.
+    expect(find.text('Who was the best player?'), findsNothing);
+    expect(find.text('Start'), findsNothing);
+  });
+
+  testWidgets('An admin cancels a match after it was played, behind a warning', (tester) async {
+    await pumpMatchTab(tester);
+    await tester.tap(find.byTooltip('Match history'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('vs Thai Group'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel match'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cancel this match?'), findsOneWidget);
+    expect(find.textContaining("This can't be undone."), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel match'));
+    await tester.pumpAndSettle();
+
+    expect(fakeMatches.pastMatches.any((match) => match.id == 'past-1'), isFalse);
+    expect(find.text('vs Thai Group'), findsNothing);
   });
 
   testWidgets('Man of the Match is decided once everyone who played has voted',
@@ -3533,8 +3653,9 @@ void main() {
     expect(find.text('Vote for Man of the Match'), findsNothing);
     // Secret until everyone's voted (or midnight): just the progress.
     expect(find.text('Man of the Match voting open · 1 of 3 voted'), findsOneWidget);
-    // Voted: only the Match tab's RSVP badge is left.
-    expect(find.text('!'), findsOneWidget);
+    // Voted, but "Rate your game" still keeps Home's badge on.
+    expect(find.text('Rate your game — 4 quick questions'), findsOneWidget);
+    expect(find.text('!'), findsNWidgets(2));
   });
 
   testWidgets('Home recaps show the unpaid fee, and Wallet gets a badge', (tester) async {
@@ -3550,7 +3671,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('You owe ฿300 to Aung Ko'), findsOneWidget);
-    expect(find.text('Add score'), findsOneWidget);
+    expect(find.text('No score yet'), findsWidgets);
     // Home (MOTM vote + fee), Wallet (fee), and Match — the admin hasn't
     // voted on the upcoming match yet.
     expect(find.text('!'), findsNWidgets(3));
@@ -3590,12 +3711,20 @@ void main() {
           history: history,
         );
 
-    // Kicked off 80 minutes ago — still playing.
-    expect(at(kickoff.add(const Duration(minutes: 80))).recaps, isEmpty);
-    // 90 minutes of play time are up — recap + MOTM vote.
+    // Before kickoff it isn't on Home.
+    expect(at(kickoff.subtract(const Duration(minutes: 1))).recaps, isEmpty);
+    // Kicked off 80 minutes ago — still playing: on Home for the scores,
+    // nothing to vote on or answer yet.
+    final playing = at(kickoff.add(const Duration(minutes: 80)));
+    expect(playing.recaps, hasLength(1));
+    expect(playing.motmVotesNeeded, 0);
+    expect(playing.answersNeeded, 0);
+    expect(playing.homeTabAlert, isFalse);
+    // 90 minutes of play time are up — MOTM vote + the questions.
     final finished = at(kickoff.add(const Duration(minutes: 90)));
     expect(finished.recaps, hasLength(1));
     expect(finished.motmVotesNeeded, 1);
+    expect(finished.answersNeeded, 1);
     expect(finished.homeTabAlert, isTrue);
     expect(finished.matchTabAlert, isFalse);
     // A week later it drops off Home.
@@ -3926,7 +4055,7 @@ void main() {
     expect(find.text('Total cost you paid'), findsNothing);
   });
 
-  testWidgets("Only the admin who created a match can cancel it", (tester) async {
+  testWidgets("Any team admin can cancel a match, not just whoever created it", (tester) async {
     // Created by Aung Ko — another admin, not me.
     final match = fakeMatches.matches.first;
     fakeMatches.matches[0] = Match(
@@ -3941,7 +4070,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Edit details'), findsOneWidget);
-    expect(find.text('Cancel match'), findsNothing);
+    await tester.scrollUntilVisible(find.text('Cancel match'), 200);
+    expect(find.text('Cancel match'), findsOneWidget);
   });
 
   testWidgets('Back goes to Home from any tab; on Home, press back twice to exit',
