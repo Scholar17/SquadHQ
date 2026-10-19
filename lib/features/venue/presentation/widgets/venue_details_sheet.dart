@@ -226,9 +226,20 @@ class _VenueDetailsSheetState extends State<_VenueDetailsSheet> {
         ],
         if (venue.notes case final notes?) ...[
           const SizedBox(height: 10),
-          Text(
-            notes,
-            style: AppTextStyles.body(size: 13.5, color: AppColors.textSubtle, height: 1.45),
+          // The icon marks it as a note, so a short one ("Bangkapi") isn't
+          // read as the venue's address.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.sticky_note_2_outlined, size: 18, color: AppColors.textMuted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  notes,
+                  style: AppTextStyles.body(size: 13.5, color: AppColors.textSubtle, height: 1.45),
+                ),
+              ),
+            ],
           ),
         ],
         if (mapsUrl != null) ...[
