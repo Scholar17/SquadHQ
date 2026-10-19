@@ -279,40 +279,41 @@ GoRouter createAppRouter(AuthBloc authBloc) {
       ),
       GoRoute(
         path: AppRoutes.teamRoster,
-        builder: (context, state) => TeamRosterPage(team: state.extra! as Team),
+        builder: (context, state) => _withExtra<Team>(state, (team) => TeamRosterPage(team: team)),
       ),
       GoRoute(
         path: AppRoutes.matchHistory,
-        builder: (context, state) => MatchHistoryPage(args: state.extra! as MatchHistoryArgs),
+        builder: (context, state) =>
+            _withExtra<MatchHistoryArgs>(state, (args) => MatchHistoryPage(args: args)),
       ),
       GoRoute(
         path: AppRoutes.matches,
-        builder: (context, state) {
-          final args = state.extra! as MatchListArgs;
-          return MatchListPage(
+        builder: (context, state) => _withExtra<MatchListArgs>(
+          state,
+          (args) => MatchListPage(
             activeTeamId: args.activeTeamId,
             teamName: args.teamName,
             userId: args.userId,
             canCreateMatch: args.canCreateMatch,
-          );
-        },
+          ),
+        ),
       ),
       GoRoute(
         path: AppRoutes.walletBills,
-        builder: (context, state) {
-          final args = state.extra! as WalletBillsArgs;
-          return WalletBillsPage(userId: args.userId, isManager: args.isManager);
-        },
+        builder: (context, state) => _withExtra<WalletBillsArgs>(
+          state,
+          (args) => WalletBillsPage(userId: args.userId, isManager: args.isManager),
+        ),
       ),
       GoRoute(
         path: AppRoutes.upcomingMatch,
         builder: (context, state) =>
-            UpcomingMatchPage(args: state.extra! as UpcomingMatchArgs),
+            _withExtra<UpcomingMatchArgs>(state, (args) => UpcomingMatchPage(args: args)),
       ),
       GoRoute(
         path: AppRoutes.notifications,
         builder: (context, state) =>
-            NotificationsPage(args: state.extra! as NotificationsArgs),
+            _withExtra<NotificationsArgs>(state, (args) => NotificationsPage(args: args)),
       ),
       GoRoute(
         path: '/expense/:id',
@@ -404,6 +405,34 @@ class _TeamGateState extends State<_TeamGate> {
 /// for a frame or two while auth state is mid-transition. Drawn like the
 /// web page's own splash (web/index.html: the GG badge over a spinner), so
 /// opening the app is one splash, then the app.
+/// A full-screen push's [GoRouterState.extra], or — when it's gone (a
+/// reload, a typed URL) — back to Home rather than crash.
+Widget _withExtra<T>(GoRouterState state, Widget Function(T extra) build) {
+  final extra = state.extra;
+  return extra is T ? build(extra) : const _BackHome();
+}
+
+/// The settling splash for a frame, then Home.
+class _BackHome extends StatefulWidget {
+  const _BackHome();
+
+  @override
+  State<_BackHome> createState() => _BackHomeState();
+}
+
+class _BackHomeState extends State<_BackHome> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go(AppRoutes.home);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const _SettlingPage();
+}
+
 class _SettlingPage extends StatelessWidget {
   const _SettlingPage();
 

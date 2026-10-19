@@ -12,6 +12,7 @@ import '../../../../core/notifications/notification_routing.dart';
 import '../../../../core/notifications/push_notifications.dart';
 import '../../../../core/notifications/web_push_prompt.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/routing/web_back_guard.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
@@ -413,7 +414,8 @@ class _NavItem extends StatelessWidget {
 /// second within [_exitWindow] closes the app. Screens pushed on top
 /// (Profile, history…) aren't affected — they're above the shell and just
 /// close. On web the browser's back button lands here too (see
-/// WebBackGuard), and exiting leaves the app.
+/// WebBackGuard): the web can't close itself, so every press on Home shows
+/// the prompt and releases the guard, and Android's next back closes it.
 class _BackButtonScope extends StatefulWidget {
   const _BackButtonScope({required this.navigationShell, required this.child});
 
@@ -435,18 +437,29 @@ class _BackButtonScopeState extends State<_BackButtonScope> {
       shell.goBranch(0);
       return;
     }
-    final now = DateTime.now();
-    final last = _lastBackOnHome;
-    if (last != null && now.difference(last) < _exitWindow) {
-      SystemNavigator.pop();
-      return;
+    if (kIsWeb) {
+      WebBackGuard.release();
+    } else {
+      final now = DateTime.now();
+      final last = _lastBackOnHome;
+      if (last != null && now.difference(last) < _exitWindow) {
+        SystemNavigator.pop();
+        return;
+      }
+      _lastBackOnHome = now;
     }
-    _lastBackOnHome = now;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(content: Text('Press back again to exit'), duration: _exitWindow),
       );
+  }
+
+  @override
+  void didUpdateWidget(_BackButtonScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Left Home: the next press there starts over with the prompt.
+    if (widget.navigationShell.currentIndex != 0) _lastBackOnHome = null;
   }
 
   @override

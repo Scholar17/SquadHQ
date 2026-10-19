@@ -89,7 +89,8 @@ class _Summary extends StatelessWidget {
 
   void _open(BuildContext context) {
     final bloc = context.read<CommentsBloc>();
-    Navigator.of(context).push(
+    // Root: above the tabs, like every full-screen page.
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
         builder: (_) => BlocProvider.value(
           value: bloc,
