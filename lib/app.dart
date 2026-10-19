@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'core/di/injection_container.dart';
 import 'core/notifications/notification_routing.dart';
 import 'core/routing/app_router.dart';
-import 'core/splash/kickoff_splash.dart';
+import 'core/splash/startup_splash.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -114,7 +114,7 @@ class _SquadHqAppState extends State<SquadHqApp> with WidgetsBindingObserver {
         // The opening splash plays over everything until the app has loaded.
         builder: (context, child) => BlocBuilder<AuthBloc, AuthState>(
           builder: (context, auth) => BlocBuilder<TeamMembershipBloc, TeamMembershipState>(
-            builder: (context, teams) => KickoffSplash(
+            builder: (context, teams) => StartupSplash(
               loaded: startupLoaded(auth, teams),
               child: ResponsiveFrame(child: child ?? const SizedBox.shrink()),
             ),

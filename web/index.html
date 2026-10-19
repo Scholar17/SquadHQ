@@ -60,38 +60,35 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
       background: #F5EAD8;
     }
-    #splash .logo {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: #D9A13C;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font: 700 20px/1 Georgia, "Times New Roman", serif;
-      color: #201E1D;
-    }
-    #splash .spinner {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: 3px solid #EBDDC5;
-      border-top-color: #C67139;
-      animation: splash-spin 0.8s linear infinite;
-    }
-    @keyframes splash-spin {
-      to { transform: rotate(360deg); }
+    /* The runner, as WarmUpAnimation lays it out (lib/core/splash). */
+    #splash .runner {
+      width: 280px;
+      height: 220px;
+      transform: scale(1.5);
     }
   </style>
 </head>
 <body>
   <div id="splash">
-    <div class="logo">GG</div>
-    <div class="spinner"></div>
+    <div class="runner" id="splash-runner"></div>
   </div>
+  <!-- The app's warm-up animation, until Flutter starts and shows its own
+       copy (assets/lottie/runner.json). Without the player, just the
+       background. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js"></script>
+  <script>
+    if (window.lottie) {
+      lottie.loadAnimation({
+        container: document.getElementById('splash-runner'),
+        renderer: 'svg',
+        loop: true,
+        autoplay: !matchMedia('(prefers-reduced-motion: reduce)').matches,
+        path: 'assets/assets/lottie/runner.json',
+      });
+    }
+  </script>
 
   <!--
     You can customize the "flutter_bootstrap.js" script.

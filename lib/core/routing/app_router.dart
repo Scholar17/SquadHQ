@@ -37,8 +37,7 @@ import '../../features/team_membership/presentation/pages/team_membership_page.d
 import '../../features/team_membership/presentation/pages/team_roster_page.dart';
 import '../../features/wallet/presentation/pages/wallet_bills_page.dart';
 import '../notifications/notification_routing.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_text_styles.dart';
+import '../splash/startup_splash.dart';
 
 /// Route paths, named so push sites don't hand-type strings.
 abstract final class AppRoutes {
@@ -439,46 +438,13 @@ class _BackHomeState extends State<_BackHome> {
 }
 
 /// Shown while the saved session restores at start, while teams load, and
-/// for a frame or two while auth state is mid-transition. Drawn like the
-/// web page's own splash (web/index.html: the GG badge over a spinner).
-/// At start it's under the KickoffSplash, which lifts once
-/// [startupLoaded].
+/// for a frame or two while auth state is mid-transition: the same warm-up
+/// as the StartupSplash it sits under at start.
 class _SettlingPage extends StatelessWidget {
   const _SettlingPage();
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.teamGold, shape: BoxShape.circle),
-              child: Text(
-                'GG',
-                style: AppTextStyles.heading(size: 20, color: AppColors.onLight, height: 1),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: AppColors.accent,
-                backgroundColor: AppColors.text.withValues(alpha: 0.08),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => const WarmUpScreen();
 }
 
 /// Bridges an [AuthBloc]'s stream into a [Listenable] go_router can use as
