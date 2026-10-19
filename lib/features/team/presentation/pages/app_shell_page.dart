@@ -22,6 +22,8 @@ import '../../../match/presentation/bloc/match_state.dart';
 import '../../../notifications/domain/entities/app_notification.dart';
 import '../../../notifications/presentation/bloc/notification_bloc.dart';
 import '../../../notifications/presentation/notification_navigation.dart';
+import '../../../share/domain/entities/share_link.dart';
+import '../../../share/domain/usecases/share_usecases.dart';
 import '../../../squad/presentation/active_group.dart';
 import '../../../squad/presentation/bloc/squad_ledger_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
@@ -194,6 +196,7 @@ class _ActiveTeamSyncState extends State<_ActiveTeamSync> with WidgetsBindingObs
     _select(_activeTeamId(context.read<TeamMembershipBloc>().state));
     _notifications.add(const NotificationsStarted());
     NotificationRouting.setNotificationOpener(_openNotification);
+    NotificationRouting.setShareOpener(_openShare);
     _refreshTimer = Timer.periodic(_refreshEvery, (_) => _refresh());
     WidgetsBinding.instance.addObserver(this);
     _turnOnPush();
@@ -214,6 +217,7 @@ class _ActiveTeamSyncState extends State<_ActiveTeamSync> with WidgetsBindingObs
   void dispose() {
     // The shell goes away on sign-out.
     NotificationRouting.setNotificationOpener(null);
+    NotificationRouting.setShareOpener(null);
     _notifications.add(const NotificationsStopped(clear: true));
     _refreshTimer.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -255,6 +259,37 @@ class _ActiveTeamSyncState extends State<_ActiveTeamSync> with WidgetsBindingObs
     await openNotification(
       context,
       notification,
+      userId: widget.userId,
+    );
+  }
+
+  /// An opened share link (054): its match, or its bill's Wallet tab — if
+  /// it's for one of your teams.
+  Future<void> _openShare(String token) async {
+    final result = await sl<OpenShareLink>()(token);
+    if (!mounted) return;
+    final opened = result.fold((_) => null, (opened) => opened);
+    if (opened == null) {
+      context.go(AppRoutes.home);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result.fold(
+                (failure) => failure.message,
+                (_) => "This link is for another team's players, or its match was deleted.",
+              ),
+            ),
+          ),
+        );
+      return;
+    }
+    await openTarget(
+      context,
+      target: opened.kind == ShareKind.bill ? NotificationTarget.wallet : NotificationTarget.match,
+      teamId: opened.teamId,
+      matchId: opened.matchId,
       userId: widget.userId,
     );
   }

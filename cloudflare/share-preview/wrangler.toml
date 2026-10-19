@@ -1,0 +1,9 @@
+# Preview cards for shared links — see src/index.js.
+# Deploy (always with --config, or wrangler sets up a new Worker for the
+# folder it runs in): wrangler deploy --config cloudflare/share-preview/wrangler.toml
+# Secrets (once, from .env): SUPABASE_URL and SUPABASE_ANON_KEY, set with
+#   wrangler secret put SUPABASE_URL   (and the same for SUPABASE_ANON_KEY)
+name = "squad-hq-share"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true

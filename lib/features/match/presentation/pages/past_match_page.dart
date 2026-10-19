@@ -7,6 +7,8 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../comments/domain/entities/match_topic.dart';
 import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../../core/clock/clock_scope.dart';
+import '../../../share/domain/entities/share_link.dart';
+import '../../../share/presentation/widgets/share_link_button.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../../wallet/presentation/bloc/wallet_event.dart';
 import '../../../wallet/presentation/bloc/wallet_state.dart';
@@ -161,6 +163,14 @@ class PastMatchPage extends StatelessWidget {
                 userId: userId,
                 canModerate: isManager,
                 subtitle:
+                    'vs ${pastMatch.match.opponent} · ${formatMatchDate(pastMatch.match.kickoffAt)}',
+              ),
+              const SizedBox(height: 10),
+              ShareLinkButton(
+                key: ValueKey('share-$matchId'),
+                matchId: matchId,
+                kind: ShareKind.match,
+                shareTitle:
                     'vs ${pastMatch.match.opponent} · ${formatMatchDate(pastMatch.match.kickoffAt)}',
               ),
             ],
@@ -806,6 +816,7 @@ class _PastMatchBill extends StatelessWidget {
             split: split,
             userId: userId,
             isManager: isManager,
+            showShare: true,
           ),
         );
       },

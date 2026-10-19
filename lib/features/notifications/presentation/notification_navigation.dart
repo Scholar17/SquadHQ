@@ -18,15 +18,39 @@ import '../../team_membership/presentation/bloc/team_membership_state.dart';
 import '../domain/entities/app_notification.dart';
 import 'bloc/notification_bloc.dart';
 
-/// Opens what [notification] is about: marks it read, switches to its team
-/// if that isn't the active one, then shows its match (detail screen while
-/// upcoming, past-match screen once played) or the Wallet tab.
+/// Opens what [notification] is about: marks it read, then [openTarget].
 Future<void> openNotification(
   BuildContext context,
   AppNotification notification, {
   required String userId,
-}) async {
+}) {
   context.read<NotificationBloc>().add(NotificationOpened(notification.id));
+  return openTarget(
+    context,
+    target: notification.target,
+    teamId: notification.teamId,
+    matchId: notification.matchId,
+    expenseId: notification.expenseId,
+    tripId: notification.tripId,
+    unknownKind: notification.kind == NotificationKind.other,
+    userId: userId,
+  );
+}
+
+/// Opens [target] — a notification's, or a share link's: switches to
+/// [teamId] if that isn't the active team, then shows its match (detail
+/// screen while upcoming, past-match screen once played) or the Wallet
+/// tab. [unknownKind]: a notification kind this version doesn't know.
+Future<void> openTarget(
+  BuildContext context, {
+  required NotificationTarget target,
+  required String? teamId,
+  String? matchId,
+  String? expenseId,
+  String? tripId,
+  bool unknownKind = false,
+  required String userId,
+}) async {
   final router = GoRouter.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
   final messenger = ScaffoldMessenger.of(context);
@@ -45,9 +69,9 @@ Future<void> openNotification(
   }
 
   final activated = await _activateTeam(
-    notification.target == NotificationTarget.squad
-        ? _footballTeamFor(notification.teamId, membershipBloc.state)
-        : notification.teamId,
+    target == NotificationTarget.squad
+        ? _footballTeamFor(teamId, membershipBloc.state)
+        : teamId,
     membershipBloc: membershipBloc,
     matchBloc: matchBloc,
     historyBloc: historyBloc,
@@ -64,7 +88,6 @@ Future<void> openNotification(
   // whole app over.
   if (activated.switched) say('Switched to ${team.name}');
   final isManager = team.role != TeamRole.player;
-  final matchId = notification.matchId;
 
   Future<void> openPast() => navigator.push(
     MaterialPageRoute<void>(
@@ -97,7 +120,7 @@ Future<void> openNotification(
   final isUpcoming = upcoming();
   final isPast = past();
 
-  switch (notification.target) {
+  switch (target) {
     case NotificationTarget.group:
       router.go(AppRoutes.home);
     // A squad's Settle tab is the Wallet slot (see GroupTab).
@@ -106,7 +129,6 @@ Future<void> openNotification(
     case NotificationTarget.squad:
       router.go(AppRoutes.squad);
     case NotificationTarget.expense:
-      final expenseId = notification.expenseId;
       // Not in the loaded ledger (added while the app was asleep, or since
       // deleted): reload once, as for matches — the detail screen would
       // otherwise wait on it forever.
@@ -127,7 +149,6 @@ Future<void> openNotification(
         unawaited(router.push(AppRoutes.expenseDetail(expenseId)));
       }
     case NotificationTarget.trip:
-      final tripId = notification.tripId;
       if (tripId == null) {
         router.go(AppRoutes.home);
       } else {
@@ -136,7 +157,7 @@ Future<void> openNotification(
     // A kind this version doesn't know yet, not about a match: Home,
     // rather than a "match no longer available" that isn't true.
     case NotificationTarget.match
-        when matchId == null && notification.kind == NotificationKind.other:
+        when matchId == null && unknownKind:
       router.go(AppRoutes.home);
     case NotificationTarget.match when isUpcoming:
       unawaited(

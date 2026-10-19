@@ -29,6 +29,8 @@ import '../../../match/presentation/pages/match_history_page.dart';
 import '../../../match/presentation/widgets/cancel_match_dialog.dart';
 import '../../../match/presentation/widgets/match_history_widgets.dart';
 import '../../../match/presentation/widgets/create_match_sheet.dart';
+import '../../../share/domain/entities/share_link.dart';
+import '../../../share/presentation/widgets/share_link_button.dart';
 import '../../../team_membership/domain/entities/team.dart' as membership;
 import '../../../team_membership/presentation/bloc/team_membership_bloc.dart';
 import '../../../team_membership/presentation/bloc/team_membership_state.dart';
@@ -409,6 +411,13 @@ class _MatchdayView extends StatelessWidget {
                 canModerate: isManager,
                 subtitle: 'vs ${match.opponent} · ${formatMatchDate(match.kickoffAt)}',
               ),
+              const SizedBox(height: 10),
+              ShareLinkButton(
+                key: ValueKey('share-${match.id}'),
+                matchId: match.id,
+                kind: ShareKind.match,
+                shareTitle: 'vs ${match.opponent} · ${formatMatchDate(match.kickoffAt)}',
+              ),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -485,6 +494,7 @@ class _MatchBill extends StatelessWidget {
             split: split,
             userId: userId,
             isManager: isManager,
+            showShare: true,
           );
         } else if (isManager) {
           card = AddBillCard(walletMatch: walletMatch, userId: userId);

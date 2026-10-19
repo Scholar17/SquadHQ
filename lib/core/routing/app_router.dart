@@ -140,7 +140,9 @@ String? _authRedirect(GoRouterState state, AuthBloc authBloc) {
 
   // A web push's link (see supabase/sql/023_push_opens_notification.sql):
   // NotificationRouting opens it once signed in, from wherever this lands.
-  if (NotificationRouting.notificationIdIn(state.uri.path) != null) {
+  // A share link (054) opens the same way.
+  if (NotificationRouting.notificationIdIn(state.uri.path) != null ||
+      NotificationRouting.shareTokenIn(state.uri.path) != null) {
     NotificationRouting.open(state.uri.path);
     return switch (settled) {
       AuthNeedsOnboarding() => AppRoutes.onboarding,
@@ -343,15 +345,17 @@ GoRouter createAppRouter(AuthBloc authBloc) {
               : TripPage(tripId: state.pathParameters['id']!, user: user);
         },
       ),
-      // Never shown: _authRedirect hands these push links off. Declared so
-      // the location matches a route rather than erroring.
+      // Never shown: _authRedirect hands these push and share links off.
+      // Declared so the location matches a route rather than erroring.
       GoRoute(
         path: '${AppRoutes.notifications}/:id',
         builder: (context, state) => const _SettlingPage(),
       ),
+      GoRoute(path: '/open/:token', builder: (context, state) => const _SettlingPage()),
+      GoRoute(path: '/s/:token', builder: (context, state) => const _SettlingPage()),
     ],
   );
-  WebBackGuard.install(router);
+  WebBackGuard.install(router, fallbackLocation: AppRoutes.home);
   return router;
 }
 

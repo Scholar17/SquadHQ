@@ -106,6 +106,10 @@ import '../../features/weather/domain/repositories/forecast_repository.dart';
 import '../../features/weather/domain/usecases/get_live_air_quality.dart';
 import '../../features/weather/domain/usecases/get_kickoff_forecast.dart';
 import '../../features/weather/presentation/temperature_unit_controller.dart';
+import '../../features/share/data/datasources/share_remote_data_source.dart';
+import '../../features/share/data/repositories/share_repository_impl.dart';
+import '../../features/share/domain/repositories/share_repository.dart';
+import '../../features/share/domain/usecases/share_usecases.dart';
 import '../env.dart';
 import '../theme/theme_controller.dart';
 
@@ -433,6 +437,16 @@ Future<void> initDependencies() async {
       ),
       instanceName: CommentsBloc.match,
     );
+
+  // Features - Share links (a match or its bill, with a preview card)
+  sl
+    ..registerLazySingleton<ShareRemoteDataSource>(
+      () => ShareRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<ShareRepository>(() => ShareRepositoryImpl(sl()))
+    ..registerLazySingleton(() => GetShareLink(sl()))
+    ..registerLazySingleton(() => RecordShare(sl()))
+    ..registerLazySingleton(() => OpenShareLink(sl()));
 
   // Features - Player ratings (Squad tab, Fill rating, match stats)
   sl

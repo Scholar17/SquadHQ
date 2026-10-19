@@ -72,9 +72,12 @@ import 'package:squad_hq/features/wallet/domain/repositories/wallet_repository.d
 import 'package:squad_hq/features/wallet/presentation/bloc/wallet_bloc.dart';
 import 'package:squad_hq/features/wallet/presentation/bloc/wallet_event.dart';
 import 'package:squad_hq/features/wallet/presentation/pages/wallet_bills_page.dart';
+import 'package:squad_hq/features/share/domain/repositories/share_repository.dart';
+import 'package:squad_hq/features/share/domain/entities/share_link.dart';
 
 import 'fake_match_comments_repository.dart';
 import 'fake_mention_members_repository.dart';
+import 'fake_share_repository.dart';
 import 'fake_notification_repository.dart';
 import 'fake_player_rating_repository.dart';
 import 'fake_squad_repository.dart';
@@ -140,6 +143,7 @@ void main() {
   final fakeVenues = FakeVenueRepository();
   final fakeForecasts = FakeForecastRepository();
   final fakeAir = FakeAirQualityRepository();
+  final fakeShares = FakeShareRepository();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -169,6 +173,8 @@ void main() {
       ..registerLazySingleton<ForecastRepository>(() => fakeForecasts)
       ..unregister<AirQualityRepository>()
       ..registerLazySingleton<AirQualityRepository>(() => fakeAir)
+      ..unregister<ShareRepository>()
+      ..registerLazySingleton<ShareRepository>(() => fakeShares)
       ..unregister<TeamChanges>()
       ..registerLazySingleton<TeamChanges>(FakeTeamChanges.new);
   });
@@ -184,6 +190,7 @@ void main() {
     fakeVenues.reset();
     fakeForecasts.reset();
     fakeAir.reset();
+    fakeShares.reset();
   });
 
   const user = AppUser(
@@ -733,6 +740,82 @@ void main() {
     await tester.tap(find.text('1 comment'));
     await tester.pumpAndSettle();
     expect(find.text('Bibs @ak7 please, and @nobody'), findsOneWidget);
+  });
+
+  testWidgets("A player who voted I'm out can still comment on the match", (tester) async {
+    await pumpHome(tester, const MatchPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("I'm out"));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit vote'));
+    await tester.pumpAndSettle();
+    expect(find.text("You voted I'm out"), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Match chat'), 200);
+    await tester.tap(find.text('Match chat'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('comment-field')), "Can't make it, sorry");
+    await tester.pump();
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(
+      fakeMatchComments.inThread((matchId: 'match-1', topic: MatchTopic.match)).single.body,
+      "Can't make it, sorry",
+    );
+  });
+
+  testWidgets('Share match copies its link where there is no share sheet', (tester) async {
+    await pumpHome(tester, const MatchPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    await tester.scrollUntilVisible(find.text('Share match'), 200);
+    await tester.tap(find.text('Share match'));
+    await tester.pumpAndSettle();
+    expect(copied, 'https://squad-hq.web.app/s/match-match-1');
+    expect(find.text('Link copied — paste it in Messenger or Facebook'), findsOneWidget);
+    // The team hears too (055's push).
+    expect(fakeShares.recorded, [('match-1', ShareKind.match)]);
+  });
+
+  testWidgets("The Match tab's bill card shares the bill; the Wallet tab's doesn't", (tester) async {
+    fakeWallet.bills['match-1'] = const MatchBill(
+      totalCost: 900,
+      payerId: 'p-2',
+      payerName: 'Aung Ko',
+      payerQrPath: 'p-2/qr.png',
+      splitMode: SplitMode.team,
+    );
+    await pumpHome(tester, const MatchPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    await tester.scrollUntilVisible(find.text('Share bill'), 200);
+    await tester.tap(find.text('Share bill'));
+    await tester.pumpAndSettle();
+    expect(copied, 'https://squad-hq.web.app/s/bill-match-1');
+
+    await pumpHome(tester, const WalletPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    expect(find.text('Share bill'), findsNothing);
   });
 
   testWidgets('Match chat and bill comments, with replies, live', (tester) async {
@@ -1971,6 +2054,32 @@ void main() {
     expect(NotificationRouting.notificationIdIn('/notifications'), isNull);
     expect(NotificationRouting.notificationIdIn('/notifications/'), isNull);
     expect(NotificationRouting.notificationIdIn('/match'), isNull);
+  });
+
+  testWidgets('A shared match link opens the match; one for another team says so', (tester) async {
+    await openHome(tester);
+    // Shared from another phone (054's share_link).
+    await fakeShares.getShareLink('match-1', ShareKind.match);
+
+    NotificationRouting.open('/open/${FakeShareRepository.tokenFor('match-1', ShareKind.match)}');
+    await tester.pumpAndSettle();
+    expect(find.text('Are you playing vs Sundown United?'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    NotificationRouting.open('/s/not-ours');
+    await tester.pumpAndSettle();
+    expect(
+      find.text("This link is for another team's players, or its match was deleted."),
+      findsOneWidget,
+    );
+  });
+
+  test('Share links carry their token', () {
+    expect(NotificationRouting.shareTokenIn('/open/a1b2c3'), 'a1b2c3');
+    expect(NotificationRouting.shareTokenIn('/s/a1b2c3'), 'a1b2c3');
+    expect(NotificationRouting.shareTokenIn('/s/'), isNull);
+    expect(NotificationRouting.shareTokenIn('/match'), isNull);
   });
 
   testWidgets("Tapping an upcoming match on Home opens its detail screen", (tester) async {

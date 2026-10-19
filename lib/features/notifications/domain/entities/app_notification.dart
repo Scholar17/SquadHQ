@@ -7,7 +7,8 @@ import 'package:equatable/equatable.dart';
 /// due_rating_push_notifications() (045_player_ratings.sql), or
 /// due_mention_push_notifications() (049_mentions.sql), or
 /// due_member_removed_push_notifications() (051_leave_and_remove_members.sql), or
-/// due_match_question_push_notifications() (053_match_questions.sql).
+/// due_match_question_push_notifications() (053_match_questions.sql), or
+/// due_share_push_notifications() (055_share_pushes.sql).
 enum NotificationKind {
   newMatch('new_match'),
   rsvpNudge('rsvp_nudge'),
@@ -60,6 +61,10 @@ enum NotificationKind {
   /// to rate your game" (053).
   matchFollowup('match_followup'),
   questionsLastDay('questions_last_day'),
+
+  /// "Aung Ko shared the match vs Red Lions" — or its bill (055).
+  matchShared('match_shared'),
+  billShared('bill_shared'),
   other('');
 
   const NotificationKind(this.dbName);
@@ -152,7 +157,8 @@ class AppNotification extends Equatable {
     NotificationKind.payReminder ||
     NotificationKind.billComment ||
     NotificationKind.billReply ||
-    NotificationKind.billMention => NotificationTarget.wallet,
+    NotificationKind.billMention ||
+    NotificationKind.billShared => NotificationTarget.wallet,
     NotificationKind.settlePending ||
     NotificationKind.settleConfirmed ||
     NotificationKind.settleRejected ||

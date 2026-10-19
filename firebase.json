@@ -17,6 +17,13 @@
         "**/.DS_Store",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/s/:token",
+          "destination": "https://squad-hq-share.share-preview.workers.dev/s/:token",
+          "type": 302
+        }
+      ],
       "rewrites": [
         {
           "source": "**",

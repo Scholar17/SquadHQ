@@ -5,17 +5,21 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../match/presentation/match_formatting.dart';
+import '../../../share/domain/entities/share_link.dart';
+import '../../../share/presentation/widgets/share_link_button.dart';
 import '../../domain/entities/bill_split.dart';
 import '../../domain/repositories/wallet_repository.dart';
 import '../bloc/wallet_bloc.dart';
 import '../bloc/wallet_state.dart';
 import '../wallet_formatting.dart';
 import 'bill_sheet.dart';
+import 'pay_bill_sheet.dart';
 import 'wallet_image.dart';
 
 /// Everyone in a bill's split and whether they've paid back. The payer
 /// can open each teammate's payment slip; everyone else only their own
-/// (the payment-slips storage policies enforce the same). [canEdit] is
+/// (the payment-slips storage policies enforce the same), and can change
+/// their own. [canEdit] is
 /// true only for the payer in the Manager view.
 Future<void> showBillDetailsSheet(
   BuildContext context, {
@@ -115,6 +119,14 @@ Future<void> showBillDetailsSheet(
                       ),
                   ],
                 ),
+              ),
+              // A payment request for the group chat: no amounts on its
+              // card, just who to pay.
+              const SizedBox(height: 16),
+              ShareLinkButton(
+                matchId: matchId,
+                kind: ShareKind.bill,
+                shareTitle: 'Bill · vs ${walletMatch.match.opponent}',
               ),
               if (canEdit) ...[
                 const SizedBox(height: 16),
