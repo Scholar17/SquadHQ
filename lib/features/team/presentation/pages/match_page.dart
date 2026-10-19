@@ -547,6 +547,40 @@ class _HubHeader extends StatelessWidget {
   final bool isManager;
   final VoidCallback onEdit;
 
+  static TextStyle get _titleStyle => AppTextStyles.body(
+    size: 11,
+    weight: FontWeight.w700,
+    color: AppColors.teamGold,
+  ).copyWith(letterSpacing: 1.4);
+
+  static TextStyle get _editStyle => AppTextStyles.title(size: 11.5, color: AppColors.onDark);
+
+  /// Whether "MATCHDAY HUB", the countdown chip and an "Edit details"
+  /// button all fit in [maxWidth] at full length. When they don't, the
+  /// button says "Edit" — the title and countdown are never cut short.
+  static bool _fullEditLabelFits(BuildContext context, double maxWidth, DateTime kickoffAt) {
+    final scaler = MediaQuery.textScalerOf(context);
+    double width(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final w = painter.width;
+      painter.dispose();
+      return w;
+    }
+
+    final title = width('MATCHDAY HUB', _titleStyle);
+    // The chip: its label plus 10 padding and 1 border each side.
+    final chip = width(_KickoffChip.labelFor(kickoffAt).$1, _KickoffChip.style(AppColors.teamGold)) + 22;
+    // The button: its label plus 13 padding and 1 border each side.
+    final button = width('Edit details', _editStyle) + 28;
+    // 8 between title and chip, and at least 8 before the button.
+    return title + 8 + chip + 8 + button <= maxWidth;
+  }
+
   @override
   Widget build(BuildContext context) {
     final venueId = match.venueId;
@@ -614,35 +648,49 @@ class _HubHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'MATCHDAY HUB',
-              style: AppTextStyles.body(
-                size: 11,
-                weight: FontWeight.w700,
-                color: AppColors.teamGold,
-              ).copyWith(letterSpacing: 1.4),
-            ),
-            const SizedBox(width: 8),
-            Flexible(child: _KickoffChip(kickoffAt: match.kickoffAt)),
-            const Spacer(),
-            if (isManager)
-              OutlinedButton(
-                onPressed: onEdit,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.onDark,
-                  side: const BorderSide(color: Color(0x47F9F4ED)),
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 13),
-                  minimumSize: const Size(0, 28),
-                ),
-                child: Text(
-                  'Edit details',
-                  style: AppTextStyles.title(size: 11.5, color: AppColors.onDark),
+        // When it doesn't all fit, the button says just "Edit", so the
+        // title and countdown keep their full text.
+        LayoutBuilder(
+          builder: (context, constraints) => Row(
+            children: [
+              // Title and chip take all the free space (a Spacer beside a
+              // Flexible title would take half of it and cut the title).
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'MATCHDAY HUB',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _titleStyle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _KickoffChip(kickoffAt: match.kickoffAt),
+                  ],
                 ),
               ),
-          ],
+              const SizedBox(width: 8),
+              if (isManager)
+                OutlinedButton(
+                  onPressed: onEdit,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.onDark,
+                    side: const BorderSide(color: Color(0x47F9F4ED)),
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    minimumSize: const Size(0, 28),
+                  ),
+                  child: Text(
+                    _fullEditLabelFits(context, constraints.maxWidth, match.kickoffAt)
+                        ? 'Edit details'
+                        : 'Edit',
+                    style: _editStyle,
+                  ),
+                ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         RichText(
@@ -805,22 +853,30 @@ class _KickoffChip extends StatelessWidget {
 
   final DateTime kickoffAt;
 
-  @override
-  Widget build(BuildContext context) {
+  static TextStyle style(Color color) =>
+      AppTextStyles.label(size: 11, color: color).copyWith(letterSpacing: 0.6);
+
+  /// The chip's text, and whether kickoff is close (gold).
+  static (String, bool) labelFor(DateTime kickoffAt) {
     final now = DateTime.now();
     final kickoff = kickoffAt.toLocal();
     final days = DateUtils.dateOnly(kickoff).difference(DateUtils.dateOnly(now)).inDays;
     final played = kickoff.isBefore(now);
-    final (label, soon) = switch (days) {
+    return switch (days) {
       0 when played => ('KICKED OFF', true),
       _ when played => ('PLAYED', false),
       0 => ('TODAY', true),
       1 => ('TOMORROW', true),
       _ => ('IN $days DAYS', days <= 3),
     };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, soon) = labelFor(kickoffAt);
     final color = soon ? AppColors.teamGold : AppColors.onDarkMuted;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: AppRadius.pill,
@@ -829,8 +885,8 @@ class _KickoffChip extends StatelessWidget {
       child: Text(
         label,
         maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.label(size: 10, color: color),
+        softWrap: false,
+        style: style(color),
       ),
     );
   }
