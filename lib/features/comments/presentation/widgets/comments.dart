@@ -458,19 +458,25 @@ class _CommentComposerState extends State<CommentComposer> {
                         ),
                       ),
                     ),
+                    // Part of the text field's tap region, as the @ list is:
+                    // on web a touch outside the field takes its focus, so
+                    // the keyboard drops, the composer slides down with it
+                    // and the tap misses Send. _send puts the keyboard away.
                     BlocBuilder<CommentsBloc, CommentsState>(
                       buildWhen: (previous, current) => previous.posting != current.posting,
-                      builder: (context, state) => TextButton(
-                        onPressed: state.posting || _text.text.trim().isEmpty ? null : _send,
-                        style: TextButton.styleFrom(minimumSize: const Size(56, 44)),
-                        child: Text(
-                          'Send',
-                          style: AppTextStyles.body(
-                            size: 14,
-                            weight: FontWeight.w800,
-                            color: state.posting || _text.text.trim().isEmpty
-                                ? AppColors.neutral500
-                                : oweColor,
+                      builder: (context, state) => TextFieldTapRegion(
+                        child: TextButton(
+                          onPressed: state.posting || _text.text.trim().isEmpty ? null : _send,
+                          style: TextButton.styleFrom(minimumSize: const Size(56, 44)),
+                          child: Text(
+                            'Send',
+                            style: AppTextStyles.body(
+                              size: 14,
+                              weight: FontWeight.w800,
+                              color: state.posting || _text.text.trim().isEmpty
+                                  ? AppColors.neutral500
+                                  : oweColor,
+                            ),
                           ),
                         ),
                       ),
