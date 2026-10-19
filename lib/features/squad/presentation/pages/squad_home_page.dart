@@ -6,6 +6,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../invites/presentation/widgets/my_invitations.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../../notifications/presentation/bloc/notification_bloc.dart';
 import '../../../notifications/presentation/widgets/other_groups_activity.dart';
@@ -74,6 +75,7 @@ class SquadHomePage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const InvitationsBanner(padding: EdgeInsets.only(bottom: 16)),
                         const OtherGroupsActivity(padding: EdgeInsets.only(bottom: 16)),
                         _BalanceHero(
                           ledger: ledger,

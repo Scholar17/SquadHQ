@@ -8,6 +8,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../invites/presentation/widgets/my_invitations.dart';
 import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../auth/domain/entities/app_user.dart';
@@ -193,6 +194,16 @@ class _EmptyHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Invited somewhere already: answer that first.
+        const InvitationsBanner(padding: EdgeInsets.fromLTRB(20, 12, 20, 0)),
+        Expanded(child: _emptyState()),
+      ],
+    );
+  }
+
+  Widget _emptyState() {
     return EmptyState(
       icon: Icons.groups_rounded,
       title: "You're not on a team yet",
@@ -258,6 +269,7 @@ class _DashboardContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           sliver: SliverList.list(
             children: [
+              const InvitationsBanner(padding: EdgeInsets.only(bottom: 16)),
               const OtherGroupsActivity(padding: EdgeInsets.only(bottom: 20)),
               UpcomingMatchesSection(
                 matches: matches,

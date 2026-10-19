@@ -65,6 +65,7 @@ import 'package:squad_hq/features/team/presentation/pages/squad_page.dart';
 import 'package:squad_hq/features/team/presentation/pages/wallet_page.dart';
 import 'package:squad_hq/features/team/presentation/widgets/group_tab.dart';
 import 'package:squad_hq/features/team_membership/domain/entities/team.dart';
+import 'package:squad_hq/features/team_membership/presentation/pages/team_membership_page.dart';
 import 'package:squad_hq/features/team_membership/presentation/bloc/team_membership_bloc.dart';
 import 'package:squad_hq/features/team_membership/presentation/bloc/team_membership_state.dart';
 import 'package:squad_hq/features/wallet/domain/entities/team_wallet.dart';
@@ -73,7 +74,9 @@ import 'package:squad_hq/features/wallet/presentation/bloc/wallet_bloc.dart';
 import 'package:squad_hq/features/wallet/presentation/bloc/wallet_event.dart';
 import 'package:squad_hq/features/wallet/presentation/pages/wallet_bills_page.dart';
 import 'package:squad_hq/features/share/domain/repositories/share_repository.dart';
+import 'package:squad_hq/features/invites/domain/entities/group_invite.dart';
 import 'package:squad_hq/features/invites/domain/repositories/invite_repository.dart';
+import 'package:squad_hq/features/invites/presentation/pages/invitations_page.dart';
 import 'package:squad_hq/features/share/domain/entities/share_link.dart';
 
 import 'fake_match_comments_repository.dart';
@@ -389,6 +392,7 @@ void main() {
         path: AppRoutes.upcomingMatch,
         builder: (context, state) => UpcomingMatchPage(args: state.extra! as UpcomingMatchArgs),
       ),
+      GoRoute(path: AppRoutes.invitations, builder: (context, state) => const InvitationsPage()),
       GoRoute(
         path: AppRoutes.notifications,
         builder: (context, state) => NotificationsPage(args: state.extra! as NotificationsArgs),
@@ -1252,6 +1256,67 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Delete your account?'), findsNothing);
+  });
+
+  testWidgets('An invitation shows on Home until answered, and opens Invitations', (tester) async {
+    fakeInvites.invites.add(
+      GroupInvite(
+        id: 'inv-1',
+        teamId: 'team-9',
+        teamName: 'Sunday FC',
+        kind: GroupKind.team,
+        memberCount: 9,
+        invitedByName: 'Aung Ko',
+        createdAt: DateTime.now(),
+      ),
+    );
+    tester.view
+      ..physicalSize = const Size(800, 1600)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(homeProvided(MaterialApp.router(routerConfig: shellRouter())));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text("You're invited to Sunday FC"), findsOneWidget);
+    expect(find.text('Aung Ko invited you to join the team.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('invitations-banner')));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Invitations'), findsOneWidget);
+
+    await tester.tap(find.text('Decline'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('invitations-banner')), findsNothing);
+  });
+
+  testWidgets('The Groups page has no Invitations row when there are none', (tester) async {
+    await pumpHome(tester, const TeamMembershipPage());
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('invitations-row')), findsNothing);
+  });
+
+  testWidgets('The Groups page shows Invitations with how many are waiting', (tester) async {
+    fakeInvites.invites.addAll([
+      for (final i in [1, 2])
+        GroupInvite(
+          id: 'inv-$i',
+          teamId: 'team-$i',
+          teamName: 'Group $i',
+          kind: GroupKind.squad,
+          memberCount: 4,
+          invitedByName: 'Aung Ko',
+          createdAt: DateTime.now(),
+        ),
+    ]);
+    await pumpHome(tester, const TeamMembershipPage());
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byKey(const ValueKey('invitations-row')), matching: find.text('2')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('App shell switches between all four tabs', (tester) async {
