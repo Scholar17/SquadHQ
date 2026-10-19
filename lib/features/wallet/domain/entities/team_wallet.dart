@@ -86,13 +86,17 @@ class MatchBill extends Equatable {
 }
 
 class WalletMember extends Equatable {
-  const WalletMember({required this.profileId, required this.name});
+  const WalletMember({required this.profileId, required this.name, this.joinedAt});
 
   final String profileId;
   final String name;
 
+  /// When they joined the team; a "Whole team" bill only counts them for
+  /// matches from then on (057). Null: always counted.
+  final DateTime? joinedAt;
+
   @override
-  List<Object?> get props => [profileId, name];
+  List<Object?> get props => [profileId, name, joinedAt];
 }
 
 /// One of the team's matches as the wallet sees it — its bill (if any)
@@ -136,7 +140,12 @@ class TeamWallet extends Equatable {
   BillSplit? splitFor(WalletMatch walletMatch) {
     final bill = walletMatch.bill;
     if (bill == null) return null;
-    return BillSplit.compute(bill: bill, members: members, answers: walletMatch.answers);
+    return BillSplit.compute(
+      bill: bill,
+      members: members,
+      answers: walletMatch.answers,
+      kickoffAt: walletMatch.match.kickoffAt,
+    );
   }
 
   /// Every match that has a bill, newest first, with its split.

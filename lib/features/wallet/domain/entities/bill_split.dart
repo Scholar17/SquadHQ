@@ -30,15 +30,27 @@ class BillSplit extends Equatable {
     required this.roundedShare,
   });
 
+  /// [kickoffAt]: the match's. A [SplitMode.team] bill is the members who
+  /// were in the team by then, plus anyone who has already paid it — not
+  /// someone who joined later (as 057 has the server count them).
   factory BillSplit.compute({
     required MatchBill bill,
     required List<WalletMember> members,
     required Map<String, RsvpAnswer> answers,
+    DateTime? kickoffAt,
   }) {
+    bool inTeamAtKickoff(WalletMember member) {
+      final joinedAt = member.joinedAt;
+      return joinedAt == null ||
+          kickoffAt == null ||
+          !joinedAt.isAfter(kickoffAt) ||
+          bill.payments.containsKey(member.profileId);
+    }
+
     final participants = switch (bill.splitMode) {
       SplitMode.rsvpIn =>
         members.where((member) => answers[member.profileId] == RsvpAnswer.yes),
-      SplitMode.team => members,
+      SplitMode.team => members.where(inTeamAtKickoff),
       SplitMode.custom =>
         members.where((member) => bill.customMemberIds.contains(member.profileId)),
     };

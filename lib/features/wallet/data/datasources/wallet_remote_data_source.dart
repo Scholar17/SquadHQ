@@ -70,7 +70,10 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     try {
       final since = DateTime.now().subtract(_recentWindow).toUtc().toIso8601String();
       final (memberRows, matchRows) = await (
-        _supabase.from('team_members').select('profile_id, profiles(name)').eq('team_id', teamId),
+        _supabase
+            .from('team_members')
+            .select('profile_id, joined_at, profiles(name)')
+            .eq('team_id', teamId),
         _supabase
             .from('matches')
             .select(

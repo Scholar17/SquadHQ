@@ -39,6 +39,10 @@ abstract final class TeamWalletModel {
             profileId: row['profile_id'] as String,
             name: ((row['profiles'] as Map<String, dynamic>?)?['name'] as String?) ??
                 'Unknown player',
+            joinedAt: switch (row['joined_at']) {
+              final String at => DateTime.parse(at),
+              _ => null,
+            },
           ),
       ],
       matches: [

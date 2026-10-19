@@ -105,6 +105,7 @@ class _BillSheetState extends State<_BillSheet> {
     ),
     members: _wallet.members,
     answers: _walletMatch?.answers ?? const {},
+    kickoffAt: _walletMatch?.match.kickoffAt,
   );
 
   @override
