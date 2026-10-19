@@ -111,22 +111,17 @@ class WarmUpAnimation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 280,
-      height: 220,
-      // The runner fills little of its canvas.
-      child: Transform.scale(
-        scale: 1.5,
-        child: Lottie.asset(
-          asset,
-          animate: !MediaQuery.of(context).disableAnimations,
-          delegates: LottieDelegates(
-            values: [
-              ValueDelegate.color(const ['**', 'man', '**'], value: AppColors.text),
-              ValueDelegate.color(const ['**', 'Shape Layer 1', '**'], value: AppColors.accent),
-              ValueDelegate.color(const ['**', 'Shape Layer 2', '**'], value: AppColors.accent),
-            ],
-          ),
+    return SizedBox.square(
+      dimension: 130,
+      child: Lottie.asset(
+        asset,
+        animate: !MediaQuery.of(context).disableAnimations,
+        delegates: LottieDelegates(
+          values: [
+            ValueDelegate.color(const ['**', 'man', '**'], value: AppColors.text),
+            ValueDelegate.color(const ['**', 'Shape Layer 1', '**'], value: AppColors.accent),
+            ValueDelegate.color(const ['**', 'Shape Layer 2', '**'], value: AppColors.accent),
+          ],
         ),
       ),
     );
