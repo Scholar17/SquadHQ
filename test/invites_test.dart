@@ -165,15 +165,17 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('pending-invites')));
     await tester.pumpAndSettle();
+    // Full screen, with its own app bar.
+    expect(find.widgetWithText(AppBar, 'Pending invites'), findsOneWidget);
     expect(find.text('Min Thu'), findsOneWidget);
-    expect(find.textContaining('@minthu · Invited by Test Player'), findsOneWidget);
+    expect(find.textContaining('@minthu · Invited by Test Player · '), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(fakeInvites.cancelled, ['inv-p-2']);
     expect(find.text('No pending invites.'), findsOneWidget);
 
-    await tester.tapAt(const Offset(10, 10));
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(count, findsOneWidget);
   });

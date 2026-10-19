@@ -55,15 +55,10 @@ class _GroupInviteActionsState extends State<GroupInviteActions> {
   }
 
   Future<void> _showPending() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: AppColors.bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _PendingInvitesPage(teamId: widget.teamId, groupName: widget.groupName),
       ),
-      builder: (_) => _PendingInvitesSheet(teamId: widget.teamId, groupName: widget.groupName),
     );
     if (mounted) await _load();
   }
@@ -128,18 +123,19 @@ class _GroupInviteActionsState extends State<GroupInviteActions> {
   }
 }
 
-/// Everyone invited to the group who hasn't answered yet, with Cancel.
-class _PendingInvitesSheet extends StatefulWidget {
-  const _PendingInvitesSheet({required this.teamId, required this.groupName});
+/// Everyone invited to the group who hasn't answered yet, with Cancel —
+/// full screen, one flat row each.
+class _PendingInvitesPage extends StatefulWidget {
+  const _PendingInvitesPage({required this.teamId, required this.groupName});
 
   final String teamId;
   final String groupName;
 
   @override
-  State<_PendingInvitesSheet> createState() => _PendingInvitesSheetState();
+  State<_PendingInvitesPage> createState() => _PendingInvitesPageState();
 }
 
-class _PendingInvitesSheetState extends State<_PendingInvitesSheet> {
+class _PendingInvitesPageState extends State<_PendingInvitesPage> {
   List<PendingInvite>? _invites;
   String? _error;
 
@@ -186,43 +182,44 @@ class _PendingInvitesSheetState extends State<_PendingInvitesSheet> {
   @override
   Widget build(BuildContext context) {
     final invites = _invites;
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.6,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-            child: Text('Pending invites', style: AppTextStyles.heading(size: 20)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Text(
-              "Invited to ${widget.groupName}, and haven't answered yet.",
-              style: AppTextStyles.body(size: 12.5, color: AppColors.textMuted),
-            ),
-          ),
-          Expanded(
-            child: switch ((invites, _error)) {
-              (null, null) => const Center(child: CircularProgressIndicator()),
-              (null, final error?) => _Note(error),
-              (final invites?, _) when invites.isEmpty => const _Note('No pending invites.'),
-              (final invites?, _) => ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                itemCount: invites.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final invite = invites[index];
-                  return _PendingRow(
-                    invite: invite,
-                    cancelling: _cancelling.contains(invite.id),
-                    onCancel: () => _cancel(invite),
-                  );
-                },
-              ),
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.bg,
+        elevation: 0,
+        foregroundColor: AppColors.text,
+        title: Text('Pending invites', style: AppTextStyles.title(size: 16)),
+      ),
+      body: SafeArea(
+        child: switch ((invites, _error)) {
+          (null, null) => const Center(child: CircularProgressIndicator()),
+          (null, final error?) => _Note(error),
+          (final invites?, _) when invites.isEmpty => const _Note('No pending invites.'),
+          (final invites?, _) => ListView.separated(
+            padding: const EdgeInsets.only(bottom: 24),
+            itemCount: invites.length + 1,
+            separatorBuilder: (_, index) => index == 0
+                ? const SizedBox.shrink()
+                : Divider(height: 1, indent: 68, color: AppColors.divider),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Text(
+                    "Invited to ${widget.groupName}, and haven't answered yet.",
+                    style: AppTextStyles.body(size: 12.5, color: AppColors.textMuted),
+                  ),
+                );
+              }
+              final invite = invites[index - 1];
+              return _PendingRow(
+                invite: invite,
+                cancelling: _cancelling.contains(invite.id),
+                onCancel: () => _cancel(invite),
+              );
             },
           ),
-        ],
+        },
       ),
     );
   }
@@ -256,10 +253,13 @@ class _PendingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final photo = invite.photoUrl;
-    final handle = invite.username == null ? '' : '@${invite.username} · ';
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-      decoration: BoxDecoration(color: AppColors.card, borderRadius: AppRadius.lg),
+    final who = [
+      if (invite.username case final username?) '@$username',
+      invite.invitedByName == null ? 'Invited' : 'Invited by ${invite.invitedByName}',
+      formatNotificationTime(invite.createdAt),
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
       child: Row(
         children: [
           CircleAvatar(
@@ -273,10 +273,16 @@ class _PendingRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(invite.name, style: AppTextStyles.title(size: 14.5)),
                 Text(
-                  '$handle${invite.invitedByName == null ? 'Invited' : 'Invited by ${invite.invitedByName}'}'
-                  ' · ${formatNotificationTime(invite.createdAt)}',
+                  invite.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title(size: 14.5),
+                ),
+                Text(
+                  who,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.body(size: 12, color: AppColors.textMuted),
                 ),
               ],
