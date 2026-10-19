@@ -9,6 +9,12 @@ class FakeInviteRepository implements InviteRepository {
   final people = <InviteCandidate>[];
   final invites = <GroupInvite>[];
 
+  /// Each group's pending invites, by team id.
+  final pending = <String, List<PendingInvite>>{};
+
+  /// Invites cancelled, by id.
+  final cancelled = <String>[];
+
   /// Invites sent, as (team id, profile id).
   final sent = <(String, String)>[];
 
@@ -23,6 +29,8 @@ class FakeInviteRepository implements InviteRepository {
     invites.clear();
     sent.clear();
     answers.clear();
+    pending.clear();
+    cancelled.clear();
     failNextAnswer = null;
   }
 
@@ -42,6 +50,30 @@ class FakeInviteRepository implements InviteRepository {
   @override
   Future<Either<Failure, Unit>> invite(String teamId, String profileId) async {
     sent.add((teamId, profileId));
+    final person = people.firstWhere((p) => p.profileId == profileId);
+    (pending[teamId] ??= []).add(
+      PendingInvite(
+        id: 'inv-$profileId',
+        profileId: profileId,
+        name: person.name,
+        username: person.username,
+        invitedByName: 'Test Player',
+        createdAt: DateTime.now(),
+      ),
+    );
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, List<PendingInvite>>> pendingInvites(String teamId) async =>
+      Right([...?pending[teamId]]);
+
+  @override
+  Future<Either<Failure, Unit>> cancel(String inviteId) async {
+    cancelled.add(inviteId);
+    for (final list in pending.values) {
+      list.removeWhere((invite) => invite.id == inviteId);
+    }
     return const Right(unit);
   }
 

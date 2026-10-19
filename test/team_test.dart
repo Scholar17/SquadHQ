@@ -73,11 +73,13 @@ import 'package:squad_hq/features/wallet/presentation/bloc/wallet_bloc.dart';
 import 'package:squad_hq/features/wallet/presentation/bloc/wallet_event.dart';
 import 'package:squad_hq/features/wallet/presentation/pages/wallet_bills_page.dart';
 import 'package:squad_hq/features/share/domain/repositories/share_repository.dart';
+import 'package:squad_hq/features/invites/domain/repositories/invite_repository.dart';
 import 'package:squad_hq/features/share/domain/entities/share_link.dart';
 
 import 'fake_match_comments_repository.dart';
 import 'fake_mention_members_repository.dart';
 import 'fake_share_repository.dart';
+import 'fake_invite_repository.dart';
 import 'fake_notification_repository.dart';
 import 'fake_player_rating_repository.dart';
 import 'fake_squad_repository.dart';
@@ -144,6 +146,7 @@ void main() {
   final fakeForecasts = FakeForecastRepository();
   final fakeAir = FakeAirQualityRepository();
   final fakeShares = FakeShareRepository();
+  final fakeInvites = FakeInviteRepository();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -175,6 +178,8 @@ void main() {
       ..registerLazySingleton<AirQualityRepository>(() => fakeAir)
       ..unregister<ShareRepository>()
       ..registerLazySingleton<ShareRepository>(() => fakeShares)
+      ..unregister<InviteRepository>()
+      ..registerLazySingleton<InviteRepository>(() => fakeInvites)
       ..unregister<TeamChanges>()
       ..registerLazySingleton<TeamChanges>(FakeTeamChanges.new);
   });
@@ -191,6 +196,7 @@ void main() {
     fakeForecasts.reset();
     fakeAir.reset();
     fakeShares.reset();
+    fakeInvites.reset();
   });
 
   const user = AppUser(
@@ -1038,6 +1044,20 @@ void main() {
 
     expect(find.text("You're not on a team yet"), findsOneWidget);
     expect(find.text('Create or join a team'), findsOneWidget);
+  });
+
+  testWidgets('Squad tab: admins get Invite people and Pending invites', (tester) async {
+    await pumpHome(tester, const SquadPage(user: user), role: TeamRole.admin);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Pending invites'), 200);
+    expect(find.text('Invite people'), findsOneWidget);
+  });
+
+  testWidgets("Squad tab: players don't get Invite people or Pending invites", (tester) async {
+    await pumpHome(tester, const SquadPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
+    expect(find.text('Invite people'), findsNothing);
+    expect(find.text('Pending invites'), findsNothing);
   });
 
   testWidgets('Squad tab shows the team average and real ratings, and opens a card', (tester) async {

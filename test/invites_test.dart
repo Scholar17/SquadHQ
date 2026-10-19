@@ -6,6 +6,7 @@ import 'package:squad_hq/core/di/injection_container.dart';
 import 'package:squad_hq/features/invites/domain/entities/group_invite.dart';
 import 'package:squad_hq/features/invites/domain/repositories/invite_repository.dart';
 import 'package:squad_hq/features/invites/presentation/pages/invitations_page.dart';
+import 'package:squad_hq/features/invites/presentation/widgets/group_invite_actions.dart';
 import 'package:squad_hq/features/invites/presentation/widgets/invite_people_sheet.dart';
 import 'package:squad_hq/features/notifications/domain/entities/app_notification.dart';
 import 'package:squad_hq/features/team_membership/domain/entities/team.dart';
@@ -112,11 +113,12 @@ void main() {
       app(
         Builder(
           builder: (context) => Scaffold(
-            body: InvitePeopleButton(teamId: 'team-9', groupName: 'Sunday FC'),
+            body: GroupInviteActions(teamId: 'team-9', groupName: 'Sunday FC'),
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Invite people'));
     await tester.pumpAndSettle();
     expect(find.text('Invite to Sunday FC'), findsOneWidget);
@@ -138,5 +140,41 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
     expect(find.text('No one from your groups matches.'), findsOneWidget);
+  });
+
+  testWidgets('Pending invites shows a count, lists who, and an admin can cancel one', (tester) async {
+    fakeInvites.people.add(const InviteCandidate(profileId: 'p-2', name: 'Min Thu', username: 'minthu'));
+    await tester.pumpWidget(
+      app(const Scaffold(body: GroupInviteActions(teamId: 'team-9', groupName: 'Sunday FC'))),
+    );
+    await tester.pumpAndSettle();
+    final count = find.descendant(of: find.byKey(const ValueKey('pending-invites')), matching: find.text('0'));
+    expect(count, findsOneWidget);
+
+    // Inviting from the sheet bumps the count once it closes.
+    await tester.tap(find.text('Invite people'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Invite'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: find.byKey(const ValueKey('pending-invites')), matching: find.text('1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('pending-invites')));
+    await tester.pumpAndSettle();
+    expect(find.text('Min Thu'), findsOneWidget);
+    expect(find.textContaining('@minthu · Invited by Test Player'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(fakeInvites.cancelled, ['inv-p-2']);
+    expect(find.text('No pending invites.'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(count, findsOneWidget);
   });
 }

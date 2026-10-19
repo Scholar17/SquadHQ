@@ -12,6 +12,13 @@ abstract interface class InviteRepository {
   /// Inviting someone already invited does nothing.
   Future<Either<Failure, Unit>> invite(String teamId, String profileId);
 
+  /// [teamId]'s invites still waiting on an answer, newest first. Admins
+  /// only.
+  Future<Either<Failure, List<PendingInvite>>> pendingInvites(String teamId);
+
+  /// Withdraws a pending invite (any admin of its group).
+  Future<Either<Failure, Unit>> cancel(String inviteId);
+
   /// Your pending invitations, newest first.
   Future<Either<Failure, List<GroupInvite>>> myInvites();
 

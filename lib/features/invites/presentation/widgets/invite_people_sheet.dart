@@ -14,32 +14,6 @@ import '../../domain/usecases/invite_usecases.dart';
 /// (056's invite_to_team checks the same).
 bool canInvite(TeamRole role) => role != TeamRole.player;
 
-/// "Invite people" for a team's or squad's admins: an outlined button that
-/// opens [showInvitePeopleSheet].
-class InvitePeopleButton extends StatelessWidget {
-  const InvitePeopleButton({super.key, required this.teamId, required this.groupName});
-
-  final String teamId;
-  final String groupName;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: () => showInvitePeopleSheet(context, teamId: teamId, groupName: groupName),
-        icon: Icon(Icons.person_add_alt_1_rounded, size: 18, color: AppColors.text),
-        label: Text('Invite people', style: AppTextStyles.title(size: 14)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
-          shape: const StadiumBorder(),
-        ),
-      ),
-    );
-  }
-}
-
 /// Search people you share a group with — by name or @username — and
 /// invite them to [teamId]. They get a notification to accept or decline.
 Future<void> showInvitePeopleSheet(

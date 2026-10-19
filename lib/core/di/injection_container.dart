@@ -460,6 +460,8 @@ Future<void> initDependencies() async {
     ..registerLazySingleton<InviteRepository>(() => InviteRepositoryImpl(sl()))
     ..registerLazySingleton(() => SearchInviteCandidates(sl()))
     ..registerLazySingleton(() => InviteToGroup(sl()))
+    ..registerLazySingleton(() => GetPendingInvites(sl()))
+    ..registerLazySingleton(() => CancelInvite(sl()))
     ..registerLazySingleton(() => GetMyInvites(sl()))
     ..registerLazySingleton(() => RespondToInvite(sl()));
 

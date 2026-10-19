@@ -31,6 +31,33 @@ class GroupInvite extends Equatable {
   List<Object?> get props => [id, teamId, teamName, kind, memberCount, invitedByName, createdAt];
 }
 
+/// A group's invite still waiting on [name] — what its admins see under
+/// "Pending invites" (058).
+class PendingInvite extends Equatable {
+  const PendingInvite({
+    required this.id,
+    required this.profileId,
+    required this.name,
+    this.username,
+    this.photoUrl,
+    this.invitedByName,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String profileId;
+  final String name;
+  final String? username;
+  final String? photoUrl;
+  final String? invitedByName;
+  final DateTime createdAt;
+
+  String get initial => name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+
+  @override
+  List<Object?> get props => [id, profileId, name, username, photoUrl, invitedByName, createdAt];
+}
+
 /// Someone an admin can invite: they share a group with the admin, and
 /// aren't in this one. [invited]: already has a pending invite to it.
 class InviteCandidate extends Equatable {

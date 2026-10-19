@@ -23,6 +23,16 @@ class InviteRepositoryImpl implements InviteRepository {
   });
 
   @override
+  Future<Either<Failure, List<PendingInvite>>> pendingInvites(String teamId) =>
+      _guard(() => _remoteDataSource.pendingInvites(teamId));
+
+  @override
+  Future<Either<Failure, Unit>> cancel(String inviteId) => _guard(() async {
+    await _remoteDataSource.cancel(inviteId);
+    return unit;
+  });
+
+  @override
   Future<Either<Failure, List<GroupInvite>>> myInvites() =>
       _guard(_remoteDataSource.myInvites);
 

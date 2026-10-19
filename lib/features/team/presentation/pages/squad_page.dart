@@ -11,6 +11,8 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../auth/domain/entities/app_user.dart';
+import '../../../invites/presentation/widgets/group_invite_actions.dart';
+import '../../../invites/presentation/widgets/invite_people_sheet.dart';
 import '../../../player_rating/domain/entities/player_rating.dart';
 import '../../../player_rating/presentation/bloc/team_ratings_bloc.dart';
 import '../../../player_rating/presentation/pages/player_card_page.dart';
@@ -105,6 +107,7 @@ class _SquadViewState extends State<_SquadView> {
   @override
   Widget build(BuildContext context) {
     final me = widget.user.id;
+    final team = watchActiveGroup(context);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -183,6 +186,10 @@ class _SquadViewState extends State<_SquadView> {
                       ],
                     ),
                   ),
+                  if (team != null && canInvite(team.role)) ...[
+                    const SizedBox(height: 14),
+                    GroupInviteActions(teamId: team.id, groupName: team.name),
+                  ],
                 ],
               ),
             );

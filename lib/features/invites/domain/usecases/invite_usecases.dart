@@ -29,6 +29,27 @@ class InviteToGroup implements UseCase<Unit, InviteParams> {
       _repository.invite(params.teamId, params.profileId);
 }
 
+/// A group's pending invites ([String] is its team id).
+class GetPendingInvites implements UseCase<List<PendingInvite>, String> {
+  const GetPendingInvites(this._repository);
+
+  final InviteRepository _repository;
+
+  @override
+  Future<Either<Failure, List<PendingInvite>>> call(String teamId) =>
+      _repository.pendingInvites(teamId);
+}
+
+/// Withdraws a pending invite ([String] is its id).
+class CancelInvite implements UseCase<Unit, String> {
+  const CancelInvite(this._repository);
+
+  final InviteRepository _repository;
+
+  @override
+  Future<Either<Failure, Unit>> call(String inviteId) => _repository.cancel(inviteId);
+}
+
 class GetMyInvites implements UseCase<List<GroupInvite>, NoParams> {
   const GetMyInvites(this._repository);
 
