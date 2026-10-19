@@ -170,13 +170,14 @@ class _KickoffConditionsState extends State<KickoffConditions> {
         ValueListenableBuilder<TemperatureUnit>(
           valueListenable: sl<TemperatureUnitController>(),
           builder: (context, unit, _) => _chip(
-            icon: _icon(forecast.kind),
+            icon: _icon(forecast),
             text: unit.format(forecast.temperatureC),
             accent: null,
             details: _weatherDetails(forecast, unit),
           ),
         ),
-        if (forecast.rainChance case final chance?)
+        // A dry day shows just the sky and temperature.
+        if (forecast.rainChance case final chance? when forecast.rainWorthShowing)
           _chip(
             icon: Icons.water_drop_outlined,
             text: '$chance%',
@@ -243,7 +244,7 @@ class _KickoffConditionsState extends State<KickoffConditions> {
 
   /// Open-Meteo's data is CC BY 4.0: credited wherever it's explained.
   String _weatherDetails(KickoffForecast forecast, TemperatureUnit unit) => [
-        'At kickoff: ${unit.format(forecast.temperatureC)}, ${forecast.kind.label.toLowerCase()}'
+        'At kickoff: ${unit.format(forecast.temperatureC)}, ${forecast.label.toLowerCase()}'
             '${forecast.rainChance == null ? '' : ', ${forecast.rainChance}% chance of rain'}.',
         if (forecast.rainLikely) 'Rain likely — bring a jacket.',
         'Weather data: Open-Meteo.com.',
@@ -255,9 +256,11 @@ class _KickoffConditionsState extends State<KickoffConditions> {
         _ => _alarm,
       };
 
-  static IconData _icon(WeatherKind kind) => switch (kind) {
-        WeatherKind.clear => Icons.wb_sunny_outlined,
-        WeatherKind.partlyCloudy => Icons.wb_cloudy_outlined,
+  static IconData _icon(KickoffForecast forecast) => switch (forecast.kind) {
+        WeatherKind.clear when forecast.isDay => Icons.wb_sunny_outlined,
+        WeatherKind.clear => Icons.nightlight_outlined,
+        WeatherKind.partlyCloudy when forecast.isDay => Icons.wb_cloudy_outlined,
+        WeatherKind.partlyCloudy => Icons.nights_stay_outlined,
         WeatherKind.cloudy => Icons.cloud_outlined,
         WeatherKind.fog => Icons.foggy,
         WeatherKind.drizzle => Icons.grain_rounded,
@@ -298,7 +301,7 @@ class _KickoffConditionsState extends State<KickoffConditions> {
           children: [
             Row(
               children: [
-                Icon(_icon(forecast.kind), size: 20, color: accent ?? _ink),
+                Icon(_icon(forecast), size: 20, color: accent ?? _ink),
                 const SizedBox(width: 6),
                 Text(
                   unit.format(forecast.temperatureC),
@@ -318,7 +321,7 @@ class _KickoffConditionsState extends State<KickoffConditions> {
               ),
             // The air tile is the latest reading; this one is for kickoff.
             Text(
-              '${forecast.kind.label} · at kickoff',
+              '${forecast.label} · at kickoff',
               style: AppTextStyles.body(size: 12, color: _quiet),
             ),
           ],

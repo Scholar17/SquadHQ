@@ -51,6 +51,14 @@ void main() {
     expect(const KickoffForecast(temperatureC: 30, weatherCode: 61).rainLikely, isFalse);
   });
 
+  test('A clear sky is Sunny by day and Clear at night; low rain chances stay quiet', () {
+    expect(const KickoffForecast(temperatureC: 33, weatherCode: 0).label, 'Sunny');
+    expect(const KickoffForecast(temperatureC: 26, weatherCode: 0, isDay: false).label, 'Clear');
+    expect(const KickoffForecast(temperatureC: 30, weatherCode: 3).label, 'Cloudy');
+    expect(const KickoffForecast(temperatureC: 30, weatherCode: 0, rainChance: 29).rainWorthShowing, isFalse);
+    expect(const KickoffForecast(temperatureC: 30, weatherCode: 3, rainChance: 30).rainWorthShowing, isTrue);
+  });
+
   test('temperatures show in °C or °F, whole degrees', () {
     expect(TemperatureUnit.celsius.format(31.4), '31°C');
     expect(TemperatureUnit.fahrenheit.format(31.4), '89°F');
@@ -65,7 +73,7 @@ void main() {
           asked = request.url;
           return http.Response(
             '{"hourly":{"time":[1792490400],"temperature_2m":[27.7],'
-            '"precipitation_probability":[87],"weather_code":[51]}}',
+            '"precipitation_probability":[87],"weather_code":[51],"is_day":[0]}}',
             200,
           );
         }),
@@ -75,7 +83,10 @@ void main() {
         longitude: 100.5018,
         kickoffAt: DateTime.utc(2026, 10, 20, 9, 45),
       );
-      expect(forecast, const KickoffForecast(temperatureC: 27.7, weatherCode: 51, rainChance: 87));
+      expect(
+        forecast,
+        const KickoffForecast(temperatureC: 27.7, weatherCode: 51, rainChance: 87, isDay: false),
+      );
       expect(asked.host, 'api.open-meteo.com');
       expect(asked.queryParameters['start_hour'], '2026-10-20T10:00');
       expect(asked.queryParameters['end_hour'], '2026-10-20T10:00');

@@ -83,7 +83,7 @@ class OpenMeteoDataSource implements ForecastRemoteDataSource {
     final values = await _kickoffHour(
       host: 'api.open-meteo.com',
       path: '/v1/forecast',
-      variables: const ['temperature_2m', 'precipitation_probability', 'weather_code'],
+      variables: const ['temperature_2m', 'precipitation_probability', 'weather_code', 'is_day'],
       latitude: latitude,
       longitude: longitude,
       kickoffAt: kickoffAt,
@@ -97,6 +97,7 @@ class OpenMeteoDataSource implements ForecastRemoteDataSource {
       temperatureC: temperature.toDouble(),
       weatherCode: code.toInt(),
       rainChance: values['precipitation_probability']?.toInt(),
+      isDay: values['is_day'] != 0,
     );
   }
 }
