@@ -40,7 +40,7 @@ class _PayBillSheet extends StatelessWidget {
   final String userId;
 
   Future<void> _uploadSlip(BuildContext context) async {
-    final picked = await pickWalletImage(slip: true);
+    final picked = await pickWalletImage(context, slip: true);
     if (picked == null || !context.mounted) return;
     context.read<WalletBloc>().add(
           WalletPaymentSubmitted(

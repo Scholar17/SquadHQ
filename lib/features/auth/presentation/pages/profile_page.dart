@@ -755,7 +755,7 @@ class _WalletQrSection extends StatelessWidget {
   const _WalletQrSection();
 
   Future<void> _upload(BuildContext context) async {
-    final picked = await pickWalletImage();
+    final picked = await pickWalletImage(context);
     if (picked == null || !context.mounted) return;
     context.read<WalletQrBloc>().add(
       WalletQrUploadRequested(bytes: picked.bytes, fileExtension: picked.fileExtension),

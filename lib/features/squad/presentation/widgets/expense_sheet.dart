@@ -89,7 +89,7 @@ class _PaymentQrSheetState extends State<_PaymentQrSheet> {
   bool _uploading = false;
 
   Future<void> _upload() async {
-    final picked = await pickWalletImage();
+    final picked = await pickWalletImage(context);
     if (picked == null || !mounted) return;
     setState(() => _uploading = true);
     final result = await sl<UploadWalletQr>()(
@@ -281,7 +281,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
   bool _removeReceipt = false;
 
   Future<void> _pickReceipt() async {
-    final picked = await pickWalletImage(slip: true);
+    final picked = await pickWalletImage(context, slip: true);
     if (picked != null && mounted) {
       setState(() {
         _receipt = picked;

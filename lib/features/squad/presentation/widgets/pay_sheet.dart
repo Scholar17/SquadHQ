@@ -109,7 +109,7 @@ class _PaySheetState extends State<_PaySheet> {
   }
 
   Future<void> _pickSlip() async {
-    final picked = await pickWalletImage(slip: true);
+    final picked = await pickWalletImage(context, slip: true);
     if (picked != null && mounted) setState(() => _slip = picked);
   }
 
