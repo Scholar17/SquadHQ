@@ -6,8 +6,6 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../comments/domain/entities/match_topic.dart';
 import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../match/presentation/match_formatting.dart';
-import '../../../share/domain/entities/share_link.dart';
-import '../../../share/presentation/widgets/share_link_button.dart';
 import '../../domain/entities/bill_split.dart';
 import '../../domain/entities/team_wallet.dart';
 import '../wallet_formatting.dart';
@@ -27,7 +25,6 @@ class BillCard extends StatelessWidget {
     required this.userId,
     required this.isManager,
     this.showMatch = false,
-    this.showShare = false,
   });
 
   final WalletMatch walletMatch;
@@ -42,10 +39,6 @@ class BillCard extends StatelessWidget {
   /// Whether to lead with the match ("vs X · date") — the Wallet tab's
   /// list needs it; the Match tab already shows the match above.
   final bool showMatch;
-
-  /// Whether to offer "Share bill" on the card itself — the Match tab's.
-  /// Elsewhere it's in the bill's breakdown.
-  final bool showShare;
 
   @override
   Widget build(BuildContext context) {
@@ -209,13 +202,6 @@ class BillCard extends StatelessWidget {
                 subtitle: 'vs ${match.opponent} · ${formatMatchDate(match.kickoffAt)}',
                 embedded: true,
               ),
-              if (showShare)
-                ShareLinkButton(
-                  matchId: match.id,
-                  kind: ShareKind.bill,
-                  shareTitle: 'Bill · vs ${match.opponent}',
-                  embedded: true,
-                ),
             ],
           ),
         ),

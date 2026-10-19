@@ -787,7 +787,7 @@ void main() {
     expect(fakeShares.recorded, [('match-1', ShareKind.match)]);
   });
 
-  testWidgets("The Match tab's bill card shares the bill; the Wallet tab's doesn't", (tester) async {
+  testWidgets("The Match tab's bill card has no Share bill; its breakdown does", (tester) async {
     fakeWallet.bills['match-1'] = const MatchBill(
       totalCost: 900,
       payerId: 'p-2',
@@ -808,14 +808,16 @@ void main() {
       () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null),
     );
 
-    await tester.scrollUntilVisible(find.text('Share bill'), 200);
+    await tester.scrollUntilVisible(find.text('Paid by Aung Ko'), 200);
+    expect(find.text('Share bill'), findsNothing);
+
+    await tester.tap(find.text('Paid by Aung Ko'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share bill'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Share bill'));
     await tester.pumpAndSettle();
     expect(copied, 'https://squad-hq.web.app/s/bill-match-1');
-
-    await pumpHome(tester, const WalletPage(user: user), role: TeamRole.player);
-    await tester.pumpAndSettle();
-    expect(find.text('Share bill'), findsNothing);
   });
 
   testWidgets('Match chat and bill comments, with replies, live', (tester) async {

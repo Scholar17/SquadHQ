@@ -816,7 +816,6 @@ class _PastMatchBill extends StatelessWidget {
             split: split,
             userId: userId,
             isManager: isManager,
-            showShare: true,
           ),
         );
       },
