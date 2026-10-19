@@ -188,10 +188,15 @@ class BillCard extends StatelessWidget {
                 ),
               ],
               // Just the viewer's status — paying happens only from the
-              // Wallet tab's "You owe" card.
+              // Wallet tab's "You owe" card. Once paid, the slip can be
+              // changed here (a wrong screenshot, say).
               if (myShare != null && !myShare.isPayer) ...[
                 const SizedBox(height: 12),
-                _MyShareStatus(paid: myShare.payment != null, amount: split.roundedShare),
+                _MyShareStatus(
+                  paid: myShare.payment != null,
+                  amount: split.roundedShare,
+                  onChangeSlip: () => showPayBillSheet(context, matchId: match.id, userId: userId),
+                ),
               ],
               const SizedBox(height: 10),
               Divider(height: 1, color: AppColors.text.withValues(alpha: 0.08)),
@@ -220,10 +225,13 @@ class BillCard extends StatelessWidget {
 }
 
 class _MyShareStatus extends StatelessWidget {
-  const _MyShareStatus({required this.paid, required this.amount});
+  const _MyShareStatus({required this.paid, required this.amount, required this.onChangeSlip});
 
   final bool paid;
   final int amount;
+
+  /// Opens the pay sheet, to view or change the slip — once [paid].
+  final VoidCallback onChangeSlip;
 
   @override
   Widget build(BuildContext context) {
@@ -243,10 +251,13 @@ class _MyShareStatus extends StatelessWidget {
             color: color,
           ),
           const SizedBox(width: 8),
-          Text(
-            paid ? "You've paid" : 'You owe ${formatBaht(amount)} · pay in Wallet',
-            style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700, color: color),
+          Expanded(
+            child: Text(
+              paid ? "You've paid" : 'You owe ${formatBaht(amount)} · pay in Wallet',
+              style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700, color: color),
+            ),
           ),
+          if (paid) _SmallButton(label: 'Change slip', onPressed: onChangeSlip),
         ],
       ),
     );

@@ -105,6 +105,12 @@ Future<void> showBillDetailsSheet(
                         isMe: split.shares[i].member.profileId == userId,
                         canViewSlip: isPayer || split.shares[i].member.profileId == userId,
                         showTopBorder: i > 0,
+                        // Your own slip, from the pay sheet (it reports a
+                        // failed upload).
+                        onChangeSlip: () {
+                          Navigator.of(context).pop();
+                          showPayBillSheet(hostContext, matchId: matchId, userId: userId);
+                        },
                       ),
                     if (split.shares.isEmpty)
                       Padding(
@@ -161,12 +167,16 @@ class _ShareRow extends StatelessWidget {
     required this.isMe,
     required this.canViewSlip,
     required this.showTopBorder,
+    required this.onChangeSlip,
   });
 
   final BillShare share;
   final bool isMe;
   final bool canViewSlip;
   final bool showTopBorder;
+
+  /// Shown on your own paid row.
+  final VoidCallback onChangeSlip;
 
   @override
   Widget build(BuildContext context) {
@@ -217,6 +227,11 @@ class _ShareRow extends StatelessWidget {
                 title: "${share.member.name}'s payment slip",
               ),
               child: Text('View slip', style: AppTextStyles.title(size: 12, color: AppColors.text)),
+            ),
+          if (payment != null && isMe)
+            TextButton(
+              onPressed: onChangeSlip,
+              child: Text('Change', style: AppTextStyles.title(size: 12, color: AppColors.accent700)),
             ),
         ],
       ),

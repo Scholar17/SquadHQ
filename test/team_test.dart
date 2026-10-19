@@ -936,7 +936,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Paid · slip sent Sun, 4 Oct'), findsOneWidget);
-    expect(find.text('Replace slip'), findsOneWidget);
+    // On the sheet, and on the bill card behind it.
+    expect(find.text('Change slip'), findsNWidgets(2));
 
     Navigator.of(sheet).pop();
     await tester.pumpAndSettle();
@@ -944,6 +945,33 @@ void main() {
     expect(find.text('YOU OWE'), findsNothing);
     expect(find.text('฿300'), findsWidgets);
     expect(find.text("You've paid"), findsOneWidget);
+    expect(find.text('Change slip'), findsOneWidget);
+
+    // A wrong slip: the bill card opens the pay sheet again to change it.
+    await tester.tap(find.text('Change slip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paid · slip sent Sun, 4 Oct'), findsOneWidget);
+    expect(find.text('View slip'), findsOneWidget);
+    expect(find.text('Change slip'), findsWidgets);
+    // The new slip goes in: the sheet closes and says so.
+    tester.element(find.text('Pay Aung Ko')).read<WalletBloc>().add(
+          WalletPaymentSubmitted(
+            matchId: 'match-1',
+            slipBytes: Uint8List(0),
+            fileExtension: 'png',
+          ),
+        );
+    await tester.pumpAndSettle();
+    expect(find.text('Pay Aung Ko'), findsNothing);
+    expect(find.text('Payment slip changed'), findsOneWidget);
+    expect(fakeWallet.bills['match-1']!.payments['test-1']!.slipPath, 'match-1/test-1/slip.png');
+
+    // And from the bill's breakdown, on your own row.
+    await tester.tap(find.text('Paid by Aung Ko'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pay Aung Ko'), findsOneWidget);
   });
 
   testWidgets('An admin payer can edit their bill', (tester) async {

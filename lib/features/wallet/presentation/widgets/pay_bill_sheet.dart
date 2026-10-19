@@ -39,6 +39,14 @@ class _PayBillSheet extends StatelessWidget {
   final String matchId;
   final String userId;
 
+  /// Your slip for this bill in [state], or null if you haven't paid.
+  String? _slipOf(WalletState state) {
+    final wallet = state.wallet;
+    final walletMatch = wallet?.forMatch(matchId);
+    final split = walletMatch == null ? null : wallet?.splitFor(walletMatch);
+    return split?.shareFor(userId)?.payment?.slipPath;
+  }
+
   Future<void> _uploadSlip(BuildContext context) async {
     final picked = await pickWalletImage(context, slip: true);
     if (picked == null || !context.mounted) return;
@@ -54,13 +62,25 @@ class _PayBillSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<WalletBloc, WalletState>(
-      listenWhen: (previous, current) => current is WalletFailure,
+      listenWhen: (previous, current) =>
+          current is WalletFailure ||
+          // Changed: there was a slip, and now there's a different one.
+          (_slipOf(previous) != null &&
+              _slipOf(current) != null &&
+              _slipOf(previous) != _slipOf(current)),
       listener: (context, state) {
+        final messenger = ScaffoldMessenger.of(context);
         if (state case WalletFailure(:final message)) {
-          ScaffoldMessenger.of(context)
+          messenger
             ..hideCurrentSnackBar()
             ..showSnackBar(SnackBar(content: Text(message)));
+          return;
         }
+        // Done here: close the sheet, so the message isn't hidden behind it.
+        Navigator.of(context).pop();
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Payment slip changed')));
       },
       builder: (context, state) {
         final wallet = state.wallet;
@@ -237,7 +257,7 @@ class _PayBillSheet extends StatelessWidget {
                           side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
                           shape: const StadiumBorder(),
                         ),
-                        child: Text('Replace slip', style: AppTextStyles.title(size: 14)),
+                        child: Text('Change slip', style: AppTextStyles.title(size: 14)),
                       ),
               ),
               const SizedBox(height: 10),
