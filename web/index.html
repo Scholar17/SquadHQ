@@ -64,6 +64,9 @@
       align-items: center;
       justify-content: center;
       background: #F5EAD8;
+      /* Over the app, which draws underneath until it has loaded. */
+      z-index: 10;
+      transition: opacity 0.25s;
     }
     /* The runner, as WarmUpAnimation lays it out (lib/core/splash). */
     #splash .runner {
@@ -81,6 +84,15 @@
        background. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js"></script>
   <script>
+    // Fades the splash into the app. On the web this is the only splash:
+    // Flutter keeps it up until the app has loaded, rather than drawing its
+    // own copy (lib/core/splash/startup_splash.dart).
+    window.__hideSplash = function () {
+      const splash = document.getElementById('splash');
+      if (!splash) return;
+      splash.style.opacity = '0';
+      setTimeout(function () { splash.remove(); }, 250);
+    };
     if (window.lottie) {
       lottie.loadAnimation({
         container: document.getElementById('splash-runner'),
@@ -117,7 +129,9 @@
       onEntrypointLoaded: async function (engineInitializer) {
         const appRunner = await engineInitializer.initializeEngine();
         await appRunner.runApp();
-        document.getElementById('splash').remove();
+        // The app calls this once it has loaded (StartupSplash) — and if it
+        // never does, the splash still goes.
+        setTimeout(window.__hideSplash, 15000);
       }
     });
   </script>

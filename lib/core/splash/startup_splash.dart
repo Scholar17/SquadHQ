@@ -4,21 +4,27 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
 import '../theme/app_colors.dart';
+import 'web_splash.dart';
 
 /// The opening splash, over the whole app: [WarmUpAnimation] until
 /// [loaded], then it fades out and never comes back. One continuous
 /// animation, though the routes underneath move from the session check to
-/// the team list. On the web, index.html plays the same animation until
-/// Flutter starts, so opening the app is one splash.
+/// the team list. On the web the page's own splash (index.html, the same
+/// animation) is the one: it stays up over the app until this lifts it, so
+/// there's no switch from one copy to the other.
 ///
 /// It stays up at least [minRun] so a fast start isn't a flicker, and goes
 /// anyway after [maxWait] so a stalled load still reaches the app (which
 /// shows its own loading state).
 class StartupSplash extends StatefulWidget {
-  const StartupSplash({super.key, required this.loaded, required this.child});
+  const StartupSplash({super.key, required this.loaded, required this.child, this.pageSplash});
 
   final bool loaded;
   final Widget child;
+
+  /// Whether the page's splash is up and stands in for this one's own —
+  /// by default, whether it was there when this started (the web).
+  final bool? pageSplash;
 
   static const minRun = Duration(milliseconds: 700);
   static const maxWait = Duration(seconds: 12);
@@ -34,6 +40,7 @@ class _StartupSplashState extends State<StartupSplash> with SingleTickerProvider
   Timer? _maxWait;
   bool _ranEnough = false;
   bool _gone = false;
+  late final bool _pageSplash = widget.pageSplash ?? hasWebSplash;
 
   @override
   void initState() {
@@ -58,7 +65,12 @@ class _StartupSplashState extends State<StartupSplash> with SingleTickerProvider
     if (!mounted || _gone) return;
     _minRun?.cancel();
     _maxWait?.cancel();
-    _fade.forward();
+    if (_pageSplash) {
+      hideWebSplash();
+      setState(() => _gone = true);
+    } else {
+      _fade.forward();
+    }
   }
 
   @override
@@ -71,7 +83,7 @@ class _StartupSplashState extends State<StartupSplash> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    if (_gone) return widget.child;
+    if (_gone || _pageSplash) return widget.child;
     return Stack(
       children: [
         widget.child,

@@ -37,6 +37,15 @@ void main() {
     expect(splash, findsNothing);
   });
 
+  testWidgets("On the web the page's splash stands in: nothing drawn over the app", (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: StartupSplash(loaded: false, pageSplash: true, child: Text('The app'))),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    expect(splash, findsNothing);
+    expect(find.text('The app'), findsOneWidget);
+  });
+
   testWidgets('A stalled load goes to the app anyway after the longest wait', (tester) async {
     await tester.pumpWidget(app(loaded: false));
     await tester.pump(StartupSplash.maxWait);
