@@ -13,6 +13,7 @@ import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/onboarding_page.dart';
 import '../../features/auth/presentation/pages/profile_page.dart';
+import '../../features/invites/presentation/pages/invitations_page.dart';
 import '../../features/match/presentation/pages/match_history_page.dart';
 import '../../features/match/presentation/pages/match_list_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
@@ -54,6 +55,9 @@ abstract final class AppRoutes {
   static const matchHistory = '/match-history';
   static const upcomingMatch = '/match-detail';
   static const notifications = '/notifications';
+
+  /// Your pending invitations to teams and squads.
+  static const invitations = '/invitations';
 
   /// A squad expense's detail screen.
   static String expenseDetail(String expenseId) => '/expense/$expenseId';
@@ -313,6 +317,10 @@ GoRouter createAppRouter(AuthBloc authBloc) {
         path: AppRoutes.notifications,
         builder: (context, state) =>
             _withExtra<NotificationsArgs>(state, (args) => NotificationsPage(args: args)),
+      ),
+      GoRoute(
+        path: AppRoutes.invitations,
+        builder: (context, state) => const InvitationsPage(),
       ),
       GoRoute(
         path: '/expense/:id',

@@ -106,6 +106,10 @@ import '../../features/weather/domain/repositories/forecast_repository.dart';
 import '../../features/weather/domain/usecases/get_live_air_quality.dart';
 import '../../features/weather/domain/usecases/get_kickoff_forecast.dart';
 import '../../features/weather/presentation/temperature_unit_controller.dart';
+import '../../features/invites/data/datasources/invite_remote_data_source.dart';
+import '../../features/invites/data/repositories/invite_repository_impl.dart';
+import '../../features/invites/domain/repositories/invite_repository.dart';
+import '../../features/invites/domain/usecases/invite_usecases.dart';
 import '../../features/share/data/datasources/share_remote_data_source.dart';
 import '../../features/share/data/repositories/share_repository_impl.dart';
 import '../../features/share/domain/repositories/share_repository.dart';
@@ -447,6 +451,17 @@ Future<void> initDependencies() async {
     ..registerLazySingleton(() => GetShareLink(sl()))
     ..registerLazySingleton(() => RecordShare(sl()))
     ..registerLazySingleton(() => OpenShareLink(sl()));
+
+  // Features - Group invites (invite people from your other groups by name)
+  sl
+    ..registerLazySingleton<InviteRemoteDataSource>(
+      () => InviteRemoteDataSourceImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton<InviteRepository>(() => InviteRepositoryImpl(sl()))
+    ..registerLazySingleton(() => SearchInviteCandidates(sl()))
+    ..registerLazySingleton(() => InviteToGroup(sl()))
+    ..registerLazySingleton(() => GetMyInvites(sl()))
+    ..registerLazySingleton(() => RespondToInvite(sl()));
 
   // Features - Player ratings (Squad tab, Fill rating, match stats)
   sl

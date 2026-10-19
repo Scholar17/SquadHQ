@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/domain/entities/app_user.dart';
+import '../../../invites/presentation/widgets/invite_people_sheet.dart';
 import '../../../team_membership/domain/entities/team.dart';
 import '../../../team_membership/presentation/widgets/group_member_actions.dart';
 import '../../domain/entities/squad_member.dart';
@@ -139,6 +140,11 @@ class SquadMembersPage extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // Or by name, for people from your other groups.
+                  if (canInvite(squad.role)) ...[
+                    const SizedBox(height: 10),
+                    InvitePeopleButton(teamId: squad.id, groupName: squad.name),
+                  ],
                   const SizedBox(height: 20),
                   SquadSectionLabel(
                     '${members.length} ${members.length == 1 ? 'MEMBER' : 'MEMBERS'}',

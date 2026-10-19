@@ -25,6 +25,10 @@ Future<void> openNotification(
   required String userId,
 }) {
   context.read<NotificationBloc>().add(NotificationOpened(notification.id));
+  // About a group you're not in yet: no team to switch to.
+  if (notification.target == NotificationTarget.invitations) {
+    return GoRouter.of(context).push(AppRoutes.invitations);
+  }
   return openTarget(
     context,
     target: notification.target,
@@ -121,6 +125,8 @@ Future<void> openTarget(
   final isPast = past();
 
   switch (target) {
+    case NotificationTarget.invitations:
+      unawaited(router.push(AppRoutes.invitations));
     case NotificationTarget.group:
       router.go(AppRoutes.home);
     // A squad's Settle tab is the Wallet slot (see GroupTab).

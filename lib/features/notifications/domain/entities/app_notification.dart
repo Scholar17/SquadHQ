@@ -8,7 +8,8 @@ import 'package:equatable/equatable.dart';
 /// due_mention_push_notifications() (049_mentions.sql), or
 /// due_member_removed_push_notifications() (051_leave_and_remove_members.sql), or
 /// due_match_question_push_notifications() (053_match_questions.sql), or
-/// due_share_push_notifications() (055_share_pushes.sql).
+/// due_share_push_notifications() (055_share_pushes.sql), or
+/// due_group_invite_push_notifications() (056_group_invites.sql).
 enum NotificationKind {
   newMatch('new_match'),
   rsvpNudge('rsvp_nudge'),
@@ -65,6 +66,9 @@ enum NotificationKind {
   /// "Aung Ko shared the match vs Red Lions" — or its bill (055).
   matchShared('match_shared'),
   billShared('bill_shared'),
+
+  /// "Aung Ko invited you to Sunday FC" (056).
+  groupInvite('group_invite'),
   other('');
 
   const NotificationKind(this.dbName);
@@ -101,6 +105,9 @@ enum NotificationTarget {
   /// The group itself (you were removed from it): Home, in it if you've
   /// rejoined since.
   group,
+
+  /// Your Invitations screen (invited to a team or squad).
+  invitations,
 }
 
 /// One entry in the player's notification list — a push that was sent to
@@ -178,6 +185,7 @@ class AppNotification extends Equatable {
     NotificationKind.tripReminder => NotificationTarget.trip,
     NotificationKind.playerRated || NotificationKind.ratingImproved => NotificationTarget.squad,
     NotificationKind.memberRemoved => NotificationTarget.group,
+    NotificationKind.groupInvite => NotificationTarget.invitations,
     _ => NotificationTarget.match,
   };
 

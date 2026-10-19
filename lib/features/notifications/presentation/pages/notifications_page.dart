@@ -295,6 +295,11 @@ class _NotificationTile extends StatelessWidget {
       label: 'GROUP',
       action: 'Open',
     ),
+    NotificationTarget.invitations => (
+      icon: Icons.group_add_outlined,
+      label: 'INVITATION',
+      action: 'See invitation',
+    ),
   };
 
   @override

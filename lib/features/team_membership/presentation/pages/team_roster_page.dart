@@ -5,6 +5,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../invites/presentation/widgets/invite_people_sheet.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/entities/team_member.dart';
 import '../bloc/team_membership_bloc.dart';
@@ -142,6 +143,10 @@ class _TeamRosterView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
+                  ],
+                  if (canInvite(team.role)) ...[
+                    const SizedBox(height: 10),
+                    InvitePeopleButton(teamId: team.id, groupName: team.name),
                   ],
                   if (_isSuperAdmin) ...[
                     const SizedBox(height: 20),
