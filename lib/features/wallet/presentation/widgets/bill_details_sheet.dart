@@ -20,12 +20,14 @@ import 'wallet_image.dart';
 /// can open each teammate's payment slip; everyone else only their own
 /// (the payment-slips storage policies enforce the same), and can change
 /// their own. [canEdit] is
-/// true only for the payer in the Manager view.
+/// true only for the payer in the Manager view. [canShare]: offer "Share
+/// bill" — the Wallet tab's, not the match screens'.
 Future<void> showBillDetailsSheet(
   BuildContext context, {
   required String matchId,
   required String userId,
   required bool canEdit,
+  bool canShare = true,
 }) {
   // The screen behind the sheet — still around after the sheet closes, so
   // "Edit bill" can open from it (the bill form first checks the payer's
@@ -128,12 +130,14 @@ Future<void> showBillDetailsSheet(
               ),
               // A payment request for the group chat: no amounts on its
               // card, just who to pay.
-              const SizedBox(height: 16),
-              ShareLinkButton(
-                matchId: matchId,
-                kind: ShareKind.bill,
-                shareTitle: 'Bill · vs ${walletMatch.match.opponent}',
-              ),
+              if (canShare) ...[
+                const SizedBox(height: 16),
+                ShareLinkButton(
+                  matchId: matchId,
+                  kind: ShareKind.bill,
+                  shareTitle: 'Bill · vs ${walletMatch.match.opponent}',
+                ),
+              ],
               if (canEdit) ...[
                 const SizedBox(height: 16),
                 SizedBox(

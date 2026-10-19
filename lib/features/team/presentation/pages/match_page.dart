@@ -494,6 +494,7 @@ class _MatchBill extends StatelessWidget {
             split: split,
             userId: userId,
             isManager: isManager,
+            canShare: false,
           );
         } else if (isManager) {
           card = AddBillCard(walletMatch: walletMatch, userId: userId);

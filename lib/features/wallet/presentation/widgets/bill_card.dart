@@ -25,6 +25,7 @@ class BillCard extends StatelessWidget {
     required this.userId,
     required this.isManager,
     this.showMatch = false,
+    this.canShare = true,
   });
 
   final WalletMatch walletMatch;
@@ -39,6 +40,9 @@ class BillCard extends StatelessWidget {
   /// Whether to lead with the match ("vs X · date") — the Wallet tab's
   /// list needs it; the Match tab already shows the match above.
   final bool showMatch;
+
+  /// Whether its breakdown offers "Share bill" — not on the match screens.
+  final bool canShare;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +62,7 @@ class BillCard extends StatelessWidget {
           matchId: match.id,
           userId: userId,
           canEdit: canEdit,
+          canShare: canShare,
         ),
         child: Container(
           padding: const EdgeInsets.all(18),

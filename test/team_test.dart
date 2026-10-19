@@ -787,7 +787,7 @@ void main() {
     expect(fakeShares.recorded, [('match-1', ShareKind.match)]);
   });
 
-  testWidgets("The Match tab's bill card has no Share bill; its breakdown does", (tester) async {
+  testWidgets('Share bill is in the Wallet tab, not on the match screens', (tester) async {
     fakeWallet.bills['match-1'] = const MatchBill(
       totalCost: 900,
       payerId: 'p-2',
@@ -809,8 +809,15 @@ void main() {
     );
 
     await tester.scrollUntilVisible(find.text('Paid by Aung Ko'), 200);
+    await tester.tap(find.text('Paid by Aung Ko'));
+    await tester.pumpAndSettle();
     expect(find.text('Share bill'), findsNothing);
+    // Close the breakdown.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
 
+    await pumpHome(tester, const WalletPage(user: user), role: TeamRole.player);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Paid by Aung Ko'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Share bill'));
