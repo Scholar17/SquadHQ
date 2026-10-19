@@ -12,7 +12,7 @@ void main() {
 
   /// The kick, then the fade.
   Future<void> finish(WidgetTester tester) async {
-    for (var i = 0; i < 15; i++) {
+    for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
   }

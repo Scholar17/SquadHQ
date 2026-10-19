@@ -53,6 +53,7 @@ dependencies:
   shared_preferences: ^2.5.5
   http: ^1.6.0
   pwa_installer: ^0.1.1
+  lottie: ^3.6.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -94,6 +95,9 @@ flutter:
   uses-material-design: true
   assets:
      - assets/images/pitch_bg.png
+     # Opening splash (lib/core/splash): free LottieFiles animations,
+     # Lottie Simple License.
+     - assets/lottie/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
