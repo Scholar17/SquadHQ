@@ -285,6 +285,44 @@ void main() {
       expect(lines[1].isPartlyPaid, isFalse);
     });
 
+    test('Two expenses to one person: one payment for all marks both paid', () {
+      final lunch = expense('lunch', 'aung', {'me': 10000, 'aung': 10000});
+      final dinner = expense('dinner', 'aung', {'me': 20000, 'aung': 20000});
+      SquadLedger paying(List<Settlement> settlements) => SquadLedger(
+        currency: GroupCurrency.thb,
+        members: [member('me'), member('aung')],
+        expenses: [dinner, lunch],
+        settlements: settlements,
+      );
+
+      final unpaid = paying(const []);
+      expect(unpaid.expenseLeft(lunch, 'me', 'aung'), 10000);
+      expect(unpaid.expenseLeft(dinner, 'me', 'aung'), 20000);
+      expect(unpaid.openExpenseCount('me', 'aung'), 2);
+
+      // Everything at once, as Settle pays it.
+      final all = paying([settlement('me', 'aung', 30000, SettlementStatus.confirmed)]);
+      expect(all.expenseLeft(lunch, 'me', 'aung'), 0);
+      expect(all.expenseLeft(dinner, 'me', 'aung'), 0);
+
+      // Just one share, still waiting: it covers the first, not the other.
+      final one = paying([settlement('me', 'aung', 10000, SettlementStatus.pending)]);
+      expect(one.expenseLeft(lunch, 'me', 'aung'), 10000);
+      expect(one.expenseLeft(lunch, 'me', 'aung', includePending: true), 0);
+      expect(one.expenseLeft(dinner, 'me', 'aung', includePending: true), 20000);
+      expect(one.openExpenseCount('me', 'aung'), 1);
+    });
+
+    test('What the other person owes back takes off an expense still open', () {
+      final dinner = expense('dinner', 'aung', {'me': 20000, 'aung': 20000});
+      final ledger = SquadLedger(
+        currency: GroupCurrency.thb,
+        members: [member('me'), member('aung')],
+        expenses: [expense('taxi', 'me', {'me': 5000, 'aung': 5000}), dinner],
+      );
+      expect(ledger.expenseLeft(dinner, 'me', 'aung'), 15000);
+    });
+
     test('A payment changes balances only once the receiver confirms it', () {
       final expenses = [
         expense('dinner', 'aung', {'aung': 30000, 'toe': 30000}),

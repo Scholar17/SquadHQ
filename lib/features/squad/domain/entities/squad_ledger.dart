@@ -370,6 +370,27 @@ class SquadLedger extends Equatable {
     return [...clear(owed, 1, paid > 0 ? paid : 0), ...clear(owing, -1, paid < 0 ? -paid : 0)];
   }
 
+  /// What's still open of [fromId]'s share of [expense] owed to [toId]:
+  /// payments clear the oldest expenses first (see [debtLines]), so this
+  /// one is paid once they reach it. Never more than [owedBetween] — what
+  /// [toId] owes back takes off it too. 0 once it's covered.
+  int expenseLeft(Expense expense, String fromId, String toId, {bool includePending = false}) {
+    final open = owedBetween(fromId, toId, includePending: includePending);
+    if (open <= 0) return 0;
+    for (final line in debtLines(fromId, toId, includePending: includePending)) {
+      if (line.expense?.id == expense.id && line.cents > 0) {
+        return line.cents < open ? line.cents : open;
+      }
+    }
+    return 0;
+  }
+
+  /// How many expenses [fromId] still owes [toId] for, once payments sent
+  /// (pending too) clear the oldest.
+  int openExpenseCount(String fromId, String toId) => debtLines(fromId, toId, includePending: true)
+      .where((line) => line.expense != null && line.cents > 0)
+      .length;
+
   /// The fewest payments that zero everyone out: the biggest debtor pays
   /// the biggest creditor, again and again. A→B ฿100 + B→C ฿100 becomes
   /// A→C ฿100.

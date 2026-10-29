@@ -201,11 +201,13 @@ class _Body extends StatelessWidget {
   final String? teamId;
   final Widget comments;
 
-  /// Paying back, on your own row: "Pay" while you owe a payer for it
-  /// (what you owe them for this expense, capped at what you owe them
-  /// overall, less what's pending) — with several payers, the next one
-  /// still to pay — "Pending" once that's all sent, "Paid" once you owe
-  /// them nothing. Null when it's not yours to pay.
+  /// Paying back, on your own row: "Pay" while you owe a payer for it —
+  /// with several payers, the next one still to pay — "Pending" once
+  /// what's sent covers it, "Paid" once confirmed payments do. Payments
+  /// clear the oldest expenses first ([SquadLedger.expenseLeft]), so
+  /// paying everything from Settle marks each one paid. The pay sheet
+  /// offers this expense's part or all you owe them. Null when it's not
+  /// yours to pay.
   ({PayStatus status, VoidCallback? onPay})? _payBack(BuildContext context) {
     final teamId = this.teamId;
     final mine = [
@@ -227,10 +229,9 @@ class _Body extends StatelessWidget {
     for (final debt in mine) {
       // Paid once confirmed payments cover it; pending once what you've
       // sent (still waiting) covers it.
-      if (ledger.owedBetween(me, debt.toId) <= 0) continue;
+      if (ledger.expenseLeft(expense, me, debt.toId) <= 0) continue;
       allPaid = false;
-      final open = ledger.owedBetween(me, debt.toId, includePending: true);
-      final toPay = debt.cents < open ? debt.cents : open;
+      final toPay = ledger.expenseLeft(expense, me, debt.toId, includePending: true);
       if (toPay > 0) {
         return (
           status: PayStatus.pay,
@@ -239,7 +240,8 @@ class _Body extends StatelessWidget {
             teamId: teamId,
             me: me,
             toId: debt.toId,
-            suggestedCents: toPay,
+            suggestedCents: ledger.owedBetween(me, debt.toId, includePending: true),
+            expenseCents: toPay,
             tripId: expense.tripId,
           ),
         );
@@ -300,7 +302,7 @@ class _Body extends StatelessWidget {
                     [
                       expense.categoryName,
                       '${formatShortDate(expense.spentAt)}, ${formatMatchTime(expense.spentAt)}',
-                      if (expense.place case final place?) place,
+                      ?expense.place,
                       if (expense.tripId case final tripId?)
                         if (ledger.trip(tripId) case final trip?) '${trip.name} trip',
                     ].join(' · '),

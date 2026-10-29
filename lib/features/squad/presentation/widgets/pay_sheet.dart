@@ -21,12 +21,17 @@ import 'squad_widgets.dart';
 /// Pay [toId] back: their QR or bank details, an editable amount (less
 /// for a partial payment), and a slip — or "paid in cash". It's sent as
 /// pending; [toId] confirms before balances change.
+///
+/// From one expense, [expenseCents] is what's left of it: the sheet then
+/// offers paying just that or all you owe [toId] ([suggestedCents], the
+/// default), so two expenses to the same person can go in one payment.
 Future<void> showPaySheet(
   BuildContext context, {
   required String teamId,
   required String me,
   required String toId,
   required int suggestedCents,
+  int? expenseCents,
   String? tripId,
 }) {
   return showModalBottomSheet<void>(
@@ -40,6 +45,7 @@ Future<void> showPaySheet(
       me: me,
       toId: toId,
       suggestedCents: suggestedCents,
+      expenseCents: expenseCents,
       tripId: tripId,
     ),
   );
@@ -51,6 +57,7 @@ class _PaySheet extends StatefulWidget {
     required this.me,
     required this.toId,
     required this.suggestedCents,
+    this.expenseCents,
     this.tripId,
   });
 
@@ -58,6 +65,9 @@ class _PaySheet extends StatefulWidget {
   final String me;
   final String toId;
   final int suggestedCents;
+
+  /// Paying from one expense: what's left of it (see [showPaySheet]).
+  final int? expenseCents;
 
   /// Paying back this (closed) trip, apart from the squad's own.
   final String? tripId;
@@ -68,8 +78,20 @@ class _PaySheet extends StatefulWidget {
 
 class _PaySheetState extends State<_PaySheet> {
   late final _amount = TextEditingController(
-    text: widget.suggestedCents > 0 ? moneyInput(widget.suggestedCents) : '',
+    text: _suggested > 0 ? moneyInput(_suggested) : '',
   );
+
+  /// Paying just the expense it was opened from, not all you owe.
+  bool _onlyThis = false;
+
+  /// Whether there's a choice: the expense is less than all you owe.
+  bool get _canChoose {
+    final cents = widget.expenseCents;
+    return cents != null && cents > 0 && cents < widget.suggestedCents;
+  }
+
+  /// What "Full" pays: this expense, or all you owe.
+  int get _suggested => _onlyThis && _canChoose ? widget.expenseCents! : widget.suggestedCents;
   SettlementMethod? _method;
   PickedImage? _slip;
   final _amountFocus = FocusNode();
@@ -99,8 +121,13 @@ class _PaySheetState extends State<_PaySheet> {
 
   /// Half of what's owed, rounded up to a whole unit (never more than it).
   int get _half {
-    final half = ((widget.suggestedCents / 2) / 100).ceil() * 100;
-    return half > widget.suggestedCents ? widget.suggestedCents : half;
+    final half = ((_suggested / 2) / 100).ceil() * 100;
+    return half > _suggested ? _suggested : half;
+  }
+
+  void _choose({required bool onlyThis}) {
+    setState(() => _onlyThis = onlyThis);
+    _setAmount(_suggested);
   }
 
   void _setAmount(int? cents) {
@@ -171,6 +198,16 @@ class _PaySheetState extends State<_PaySheet> {
             };
         return StickyActionSheet(
           background: AppColors.card,
+          action: SquadPrimaryButton(
+            label: method == SettlementMethod.cash ? 'I paid in cash' : 'Send for confirmation',
+            isLoading: _sending || state is SquadLedgerSubmitting,
+            onPressed: canSend ? () => _send(method) : null,
+          ),
+          footer: Text(
+            '$name confirms before your balance changes.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body(size: 12, color: squadMuted),
+          ),
           children: [
             const _Grabber(),
             Row(
@@ -214,8 +251,30 @@ class _PaySheetState extends State<_PaySheet> {
                 ),
               ],
             ),
+            // From an expense: just it, or everything you owe them.
+            if (_canChoose) ...[
+              const SizedBox(height: 10),
+              _ScopeOption(
+                label: 'All you owe $name',
+                detail: switch (ledger.openExpenseCount(widget.me, widget.toId)) {
+                  final n when n > 1 => 'Covers $n expenses',
+                  _ => 'Everything still open between you',
+                },
+                amount: formatMoney(widget.suggestedCents, currency),
+                selected: !_onlyThis,
+                onTap: () => _choose(onlyThis: false),
+              ),
+              const SizedBox(height: 8),
+              _ScopeOption(
+                label: 'This expense only',
+                amount: formatMoney(widget.expenseCents!, currency),
+                selected: _onlyThis,
+                onTap: () => _choose(onlyThis: true),
+              ),
+              const SizedBox(height: 12),
+            ],
             // Pay it all, half, or any part.
-            if (widget.suggestedCents > 0) ...[
+            if (_suggested > 0) ...[
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
@@ -223,10 +282,10 @@ class _PaySheetState extends State<_PaySheet> {
                 children: [
                   SquadChoiceChip(
                     label: 'Full',
-                    selected: amount == widget.suggestedCents,
-                    onTap: () => _setAmount(widget.suggestedCents),
+                    selected: amount == _suggested,
+                    onTap: () => _setAmount(_suggested),
                   ),
-                  if (_half < widget.suggestedCents)
+                  if (_half < _suggested)
                     SquadChoiceChip(
                       label: 'Half · ${formatMoney(_half, currency)}',
                       selected: amount == _half,
@@ -234,7 +293,7 @@ class _PaySheetState extends State<_PaySheet> {
                     ),
                   SquadChoiceChip(
                     label: 'Custom',
-                    selected: amount != widget.suggestedCents && amount != _half,
+                    selected: amount != _suggested && amount != _half,
                     onTap: () => _setAmount(null),
                   ),
                 ],
@@ -247,7 +306,7 @@ class _PaySheetState extends State<_PaySheet> {
                 if (pending > 0) '${formatMoney(pending, currency)} already sent and waiting',
                 if (amount > 0 && amount < widget.suggestedCents)
                   '${formatMoney(widget.suggestedCents - amount, currency)} left after this'
-                else if (widget.suggestedCents > 0)
+                else if (_suggested > 0)
                   'or pay part of it',
               ].join(' · '),
               style: AppTextStyles.body(size: 12, color: squadMuted),
@@ -280,16 +339,6 @@ class _PaySheetState extends State<_PaySheet> {
               _SlipButton(slip: _slip, onPick: _pickSlip),
             ],
           ],
-          action: SquadPrimaryButton(
-            label: method == SettlementMethod.cash ? 'I paid in cash' : 'Send for confirmation',
-            isLoading: _sending || state is SquadLedgerSubmitting,
-            onPressed: canSend ? () => _send(method) : null,
-          ),
-          footer: Text(
-            '$name confirms before your balance changes.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.body(size: 12, color: squadMuted),
-          ),
         );
       },
     );
@@ -309,6 +358,70 @@ class _Grabber extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.neutral400,
           borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+}
+
+/// One of "All you owe …" / "This expense only": a radio-style row.
+class _ScopeOption extends StatelessWidget {
+  const _ScopeOption({
+    required this.label,
+    required this.amount,
+    required this.selected,
+    required this.onTap,
+    this.detail,
+  });
+
+  final String label;
+  final String amount;
+  final String? detail;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = this.detail;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? AppColors.surface : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.md,
+          side: BorderSide(
+            color: selected ? AppColors.accent700 : AppColors.text.withValues(alpha: 0.15),
+          ),
+        ),
+        child: InkWell(
+          customBorder: RoundedRectangleBorder(borderRadius: AppRadius.md),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                  size: 20,
+                  color: selected ? AppColors.accent700 : squadMuted,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
+                      if (detail != null)
+                        Text(detail, style: AppTextStyles.body(size: 12, color: squadMuted)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(amount, style: AppTextStyles.body(size: 14, weight: FontWeight.w800)),
+              ],
+            ),
+          ),
         ),
       ),
     );
