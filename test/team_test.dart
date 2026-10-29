@@ -932,9 +932,10 @@ void main() {
     expect(find.text('vs Sundown United · to Aung Ko'), findsOneWidget);
     expect(find.text('Paid by Aung Ko'), findsOneWidget);
 
-    // One Pay button — on the "You owe" card; the bill card only shows status.
+    // The "You owe" card's Pay, and the bill card's own (Wallet tab only).
     expect(find.text('Pay ฿300'), findsOneWidget);
-    expect(find.text('You owe ฿300 · pay in Wallet'), findsOneWidget);
+    expect(find.text('You owe ฿300'), findsOneWidget);
+    expect(find.text('Pay'), findsOneWidget);
     await tester.tap(find.text('Pay ฿300'));
     await tester.pumpAndSettle();
 
@@ -1488,8 +1489,9 @@ void main() {
     await tester.tap(find.text('Save venue'));
     await tester.pumpAndSettle();
 
-    // Straight back to the match form, with it picked.
-    expect(find.text('Kickhub Onnut'), findsOneWidget);
+    // Straight back to the match form, with it picked — in the Venue
+    // field, and as a selected recent-venue chip.
+    expect(find.text('Kickhub Onnut'), findsNWidgets(2));
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(fakeMatches.matches.first.venue, 'Kickhub Onnut');
@@ -2907,14 +2909,22 @@ void main() {
     expect(find.text('You get ฿600'), findsOneWidget);
     expect(find.text('Add trip expense'), findsOneWidget);
 
-    // Settle: the trip's own card, and the payment history button.
+    // Settle: Squad · Trips; the trip's own card on Trips, and each
+    // tab's own payment history.
     await tester.tap(find.text('Settle').last);
     await tester.pumpAndSettle();
-    expect(find.text('TRIPS'), findsOneWidget);
-    expect(find.text('You get ฿600'), findsOneWidget);
+    expect(find.text('Squad'), findsOneWidget);
     await tester.tap(find.byTooltip('Payment history'));
     await tester.pumpAndSettle();
     expect(find.text('Payment history'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Trips').last);
+    await tester.pumpAndSettle();
+    expect(find.text('You get ฿600'), findsOneWidget);
+    await tester.tap(find.byTooltip('Payment history'));
+    await tester.pumpAndSettle();
+    expect(find.text('Trip payment history'), findsOneWidget);
     expect(find.text('No payments yet.'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();

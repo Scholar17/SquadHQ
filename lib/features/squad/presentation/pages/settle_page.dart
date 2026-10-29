@@ -25,7 +25,8 @@ import '../widgets/trip_card.dart';
 /// A squad's Settle tab: everyone you pay and everyone who pays you, each
 /// debt person to person (across every expense between you, less
 /// confirmed payments), payments waiting for you to confirm, the rest of
-/// the squad's debts, and the history.
+/// the squad's debts, and the history. With trips, a Squad · Trips switch:
+/// trips settle on their own, so they get their own list and history.
 class SettlePage extends StatefulWidget {
   const SettlePage({super.key, required this.user});
 
@@ -35,7 +36,16 @@ class SettlePage extends StatefulWidget {
   State<SettlePage> createState() => _SettlePageState();
 }
 
-class _SettlePageState extends State<SettlePage> {
+class _SettlePageState extends State<SettlePage> with SingleTickerProviderStateMixin {
+  /// Squad · Trips, shown once the squad has a trip.
+  late final TabController _tabs = TabController(length: 2, vsync: this);
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
   /// The "You pay" list — the hero's "Pay" scrolls here when you owe more
   /// than one person.
   final _payKey = GlobalKey();
@@ -108,6 +118,20 @@ class _SettlePageState extends State<SettlePage> {
               suggestedCents: owedCents,
             );
 
+            final hasTrips = ledger.trips.isNotEmpty;
+            // History follows the tab: the squad's payments, or the trips'.
+            final header = Row(
+              children: [
+                Expanded(child: Text('Settle up', style: AppTextStyles.heading(size: 24))),
+                IconButton(
+                  onPressed: () => _openHistory(context, me, trips: hasTrips && _tabs.index == 1),
+                  icon: const Icon(Icons.history_rounded),
+                  tooltip: 'Payment history',
+                  color: AppColors.text,
+                ),
+              ],
+            );
+
             Widget debtRow(Debt debt) => _DebtRow(
               debt: debt,
               ledger: ledger,
@@ -117,24 +141,13 @@ class _SettlePageState extends State<SettlePage> {
               canRemind: debt.toId == me,
             );
 
-            return RefreshIndicator(
+            final squadList = RefreshIndicator(
               color: AppColors.accent,
               onRefresh: () => refreshSquad(context),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                padding: EdgeInsets.fromLTRB(20, hasTrips ? 14 : 16, 20, 32),
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text('Settle up', style: AppTextStyles.heading(size: 24))),
-                      IconButton(
-                        onPressed: () => _openHistory(context, me),
-                        icon: const Icon(Icons.history_rounded),
-                        tooltip: 'Payment history',
-                        color: AppColors.text,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                  if (!hasTrips) ...[header, const SizedBox(height: 12)],
                   _Hero(
                     ledger: ledger,
                     me: me,
@@ -261,45 +274,62 @@ class _SettlePageState extends State<SettlePage> {
                     const SizedBox(height: 8),
                     SeeMoreList(children: [for (final debt in others) debtRow(debt)]),
                   ],
-                  // Trips settle on their own; here's where you stand on each.
-                  if (ledger.trips.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    SquadSectionLabel('TRIPS', trailing: '${ledger.trips.length}'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Each trip settles on its own — open one to pay or remind.',
-                      style: AppTextStyles.body(size: 12, color: squadMuted),
-                    ),
-                    const SizedBox(height: 8),
-                    SeeMoreList(
-                      children: [
-                        for (final trip in ledger.trips)
-                          TripCard(trip: trip, ledger: ledger, me: me),
-                      ],
-                    ),
-                  ],
-                  if (settled.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SquadSectionLabel('SETTLED', trailing: '${settled.length}'),
-                    const SizedBox(height: 4),
-                    for (final settlement in settled.take(_recentSettledCount))
-                      _SettledRow(settlement: settlement, ledger: ledger, me: me),
-                    if (settled.length > _recentSettledCount)
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () => _openHistory(context, me),
-                          iconAlignment: IconAlignment.end,
-                          icon: const Icon(Icons.chevron_right_rounded, size: 18),
-                          label: Text(
-                            'Full history (${settled.length})',
-                            style: AppTextStyles.body(size: 13, weight: FontWeight.w700),
-                          ),
-                          style: TextButton.styleFrom(foregroundColor: oweColor),
-                        ),
-                      ),
-                  ],
+                  ..._settledSection(context, ledger, me, settled, trips: false),
                 ],
               ),
+            );
+            if (!hasTrips) return squadList;
+
+            // Closed trips you still pay for: a count on the Trips tab.
+            final tripsToPay = ledger.trips
+                .where((t) => t.isClosed && ledger.forTrip(t.id).balanceOf(me) < 0)
+                .length;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 0), child: header),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
+                    child: TabBar(
+                      controller: _tabs,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      indicator: ShapeDecoration(
+                        color: AppColors.card,
+                        shape: StadiumBorder(),
+                      ),
+                      labelColor: AppColors.text,
+                      unselectedLabelColor: squadMuted,
+                      labelStyle: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
+                      tabs: [
+                        const Tab(height: 36, text: 'Squad'),
+                        Tab(
+                          height: 36,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('Trips'),
+                              if (tripsToPay > 0) ...[
+                                const SizedBox(width: 6),
+                                _CountBadge(tripsToPay),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabs,
+                    children: [squadList, _tripsList(context, ledger, me)],
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -307,15 +337,73 @@ class _SettlePageState extends State<SettlePage> {
     );
   }
 
+  /// Every trip and where you stand on each — a trip settles on its own,
+  /// once it's closed — then the trips' recent payments.
+  Widget _tripsList(BuildContext context, SquadLedger ledger, String me) {
+    final settled = ledger.tripSettlements.where((s) => s.isConfirmed).toList();
+    return RefreshIndicator(
+      color: AppColors.accent,
+      onRefresh: () => refreshSquad(context),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+        children: [
+          Text(
+            'Each trip settles on its own — open one to pay or remind.',
+            style: AppTextStyles.body(size: 12, color: squadMuted),
+          ),
+          const SizedBox(height: 8),
+          SeeMoreList(
+            previewCount: 6,
+            children: [
+              for (final trip in ledger.trips) TripCard(trip: trip, ledger: ledger, me: me),
+            ],
+          ),
+          ..._settledSection(context, ledger, me, settled, trips: true),
+        ],
+      ),
+    );
+  }
+
+  /// The latest few confirmed payments, then "Full history".
+  List<Widget> _settledSection(
+    BuildContext context,
+    SquadLedger ledger,
+    String me,
+    List<Settlement> settled, {
+    required bool trips,
+  }) => [
+    if (settled.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      SquadSectionLabel('SETTLED', trailing: '${settled.length}'),
+      const SizedBox(height: 4),
+      for (final settlement in settled.take(_recentSettledCount))
+        _SettledRow(settlement: settlement, ledger: ledger, me: me),
+      if (settled.length > _recentSettledCount)
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _openHistory(context, me, trips: trips),
+            iconAlignment: IconAlignment.end,
+            icon: const Icon(Icons.chevron_right_rounded, size: 18),
+            label: Text(
+              'Full history (${settled.length})',
+              style: AppTextStyles.body(size: 13, weight: FontWeight.w700),
+            ),
+            style: TextButton.styleFrom(foregroundColor: oweColor),
+          ),
+        ),
+    ],
+  ];
+
   static int _total(List<Debt> debts) => debts.fold(0, (sum, debt) => sum + debt.amountCents);
 
   static const _recentSettledCount = 5;
 
-  /// Every confirmed payment — the squad's and each trip's — like the
+  /// Every confirmed payment — the squad's, or the trips' — like the
   /// football Wallet's bill history.
-  static Future<void> _openHistory(BuildContext context, String me) =>
-      Navigator.of(context)
-          .push(MaterialPageRoute<void>(builder: (_) => _SettleHistoryPage(me: me)));
+  static Future<void> _openHistory(BuildContext context, String me, {required bool trips}) =>
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => _SettleHistoryPage(me: me, trips: trips)),
+      );
 
   static String _methodDetail(Settlement settlement) => switch (settlement.method) {
     SettlementMethod.qr => 'QR + slip',
@@ -759,11 +847,13 @@ class _SettledRow extends StatelessWidget {
 }
 
 /// Every confirmed payment, newest first under month headings — the
-/// squad's and its trips' (labelled) — read live from [SquadLedgerBloc].
+/// squad's, or with [trips] its trips' (labelled) — read live from
+/// [SquadLedgerBloc].
 class _SettleHistoryPage extends StatelessWidget {
-  const _SettleHistoryPage({required this.me});
+  const _SettleHistoryPage({required this.me, required this.trips});
 
   final String me;
+  final bool trips;
 
   @override
   Widget build(BuildContext context) {
@@ -773,17 +863,20 @@ class _SettleHistoryPage extends StatelessWidget {
         backgroundColor: AppColors.bg,
         elevation: 0,
         foregroundColor: AppColors.text,
-        title: Text('Payment history', style: AppTextStyles.title(size: 16)),
+        title: Text(
+          trips ? 'Trip payment history' : 'Payment history',
+          style: AppTextStyles.title(size: 16),
+        ),
       ),
       body: BlocBuilder<SquadLedgerBloc, SquadLedgerState>(
         builder: (context, state) {
           final ledger = state.ledger;
           if (ledger == null) return SquadLoadingView(state: state);
           DateTime at(Settlement s) => s.respondedAt ?? s.createdAt;
-          final settled = [
-            ...ledger.settlements.where((s) => s.isConfirmed),
-            ...ledger.tripSettlements.where((s) => s.isConfirmed),
-          ]..sort((a, b) => at(b).compareTo(at(a)));
+          final settled = (trips ? ledger.tripSettlements : ledger.settlements)
+              .where((s) => s.isConfirmed)
+              .toList()
+            ..sort((a, b) => at(b).compareTo(at(a)));
           if (settled.isEmpty) {
             return Center(
               child: Text(
@@ -816,6 +909,27 @@ class _SettleHistoryPage extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// How many trips are waiting on you, by the Trips tab's label.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count);
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(color: AppColors.accentFill, borderRadius: AppRadius.pill),
+      child: Text(
+        '$count',
+        textAlign: TextAlign.center,
+        style: AppTextStyles.body(size: 11, weight: FontWeight.w800, color: AppColors.onDark),
       ),
     );
   }
