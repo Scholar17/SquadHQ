@@ -25,6 +25,7 @@ import '../../../wallet/presentation/widgets/bill_details_sheet.dart';
 import '../../../wallet/presentation/widgets/bill_sheet.dart';
 import '../../../wallet/presentation/widgets/bill_card.dart';
 import '../../../wallet/presentation/widgets/pay_bill_sheet.dart';
+import '../../../squad/presentation/widgets/squad_widgets.dart' show SeeMoreList;
 import '../../domain/entities/team_snapshot.dart' show SquadRole;
 import '../view_role.dart';
 import '../widgets/profile_corner.dart';
@@ -165,6 +166,7 @@ class _WalletContent extends StatelessWidget {
               userId: userId,
               isManager: isManager,
               showMatch: true,
+              canPay: true,
             ),
             const SizedBox(height: 10),
           ],
@@ -195,7 +197,7 @@ class _WalletContent extends StatelessWidget {
 
 /// "No total cost yet" matches — the first [_previewCount], with "See more"
 /// expanding the rest in place (there's no separate page for them).
-class _UnbilledList extends StatefulWidget {
+class _UnbilledList extends StatelessWidget {
   const _UnbilledList({required this.unbilled, required this.userId});
 
   final List<WalletMatch> unbilled;
@@ -204,36 +206,14 @@ class _UnbilledList extends StatefulWidget {
   static const _previewCount = 2;
 
   @override
-  State<_UnbilledList> createState() => _UnbilledListState();
-}
-
-class _UnbilledListState extends State<_UnbilledList> {
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final unbilled = widget.unbilled;
-    final hasMore = unbilled.length > _UnbilledList._previewCount;
-    final shown = _expanded ? unbilled : unbilled.take(_UnbilledList._previewCount);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SeeMoreList(
+      previewCount: _previewCount,
+      spacing: 10,
+      color: AppColors.accent700,
       children: [
-        for (final walletMatch in shown) ...[
-          AddBillCard(walletMatch: walletMatch, userId: widget.userId, showMatch: true),
-          const SizedBox(height: 10),
-        ],
-        if (hasMore)
-          Center(
-            child: TextButton(
-              onPressed: () => setState(() => _expanded = !_expanded),
-              child: Text(
-                _expanded
-                    ? 'Show less'
-                    : 'See more (${unbilled.length - _UnbilledList._previewCount})',
-                style: AppTextStyles.title(size: 13, color: AppColors.accent700),
-              ),
-            ),
-          ),
+        for (final walletMatch in unbilled)
+          AddBillCard(walletMatch: walletMatch, userId: userId, showMatch: true),
       ],
     );
   }

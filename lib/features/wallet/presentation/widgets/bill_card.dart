@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/bounce_tap.dart';
 import '../../../comments/domain/entities/match_topic.dart';
 import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../match/presentation/match_formatting.dart';
@@ -26,6 +29,7 @@ class BillCard extends StatelessWidget {
     required this.isManager,
     this.showMatch = false,
     this.canShare = true,
+    this.canPay = false,
   });
 
   final WalletMatch walletMatch;
@@ -43,6 +47,10 @@ class BillCard extends StatelessWidget {
 
   /// Whether its breakdown offers "Share bill" — not on the match screens.
   final bool canShare;
+
+  /// The Wallet tab's: an unpaid share gets a Pay button. Elsewhere (the
+  /// match screens) "You owe … · pay in Wallet" takes you to the Wallet tab.
+  final bool canPay;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +75,7 @@ class BillCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+            border: Border.all(color: AppColors.divider),
             borderRadius: AppRadius.lg,
           ),
           child: Column(
@@ -185,19 +193,23 @@ class BillCard extends StatelessWidget {
                   ),
                 ),
               ],
-              // Just the viewer's status — paying happens only from the
-              // Wallet tab's "You owe" card. Once paid, the slip can be
-              // changed here (a wrong screenshot, say).
+              // The viewer's own share: paying happens in the Wallet tab
+              // only, so the match screens send you there. Once paid, the
+              // slip can be changed here (a wrong screenshot, say).
               if (myShare != null && !myShare.isPayer) ...[
                 const SizedBox(height: 12),
                 _MyShareStatus(
                   paid: myShare.payment != null,
                   amount: split.roundedShare,
+                  canPay: canPay,
+                  onPay: canPay
+                      ? () => showPayBillSheet(context, matchId: match.id, userId: userId)
+                      : () => context.go(AppRoutes.wallet),
                   onChangeSlip: () => showPayBillSheet(context, matchId: match.id, userId: userId),
                 ),
               ],
               const SizedBox(height: 10),
-              Divider(height: 1, color: AppColors.text.withValues(alpha: 0.08)),
+              Divider(height: 1, color: AppColors.divider),
               const SizedBox(height: 4),
               MatchCommentsButton(
                 thread: (matchId: match.id, topic: MatchTopic.bill),
@@ -216,10 +228,21 @@ class BillCard extends StatelessWidget {
 }
 
 class _MyShareStatus extends StatelessWidget {
-  const _MyShareStatus({required this.paid, required this.amount, required this.onChangeSlip});
+  const _MyShareStatus({
+    required this.paid,
+    required this.amount,
+    required this.canPay,
+    required this.onPay,
+    required this.onChangeSlip,
+  });
 
   final bool paid;
   final int amount;
+
+  /// A Pay button (the Wallet tab); otherwise the row itself goes to the
+  /// Wallet tab — [onPay] either way.
+  final bool canPay;
+  final VoidCallback onPay;
 
   /// Opens the pay sheet, to view or change the slip — once [paid].
   final VoidCallback onChangeSlip;
@@ -227,7 +250,8 @@ class _MyShareStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = paid ? AppColors.accent2_700 : AppColors.accent700;
-    return Container(
+    final goesToWallet = !paid && !canPay;
+    final status = Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
@@ -244,13 +268,22 @@ class _MyShareStatus extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              paid ? "You've paid" : 'You owe ${formatBaht(amount)} · pay in Wallet',
+              paid
+                  ? "You've paid"
+                  : 'You owe ${formatBaht(amount)}${canPay ? '' : ' · pay in Wallet'}',
               style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700, color: color),
             ),
           ),
           if (paid) _SmallButton(label: 'Change slip', onPressed: onChangeSlip),
+          if (!paid && canPay) _SmallButton(label: 'Pay', onPressed: onPay),
+          if (goesToWallet) Icon(Icons.chevron_right_rounded, size: 18, color: color),
         ],
       ),
+    );
+    if (!goesToWallet) return status;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(borderRadius: AppRadius.sm, onTap: onPay, child: status),
     );
   }
 }
@@ -284,7 +317,7 @@ class _RemindUnpaidButton extends StatelessWidget {
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.text,
-          side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
+          side: BorderSide(color: AppColors.divider),
           shape: const StadiumBorder(),
         ),
       ),
@@ -358,16 +391,19 @@ class _SmallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.text,
-        side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
-        shape: const StadiumBorder(),
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        minimumSize: const Size(0, 30),
+    return BounceTap(
+      onTap: onPressed,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.text,
+          side: BorderSide(color: AppColors.divider),
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          minimumSize: const Size(0, 30),
+        ),
+        child: Text(label, style: AppTextStyles.title(size: 12)),
       ),
-      child: Text(label, style: AppTextStyles.title(size: 12)),
     );
   }
 }
