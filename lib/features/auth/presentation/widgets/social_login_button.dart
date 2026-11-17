@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/widgets/bounce_tap.dart';
 
 class SocialLoginButton extends StatelessWidget {
   const SocialLoginButton({
@@ -82,32 +83,35 @@ class SocialLoginButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: 54,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: foregroundColor,
-          disabledBackgroundColor: backgroundColor.withValues(alpha: 0.6),
-          shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          elevation: 0,
-        ),
-        child: Row(
-          children: [
-            badge,
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                textAlign: TextAlign.left,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  color: foregroundColor,
+      child: BounceTap(
+        onTap: onPressed,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            disabledBackgroundColor: backgroundColor.withValues(alpha: 0.6),
+            shape: const StadiumBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            elevation: 0,
+          ),
+          child: Row(
+            children: [
+              badge,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.left,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: foregroundColor,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

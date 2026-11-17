@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/bounce_tap.dart';
 import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../../core/theme/app_decorations.dart';
 import '../../domain/entities/expense.dart';
@@ -41,11 +42,18 @@ class SquadSectionLabel extends StatelessWidget {
 /// "See more (n)" expanding the rest in place and "Show less" folding them
 /// back — so a long section doesn't push everything below it off screen.
 class SeeMoreList extends StatefulWidget {
-  const SeeMoreList({super.key, required this.children, this.previewCount = 3, this.spacing = 8});
+  const SeeMoreList({
+    super.key,
+    required this.children,
+    this.previewCount = 3,
+    this.spacing = 8,
+    this.color,
+  });
 
   final List<Widget> children;
   final int previewCount;
   final double spacing;
+  final Color? color;
 
   @override
   State<SeeMoreList> createState() => _SeeMoreListState();
@@ -59,6 +67,7 @@ class _SeeMoreListState extends State<SeeMoreList> {
     final children = widget.children;
     final hidden = children.length - widget.previewCount;
     final shown = _expanded || hidden <= 0 ? children : children.take(widget.previewCount);
+    final actionColor = widget.color ?? oweColor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -85,11 +94,11 @@ class _SeeMoreListState extends State<SeeMoreList> {
               icon: Icon(
                 _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                 size: 18,
-                color: oweColor,
+                color: actionColor,
               ),
               label: Text(
                 _expanded ? 'Show less' : 'See more ($hidden)',
-                style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: oweColor),
+                style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: actionColor),
               ),
               style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
             ),
@@ -166,9 +175,9 @@ class SquadCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
-      side: BorderSide(color: AppColors.text.withValues(alpha: 0.1)),
+      side: BorderSide(color: AppColors.divider),
     );
-    return Material(
+    final card = Material(
       color: AppColors.card,
       shape: shape,
       child: InkWell(
@@ -177,6 +186,8 @@ class SquadCard extends StatelessWidget {
         child: Padding(padding: padding, child: child),
       ),
     );
+    if (onTap == null) return card;
+    return BounceTap(onTap: onTap, child: card);
   }
 }
 
@@ -214,36 +225,39 @@ class HeroPillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = light ? AppColors.onLight : AppColors.onDark;
-    return SizedBox(
-      height: 44,
-      child: TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          backgroundColor: light ? AppColors.onDark : Colors.transparent,
-          foregroundColor: fg,
-          shape: StadiumBorder(
-            side: light
-                ? BorderSide.none
-                : BorderSide(color: AppColors.onDark.withValues(alpha: 0.35)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-        ),
-        // Half the hero card's width on a narrow phone: the label gives way
-        // (ellipsis) rather than overflowing.
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.title(size: 14, color: fg),
-              ),
+    return BounceTap(
+      onTap: onPressed,
+      child: SizedBox(
+        height: 44,
+        child: TextButton(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            backgroundColor: light ? AppColors.onDark : Colors.transparent,
+            foregroundColor: fg,
+            shape: StadiumBorder(
+              side: light
+                  ? BorderSide.none
+                  : BorderSide(color: AppColors.onDark.withValues(alpha: 0.35)),
             ),
-          ],
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+          ),
+          // Half the hero card's width on a narrow phone: the label gives way
+          // (ellipsis) rather than overflowing.
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title(size: 14, color: fg),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -267,23 +281,26 @@ class SquadPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: FilledButton(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: color,
-          disabledBackgroundColor: color.withValues(alpha: 0.4),
-          shape: const StadiumBorder(),
+    return BounceTap(
+      onTap: isLoading ? null : onPressed,
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton(
+          onPressed: isLoading ? null : onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: color,
+            disabledBackgroundColor: color.withValues(alpha: 0.4),
+            shape: const StadiumBorder(),
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                )
+              : Text(label, style: AppTextStyles.title(size: 16, color: AppColors.onDark)),
         ),
-        child: isLoading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
-              )
-            : Text(label, style: AppTextStyles.title(size: 16, color: AppColors.onDark)),
       ),
     );
   }
@@ -314,7 +331,7 @@ class SquadChoiceChip extends StatelessWidget {
         color: selected ? AppColors.neutral900 : AppColors.card,
         shape: StadiumBorder(
           side: BorderSide(
-            color: selected ? AppColors.neutral900 : AppColors.text.withValues(alpha: 0.14),
+            color: selected ? AppColors.neutral900 : AppColors.divider,
           ),
         ),
         child: InkWell(

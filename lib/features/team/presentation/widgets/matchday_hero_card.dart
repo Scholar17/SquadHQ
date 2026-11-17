@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_decorations.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/bounce_tap.dart';
 import '../../domain/entities/team_snapshot.dart';
 
 class MatchdayHeroCard extends StatelessWidget {
@@ -29,13 +31,7 @@ class MatchdayHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.neutral900,
-        borderRadius: AppRadius.xl,
-        boxShadow: const [
-          BoxShadow(color: Color(0x292E2B25), blurRadius: 10, offset: Offset(0, 3)),
-        ],
-      ),
+      decoration: AppDecorations.darkHero(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -121,7 +117,10 @@ class MatchdayHeroCard extends StatelessWidget {
                 Expanded(
                   child: _PillButton(
                     label: myRsvp == RsvpStatus.yes ? "You're in ✓" : "I'm in",
-                    onTap: onRsvpIn,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onRsvpIn();
+                    },
                     filled: myRsvp == RsvpStatus.yes || myRsvp == RsvpStatus.pending,
                   ),
                 ),
@@ -129,7 +128,10 @@ class MatchdayHeroCard extends StatelessWidget {
                 Expanded(
                   child: _PillButton(
                     label: "Can't make it",
-                    onTap: onRsvpOut,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onRsvpOut();
+                    },
                     filled: myRsvp == RsvpStatus.no,
                   ),
                 ),
@@ -188,34 +190,37 @@ class _PillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: filled
-          ? ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.teamGold,
-                foregroundColor: AppColors.neutral800,
-                shape: const StadiumBorder(),
-                elevation: 0,
+    return BounceTap(
+      onTap: onTap,
+      child: SizedBox(
+        height: 46,
+        child: filled
+            ? ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.teamGold,
+                  foregroundColor: AppColors.neutral800,
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                child: Text(
+                  label,
+                  style: AppTextStyles.title(size: 14, color: AppColors.neutral800),
+                ),
+              )
+            : OutlinedButton(
+                onPressed: onTap,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.onDark,
+                  side: const BorderSide(color: Color(0x47F9F4ED)),
+                  shape: const StadiumBorder(),
+                ),
+                child: Text(
+                  label,
+                  style: AppTextStyles.title(size: 14, color: AppColors.onDark),
+                ),
               ),
-              child: Text(
-                label,
-                style: AppTextStyles.title(size: 14, color: AppColors.neutral800),
-              ),
-            )
-          : OutlinedButton(
-              onPressed: onTap,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.onDark,
-                side: const BorderSide(color: Color(0x47F9F4ED)),
-                shape: const StadiumBorder(),
-              ),
-              child: Text(
-                label,
-                style: AppTextStyles.title(size: 14, color: AppColors.onDark),
-              ),
-            ),
+      ),
     );
   }
 }

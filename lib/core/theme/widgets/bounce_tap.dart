@@ -34,11 +34,15 @@ class _BounceTapState extends State<BounceTap> {
   bool _pressed = false;
 
   void _setPressed(bool pressed) {
-    if (_pressed != pressed) setState(() => _pressed = pressed);
+    if (_pressed != pressed) {
+      if (pressed && widget.haptic) {
+        HapticFeedback.lightImpact();
+      }
+      setState(() => _pressed = pressed);
+    }
   }
 
   void _handleTap() {
-    if (widget.haptic) HapticFeedback.lightImpact();
     widget.onTap?.call();
   }
 
@@ -47,7 +51,7 @@ class _BounceTapState extends State<BounceTap> {
     final enabled = widget.onTap != null;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent,
       onTapDown: enabled ? (_) => _setPressed(true) : null,
       onTapUp: enabled ? (_) => _setPressed(false) : null,
       onTapCancel: enabled ? () => _setPressed(false) : null,
