@@ -46,7 +46,7 @@
   <header>
     <div class="brand"><div class="logo">GG</div><strong>Squad HQ</strong></div>
     <h1>Privacy policy</h1>
-    <p class="muted">Effective 5 October 2026</p>
+    <p class="muted">Effective 5 October 2026 · Updated 22 October 2026</p>
     <p>Squad HQ helps teams and squads organise matches, trips, shared bills and
       subscriptions, and settle up with each other. This policy explains what
       information the app collects, who can see it, and how to delete it.</p>
@@ -65,13 +65,22 @@
     <li><strong>Your profile.</strong> Your name, photo, phone number and username, which
       you can change in Profile.</li>
     <li><strong>What you do in your groups.</strong> The teams and squads you join; matches,
-      availability (RSVPs) and Man of the Match votes; match bills; expenses and how they're
-      split, including names of guests you add; trips; monthly expenses; comments; and
-      payments you record between members.</li>
+      availability (RSVPs), scores, Man of the Match votes, player ratings and your answers
+      to after-match questions; match bills; expenses and how they're split, including names
+      of guests you add; trips; monthly expenses; comments; and payments you record between
+      members.</li>
+    <li><strong>Venues your team saves.</strong> A venue's name, Google Maps link, location
+      (latitude and longitude), photo, notes and price, as an admin enters them. This is
+      the pitch's location, not yours: Squad HQ never reads your phone's location.</li>
     <li><strong>Payment details you choose to add.</strong> A payment QR image, your bank
       name, account name and account number, and photos of payment slips or receipts.
       Squad HQ does not process payments or hold money — it only records what members
       tell it.</li>
+    <li><strong>Photos and the camera.</strong> When you add a photo (your profile photo,
+      a payment QR, a slip, a receipt or a venue photo), you choose it from your photos,
+      take it with your camera, or paste one you copied. Squad HQ only reads the photo you
+      choose, take or paste, and only when you ask it to; it doesn't look through your
+      photos or use the camera otherwise.</li>
     <li><strong>Your device, for notifications.</strong> A push notification token and the
       kind of device (Android, iPhone or web), and a list of the notifications sent to you.</li>
   </ul>
@@ -91,7 +100,11 @@
       expense is visible to that squad.</li>
     <li>Your phone number is part of your profile, which members of your teams and squads
       can access (the app doesn't display it to them).</li>
-    <li>People outside your groups can't see any of it.</li>
+    <li><strong>Shared links.</strong> If you share a match or bill link (for example in
+      Messenger), anyone who has the link can see its preview: the team name, the
+      opponent, the kick-off date and time, the venue, the score, and for a bill the name
+      of who paid. Opening the details still needs a Squad HQ account in that group.</li>
+    <li>Otherwise, people outside your groups can't see any of it.</li>
   </ul>
 
   <h2>Services we use</h2>
@@ -102,11 +115,19 @@
     <li><strong>Google Firebase</strong> — hosting the web app and delivering push
       notifications.</li>
     <li><strong>Google and Facebook</strong> — signing you in.</li>
+    <li><strong>Cloudflare</strong> — showing the preview of a shared match or bill
+      link.</li>
+    <li><strong>Open-Meteo and the World Air Quality Index project (aqicn.org)</strong> —
+      the weather and air-quality forecast for a match. They receive the venue's location
+      only, never anything about you.</li>
   </ul>
 
   <h2>How long we keep it</h2>
-  <p>We keep your information while you have an account. When you delete your account,
-    your personal details are removed as described below.</p>
+  <p>We keep your profile while you have an account. Group history is kept for one year:
+    matches, expenses, comments, slips and notifications are deleted once they're a year
+    old. Debts from deleted expenses are combined into one "carried over" amount so
+    balances stay correct, and a match's bill is kept until everyone has paid. When you
+    delete your account, your personal details are removed as described below.</p>
 
   <section class="card" id="delete-account">
     <h2>Deleting your account</h2>
