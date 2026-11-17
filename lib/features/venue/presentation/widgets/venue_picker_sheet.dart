@@ -8,40 +8,38 @@ import '../../domain/entities/venue.dart';
 import '../../domain/usecases/get_team_venues.dart';
 import 'venue_form_sheet.dart';
 
-/// What the venue picker came back with: a venue, or none ("No venue").
-typedef VenueChoice = ({Venue? venue});
-
-/// The new/edit match form's venue: [teamId]'s saved venues, most recently
-/// used first, with a search, an edit button on each and "+ Add new
-/// venue". Null when closed without choosing.
-Future<VenueChoice?> showVenuePicker(
-  BuildContext context, {
-  required String teamId,
-  String? selectedId,
-}) {
-  return showModalBottomSheet<VenueChoice>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
-    builder: (_) => _VenuePickerSheet(teamId: teamId, selectedId: selectedId),
-  );
-}
-
-class _VenuePickerSheet extends StatefulWidget {
-  const _VenuePickerSheet({required this.teamId, this.selectedId});
+/// The new/edit match form's venue step, shown in place of the form inside
+/// the same sheet: [teamId]'s saved venues, most recently used first, with
+/// a search, an edit button on each and "+ Add new venue" — which also
+/// open in place, so there's only ever one sheet. [onChosen] gets the
+/// venue, or null for "No venue"; [onBack] returns without choosing (✕ or
+/// the system back).
+class VenuePicker extends StatefulWidget {
+  const VenuePicker({
+    super.key,
+    required this.teamId,
+    required this.onChosen,
+    required this.onBack,
+    this.selectedId,
+  });
 
   final String teamId;
   final String? selectedId;
+  final ValueChanged<Venue?> onChosen;
+  final VoidCallback onBack;
 
   @override
-  State<_VenuePickerSheet> createState() => _VenuePickerSheetState();
+  State<VenuePicker> createState() => _VenuePickerState();
 }
 
-class _VenuePickerSheetState extends State<_VenuePickerSheet> {
+class _VenuePickerState extends State<VenuePicker> {
   final _searchController = TextEditingController();
   List<Venue>? _venues;
   String? _error;
+
+  /// The venue form open in place of the list: adding (initial null) or
+  /// editing. Null shows the list.
+  ({Venue? initial})? _form;
 
   @override
   void initState() {
@@ -65,21 +63,12 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
     );
   }
 
-  Future<void> _addNew() async {
-    final venue = await showVenueForm(
-      context,
-      teamId: widget.teamId,
-      initial: null,
-    );
-    // Picked as soon as it's saved.
-    if (venue != null && mounted) Navigator.of(context).pop((venue: venue));
-  }
-
-  /// Edited in place: the list shows the change, and nothing's picked.
-  Future<void> _edit(Venue venue) async {
-    final saved = await showVenueForm(context, teamId: widget.teamId, initial: venue);
-    if (saved == null || !mounted) return;
+  void _onSaved(Venue saved) {
+    // A new venue is picked as soon as it's saved; an edited one updates
+    // the list, and nothing's picked.
+    if (_form?.initial == null) return widget.onChosen(saved);
     setState(() {
+      _form = null;
       _venues = [
         for (final existing in _venues ?? const <Venue>[]) existing.id == saved.id ? saved : existing,
       ];
@@ -88,6 +77,38 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final form = _form;
+    // The system back steps back too: form → list → the match form.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_form != null) {
+          setState(() => _form = null);
+        } else {
+          widget.onBack();
+        }
+      },
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.bottomCenter,
+          children: [...previous, ?current],
+        ),
+        child: form == null
+            ? KeyedSubtree(key: const ValueKey('list'), child: _buildList(context))
+            : VenueForm(
+                key: ValueKey(form.initial?.id ?? 'new'),
+                teamId: widget.teamId,
+                initial: form.initial,
+                onSaved: _onSaved,
+                onClose: () => setState(() => _form = null),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildList(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
     final venues = [
       for (final venue in _venues ?? const <Venue>[])
@@ -111,7 +132,7 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
                 children: [
                   Expanded(child: Text('Venue', style: AppTextStyles.title(size: 18))),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: widget.onBack,
                     icon: const Icon(Icons.close_rounded),
                     tooltip: 'Close',
                   ),
@@ -156,7 +177,7 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
                           _VenueTile(
                             icon: Icons.block_rounded,
                             title: 'No venue',
-                            onTap: () => Navigator.of(context).pop((venue: null)),
+                            onTap: () => widget.onChosen(null),
                           ),
                         for (final venue in venues)
                           _VenueTile(
@@ -164,8 +185,8 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
                             title: venue.name,
                             subtitle: venue.notes,
                             selected: venue.id == widget.selectedId,
-                            onTap: () => Navigator.of(context).pop((venue: venue)),
-                            onEdit: () => _edit(venue),
+                            onTap: () => widget.onChosen(venue),
+                            onEdit: () => setState(() => _form = (initial: venue)),
                           ),
                         if (venues.isEmpty)
                           _Message(
@@ -179,7 +200,7 @@ class _VenuePickerSheetState extends State<_VenuePickerSheet> {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: _addNew,
+                onPressed: () => setState(() => _form = (initial: null)),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add new venue'),
                 style: OutlinedButton.styleFrom(

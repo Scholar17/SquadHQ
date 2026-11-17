@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
+import '../../../squad/presentation/widgets/squad_widgets.dart';
+import '../../../venue/domain/entities/venue.dart';
+import '../../../venue/domain/usecases/get_team_venues.dart';
 import '../../../venue/presentation/widgets/venue_picker_sheet.dart';
 import '../../domain/entities/match.dart' as match_entity;
 import '../bloc/match_bloc.dart';
@@ -54,9 +58,19 @@ class _MatchFormSheet extends StatefulWidget {
 class _MatchFormSheetState extends State<_MatchFormSheet> {
   late final _opponentController = TextEditingController(text: widget.initial?.opponent);
   /// A saved venue (052), or — on a match from before them — a typed one
-  /// ([_venueId] null). Picked from [showVenuePicker].
+  /// ([_venueId] null). Picked from [VenuePicker].
   late String? _venueId = widget.initial?.venueId;
   late String? _venueName = widget.initial?.venue;
+
+  /// The venue step is showing in place of the form — same sheet, so
+  /// sheets never stack. The fields keep what was typed.
+  bool _choosingVenue = false;
+
+  /// The team's saved venues, most recently used first — the first few
+  /// show as one-tap chips under the Venue field, since most matches are
+  /// at the same pitches. Empty until loaded (or if loading fails).
+  List<Venue> _venues = const [];
+  static const _quickVenues = 3;
   late DateTime? _kickoffAt = widget.initial?.kickoffAt.toLocal();
   late final _playTimeController = TextEditingController(
     text: _formatHours(
@@ -115,6 +129,24 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadVenues();
+  }
+
+  /// Also after the venue step, which may have added or renamed one.
+  Future<void> _loadVenues() async {
+    final result = await sl<GetTeamVenues>()(widget.teamId);
+    if (!mounted) return;
+    result.fold((_) {}, (venues) => setState(() => _venues = venues));
+  }
+
+  void _selectVenue(Venue? venue) => setState(() {
+        _venueId = venue?.id;
+        _venueName = venue?.name;
+      });
+
+  @override
   void dispose() {
     _opponentController.dispose();
     _playTimeController.dispose();
@@ -160,6 +192,17 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
       _playHours != null &&
       _playersNeededValid;
 
+  /// Under the disabled button, so it's never a silent dead end. Invalid
+  /// numbers and a past kick-off already show their own error lines.
+  String? get _missingHint {
+    final missing = [
+      if (_opponentController.text.trim().isEmpty) 'an opponent',
+      if (_kickoffAt == null) 'a date & time',
+    ];
+    if (missing.isEmpty) return null;
+    return 'Add ${missing.join(' and ')} to ${_isEditing ? 'save' : 'create the match'}.';
+  }
+
   void _submit() {
     if (!_isValid) return;
     final opponent = _opponentController.text.trim();
@@ -189,13 +232,9 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
     );
   }
 
-  Future<void> _pickVenue() async {
-    final choice = await showVenuePicker(context, teamId: widget.teamId, selectedId: _venueId);
-    if (choice == null || !mounted) return;
-    setState(() {
-      _venueId = choice.venue?.id;
-      _venueName = choice.venue?.name;
-    });
+  void _pickVenue() {
+    FocusScope.of(context).unfocus();
+    setState(() => _choosingVenue = true);
   }
 
   @override
@@ -214,155 +253,216 @@ class _MatchFormSheetState extends State<_MatchFormSheet> {
           Navigator.of(context).pop();
         }
       },
-      // The fields scroll when the keyboard leaves too little room; the
-      // button stays pinned above it.
-      child: StickyActionSheet(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        children: [
-          Text(_isEditing ? 'Edit match' : 'New match', style: AppTextStyles.title(size: 18)),
-          const SizedBox(height: 16),
-          _Field(controller: _opponentController, hintText: 'Opponent'),
-          const SizedBox(height: 10),
-          InkWell(
-            borderRadius: AppRadius.pill,
-            onTap: _pickKickoff,
-            child: Container(
-              height: 50,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              alignment: Alignment.centerLeft,
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: AppRadius.pill,
-                border: Border.all(
-                  color: _kickoffAt != null && !_kickoffInFuture
-                      ? AppColors.accent700
-                      : AppColors.text.withValues(alpha: 0.16),
-                ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.bottomCenter,
+          children: [...previous, ?current],
+        ),
+        child: _choosingVenue
+            ? VenuePicker(
+                key: const ValueKey('venue'),
+                teamId: widget.teamId,
+                selectedId: _venueId,
+                onChosen: (venue) {
+                  _selectVenue(venue);
+                  setState(() => _choosingVenue = false);
+                  _loadVenues();
+                },
+                onBack: () {
+                  setState(() => _choosingVenue = false);
+                  _loadVenues();
+                },
+              )
+            : _buildForm(),
+      ),
+    );
+  }
+
+  /// The fields scroll when the keyboard leaves too little room; the
+  /// button stays pinned above it.
+  Widget _buildForm() {
+    return StickyActionSheet(
+      key: const ValueKey('form'),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      action: BlocBuilder<MatchBloc, MatchState>(
+        builder: (context, state) {
+          final isSubmitting = state is MatchSubmitting;
+          return SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: isSubmitting || !_isValid ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.onDark,
+                disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
+                shape: const StadiumBorder(),
+                elevation: 0,
               ),
-              child: Text(
-                _kickoffAt == null ? 'Date & time' : formatMatchDateTime(_kickoffAt!),
-                style: AppTextStyles.body(
-                  size: 14,
-                  weight: FontWeight.w600,
-                  color: _kickoffAt == null ? AppColors.textMuted : AppColors.text,
-                ),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                    )
+                  : Text(
+                      _isEditing ? 'Save changes' : 'Create match',
+                      style: AppTextStyles.title(size: 14, color: AppColors.onDark),
+                    ),
+            ),
+          );
+        },
+      ),
+      footer: switch (_missingHint) {
+        final hint? => Text(
+            hint,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.body(size: 12, color: AppColors.textMuted),
+          ),
+        null => null,
+      },
+      children: [
+        Text(_isEditing ? 'Edit match' : 'New match', style: AppTextStyles.title(size: 18)),
+        const SizedBox(height: 16),
+        _Field(
+          controller: _opponentController,
+          hintText: 'Opponent',
+          onChanged: () => setState(() {}),
+        ),
+        const SizedBox(height: 10),
+        InkWell(
+          borderRadius: AppRadius.pill,
+          onTap: _pickKickoff,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 50),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            alignment: Alignment.centerLeft,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppRadius.pill,
+              border: Border.all(
+                color: _kickoffAt != null && !_kickoffInFuture
+                    ? AppColors.accent700
+                    : AppColors.text.withValues(alpha: 0.16),
+              ),
+            ),
+            child: Text(
+              _kickoffAt == null ? 'Date & time' : formatMatchDateTime(_kickoffAt!),
+              style: AppTextStyles.body(
+                size: 14,
+                weight: FontWeight.w600,
+                color: _kickoffAt == null ? AppColors.textMuted : AppColors.text,
               ),
             ),
           ),
-          if (_kickoffAt != null && !_kickoffInFuture)
-            Padding(
-              padding: const EdgeInsets.only(left: 18, top: 4),
-              child: Text(
-                'Kick-off must be later than now — check AM / PM.',
-                style: AppTextStyles.body(size: 11.5, color: AppColors.accent700),
-              ),
+        ),
+        if (_kickoffAt != null && !_kickoffInFuture)
+          Padding(
+            padding: const EdgeInsets.only(left: 18, top: 4),
+            child: Text(
+              'Kick-off must be later than now — check AM / PM.',
+              style: AppTextStyles.body(size: 11.5, color: AppColors.accent700),
             ),
-          const SizedBox(height: 10),
-          InkWell(
-            borderRadius: AppRadius.pill,
-            onTap: _pickVenue,
-            child: Container(
-              height: 50,
-              padding: const EdgeInsets.only(left: 18, right: 12),
-              decoration: BoxDecoration(
-                color: AppColors.card,
-                borderRadius: AppRadius.pill,
-                border: Border.all(color: AppColors.text.withValues(alpha: 0.16)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _venueName ?? 'Venue (optional)',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body(
-                        size: 14,
-                        weight: FontWeight.w600,
-                        color: _venueName == null ? AppColors.textMuted : AppColors.text,
-                      ),
+          ),
+        const SizedBox(height: 10),
+        InkWell(
+          borderRadius: AppRadius.pill,
+          onTap: _pickVenue,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 50),
+            padding: const EdgeInsets.only(left: 18, right: 12),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppRadius.pill,
+              border: Border.all(color: AppColors.text.withValues(alpha: 0.16)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _venueName ?? 'Venue (optional)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body(
+                      size: 14,
+                      weight: FontWeight.w600,
+                      color: _venueName == null ? AppColors.textMuted : AppColors.text,
                     ),
                   ),
-                  Icon(Icons.expand_more_rounded, color: AppColors.textMuted),
-                ],
-              ),
+                ),
+                Icon(Icons.expand_more_rounded, color: AppColors.textMuted),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          _StepperField(
-            label: 'Play time',
-            unit: 'hr',
-            controller: _playTimeController,
-            decimal: true,
-            isValid: _playHours != null,
-            errorText: 'Enter between 0.25 and 12 hours',
-            minusTooltip: 'Half an hour less',
-            plusTooltip: 'Half an hour more',
-            onChanged: () => setState(() {}),
-            onMinus: () => _stepPlayTime(-_stepHours),
-            onPlus: () => _stepPlayTime(_stepHours),
-          ),
-          const SizedBox(height: 10),
-          _StepperField(
-            label: 'Players needed',
-            unit: '',
-            hintText: 'optional',
-            controller: _playersNeededController,
-            isValid: _playersNeededValid,
-            errorText: 'Enter between $_minPlayers and $_maxPlayers players, or leave it blank',
-            minusTooltip: 'One player fewer',
-            plusTooltip: 'One player more',
-            onChanged: () => setState(() {}),
-            onMinus: () => _stepPlayers(-1),
-            onPlus: () => _stepPlayers(1),
+        ),
+        if (_venues.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final venue in _venues.take(_quickVenues)) ...[
+                  SquadChoiceChip(
+                    label: venue.name,
+                    icon: Icons.place_outlined,
+                    selected: venue.id == _venueId,
+                    // Tapping the picked one again clears it.
+                    onTap: () => _selectVenue(venue.id == _venueId ? null : venue),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ],
+            ),
           ),
         ],
-        action: BlocBuilder<MatchBloc, MatchState>(
-          builder: (context, state) {
-            final isSubmitting = state is MatchSubmitting;
-            return SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: isSubmitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onDark,
-                  disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
-                      )
-                    : Text(
-                        _isEditing ? 'Save changes' : 'Create match',
-                        style: AppTextStyles.title(size: 14, color: AppColors.onDark),
-                      ),
-              ),
-            );
-          },
+        const SizedBox(height: 10),
+        _StepperField(
+          label: 'Play time',
+          unit: 'hr',
+          controller: _playTimeController,
+          decimal: true,
+          isValid: _playHours != null,
+          errorText: 'Enter between 0.25 and 12 hours',
+          minusTooltip: 'Half an hour less',
+          plusTooltip: 'Half an hour more',
+          onChanged: () => setState(() {}),
+          onMinus: () => _stepPlayTime(-_stepHours),
+          onPlus: () => _stepPlayTime(_stepHours),
         ),
-      ),
+        const SizedBox(height: 10),
+        _StepperField(
+          label: 'Players needed',
+          unit: '',
+          hintText: 'optional',
+          controller: _playersNeededController,
+          isValid: _playersNeededValid,
+          errorText: 'Enter between $_minPlayers and $_maxPlayers players, or leave it blank',
+          minusTooltip: 'One player fewer',
+          plusTooltip: 'One player more',
+          onChanged: () => setState(() {}),
+          onMinus: () => _stepPlayers(-1),
+          onPlus: () => _stepPlayers(1),
+        ),
+      ],
     );
   }
 }
 
 class _Field extends StatelessWidget {
-  const _Field({required this.controller, required this.hintText});
+  const _Field({required this.controller, required this.hintText, required this.onChanged});
 
   final TextEditingController controller;
   final String hintText;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 50,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 50),
       child: TextField(
         controller: controller,
+        onChanged: (_) => onChanged(),
         decoration: InputDecoration(
           hintText: hintText,
           filled: true,
@@ -415,7 +515,7 @@ class _StepperField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          height: 50,
+          constraints: const BoxConstraints(minHeight: 50),
           padding: const EdgeInsets.only(left: 18, right: 4),
           decoration: BoxDecoration(
             color: AppColors.card,

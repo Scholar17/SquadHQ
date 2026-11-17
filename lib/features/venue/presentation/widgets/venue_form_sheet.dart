@@ -22,21 +22,37 @@ Future<Venue?> showVenueForm(BuildContext context, {required String teamId, Venu
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
-    builder: (_) => _VenueFormSheet(teamId: teamId, initial: initial),
+    builder: (sheetContext) => VenueForm(
+      teamId: teamId,
+      initial: initial,
+      onSaved: (venue) => Navigator.of(sheetContext).pop(venue),
+      onClose: () => Navigator.of(sheetContext).pop(),
+    ),
   );
 }
 
-class _VenueFormSheet extends StatefulWidget {
-  const _VenueFormSheet({required this.teamId, this.initial});
+/// The venue form itself: in a sheet of its own ([showVenueForm]), or
+/// swapped in place inside another sheet (the venue picker) so sheets
+/// never stack.
+class VenueForm extends StatefulWidget {
+  const VenueForm({
+    super.key,
+    required this.teamId,
+    required this.onSaved,
+    required this.onClose,
+    this.initial,
+  });
 
   final String teamId;
   final Venue? initial;
+  final ValueChanged<Venue> onSaved;
+  final VoidCallback onClose;
 
   @override
-  State<_VenueFormSheet> createState() => _VenueFormSheetState();
+  State<VenueForm> createState() => _VenueFormState();
 }
 
-class _VenueFormSheetState extends State<_VenueFormSheet> {
+class _VenueFormState extends State<VenueForm> {
   static const _maxName = 80;
   static const _maxNotes = 300;
 
@@ -210,7 +226,7 @@ class _VenueFormSheetState extends State<_VenueFormSheet> {
         _saving = false;
         _error = failure.message;
       }),
-      (venue) => Navigator.of(context).pop(venue),
+      (venue) => widget.onSaved(venue),
     );
   }
 
@@ -218,7 +234,33 @@ class _VenueFormSheetState extends State<_VenueFormSheet> {
   Widget build(BuildContext context) {
     final initialPhoto = widget.initial?.photoUrl;
     return StickyActionSheet(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+      // A long form: leave the page peeking above, clear of the status bar.
+      maxHeightFactor: 0.85,
+      action: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton(
+          onPressed: _isValid && !_saving ? _save : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: AppColors.onDark,
+            disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
+            shape: const StadiumBorder(),
+            elevation: 0,
+          ),
+          child: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                )
+              : Text(
+                  widget.initial == null ? 'Save venue' : 'Save changes',
+                  style: AppTextStyles.title(size: 14, color: AppColors.onDark),
+                ),
+        ),
+      ),
       children: [
         Row(
           children: [
@@ -229,7 +271,7 @@ class _VenueFormSheetState extends State<_VenueFormSheet> {
               ),
             ),
             IconButton(
-              onPressed: _saving ? null : () => Navigator.of(context).pop(),
+              onPressed: _saving ? null : widget.onClose,
               icon: const Icon(Icons.close_rounded),
               tooltip: 'Close',
             ),
@@ -349,30 +391,6 @@ class _VenueFormSheetState extends State<_VenueFormSheet> {
           Text(error, style: AppTextStyles.body(size: 12.5, color: AppColors.accent700)),
         ],
       ],
-      action: SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton(
-          onPressed: _isValid && !_saving ? _save : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.onDark,
-            disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-            shape: const StadiumBorder(),
-            elevation: 0,
-          ),
-          child: _saving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
-                )
-              : Text(
-                  widget.initial == null ? 'Save venue' : 'Save changes',
-                  style: AppTextStyles.title(size: 14, color: AppColors.onDark),
-                ),
-        ),
-      ),
     );
   }
 }
