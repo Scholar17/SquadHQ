@@ -212,7 +212,7 @@ class ProfilePage extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.card,
                   borderRadius: AppRadius.lg,
-                  border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                  border: Border.all(color: AppColors.divider),
                 ),
                 child: Row(
                   children: [
@@ -315,7 +315,7 @@ class ProfilePage extends StatelessWidget {
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.card,
-                  border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                  border: Border.all(color: AppColors.divider),
                   borderRadius: AppRadius.lg,
                 ),
                 child: Column(
@@ -377,16 +377,15 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 10),
               Material(
                 color: AppColors.card,
-                borderRadius: AppRadius.lg,
-                child: InkWell(
+                shape: RoundedRectangleBorder(
                   borderRadius: AppRadius.lg,
+                  side: BorderSide(color: AppColors.divider),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
                   onTap: () => context.push(AppRoutes.team),
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                      borderRadius: AppRadius.lg,
-                    ),
                     child: Row(
                       children: [
                         Text(
@@ -413,16 +412,15 @@ class ProfilePage extends StatelessWidget {
                       const SizedBox(height: 10),
                       Material(
                         color: AppColors.card,
-                        borderRadius: AppRadius.lg,
-                        child: InkWell(
+                        shape: RoundedRectangleBorder(
                           borderRadius: AppRadius.lg,
+                          side: BorderSide(color: AppColors.divider),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
                           onTap: () => installPwa(context),
-                          child: Container(
+                          child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                              borderRadius: AppRadius.lg,
-                            ),
                             child: Row(
                               children: [
                                 Text(
@@ -449,16 +447,15 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 10),
               Material(
                 color: AppColors.card,
-                borderRadius: AppRadius.lg,
-                child: InkWell(
+                shape: RoundedRectangleBorder(
                   borderRadius: AppRadius.lg,
+                  side: BorderSide(color: AppColors.divider),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
                   onTap: () => openTermsOfService(context),
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                      borderRadius: AppRadius.lg,
-                    ),
                     child: Row(
                       children: [
                         Text(
@@ -475,16 +472,15 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 10),
               Material(
                 color: AppColors.card,
-                borderRadius: AppRadius.lg,
-                child: InkWell(
+                shape: RoundedRectangleBorder(
                   borderRadius: AppRadius.lg,
+                  side: BorderSide(color: AppColors.divider),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
                   onTap: () => openPrivacyPolicy(context),
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                      borderRadius: AppRadius.lg,
-                    ),
                     child: Row(
                       children: [
                         Text(
@@ -501,20 +497,19 @@ class ProfilePage extends StatelessWidget {
               const SizedBox(height: 10),
               Material(
                 color: AppColors.card,
-                borderRadius: AppRadius.lg,
-                child: InkWell(
+                shape: RoundedRectangleBorder(
                   borderRadius: AppRadius.lg,
+                  side: BorderSide(color: AppColors.divider),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
                   onTap: saving
                       ? null
                       : () => Navigator.of(
                           context,
                         ).push(MaterialPageRoute<void>(builder: (_) => const DeleteAccountPage())),
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                      borderRadius: AppRadius.lg,
-                    ),
                     child: Row(
                       children: [
                         Text(
@@ -598,7 +593,7 @@ class _InfoRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           border: showTopBorder
-              ? Border(top: BorderSide(color: AppColors.text.withValues(alpha: 0.07)))
+              ? Border(top: BorderSide(color: AppColors.divider))
               : null,
         ),
         child: Row(
@@ -788,7 +783,7 @@ class _WalletQrSection extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.card,
-            border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+            border: Border.all(color: AppColors.divider),
             borderRadius: AppRadius.lg,
           ),
           child: Row(
@@ -809,7 +804,7 @@ class _WalletQrSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: AppRadius.md,
-                    border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                    border: Border.all(color: AppColors.divider),
                   ),
                   child: isLoading
                       ? const Center(
@@ -844,7 +839,7 @@ class _WalletQrSection extends StatelessWidget {
                       onPressed: isLoading || isUploading ? null : () => _upload(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.text,
-                        side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
+                        side: BorderSide(color: AppColors.divider),
                         shape: const StadiumBorder(),
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         minimumSize: const Size(0, 32),
@@ -903,7 +898,7 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
         color: AppColors.card,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
         borderRadius: AppRadius.lg,
       ),
       child: FutureBuilder<PushStatus>(
@@ -1035,7 +1030,7 @@ class _ChoiceBar<T> extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.card,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
         borderRadius: AppRadius.lg,
       ),
       child: Row(

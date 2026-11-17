@@ -116,7 +116,7 @@ class _EmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

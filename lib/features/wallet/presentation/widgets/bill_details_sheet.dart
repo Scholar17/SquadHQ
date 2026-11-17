@@ -96,7 +96,7 @@ Future<void> showBillDetailsSheet(
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.card,
-                  border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+                  border: Border.all(color: AppColors.divider),
                   borderRadius: AppRadius.lg,
                 ),
                 child: Column(
@@ -150,7 +150,7 @@ Future<void> showBillDetailsSheet(
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.text,
-                      side: BorderSide(color: AppColors.text.withValues(alpha: 0.16)),
+                      side: BorderSide(color: AppColors.divider),
                       shape: const StadiumBorder(),
                     ),
                     child: Text('Edit bill', style: AppTextStyles.title(size: 14)),
@@ -195,7 +195,7 @@ class _ShareRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         border: showTopBorder
-            ? Border(top: BorderSide(color: AppColors.text.withValues(alpha: 0.07)))
+            ? Border(top: BorderSide(color: AppColors.divider))
             : null,
       ),
       child: Row(

@@ -26,7 +26,7 @@ Future<void> showInvitePeopleSheet(
     isScrollControlled: true,
     useRootNavigator: true,
     backgroundColor: AppColors.bg,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
     builder: (_) => _InvitePeopleSheet(teamId: teamId, groupName: groupName),
   );
 }

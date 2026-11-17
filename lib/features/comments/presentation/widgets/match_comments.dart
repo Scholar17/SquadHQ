@@ -157,17 +157,16 @@ class _Summary extends StatelessWidget {
         }
         return Material(
           color: AppColors.card,
-          borderRadius: AppRadius.lg,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.lg,
+            side: BorderSide(color: AppColors.divider),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: ValueKey('open-comments-${thread.topic.name}'),
-            borderRadius: AppRadius.lg,
             onTap: () => _open(context),
-            child: Container(
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-                borderRadius: AppRadius.lg,
-              ),
               child: row,
             ),
           ),

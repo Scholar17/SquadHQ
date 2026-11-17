@@ -28,7 +28,7 @@ class MatchRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,

@@ -177,7 +177,7 @@ class _CommentTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     borderRadius: AppRadius.md,
-                    border: Border.all(color: AppColors.text.withValues(alpha: 0.08)),
+                    border: Border.all(color: AppColors.divider),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,7 +354,7 @@ class _CommentComposerState extends State<CommentComposer> {
             ],
           ),
         ),
-        Divider(height: 8, color: AppColors.text.withValues(alpha: 0.08)),
+        Divider(height: 8, color: AppColors.divider),
       ],
     );
   }
@@ -387,7 +387,7 @@ class _CommentComposerState extends State<CommentComposer> {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.card,
-          border: Border(top: BorderSide(color: AppColors.text.withValues(alpha: 0.08))),
+          border: Border(top: BorderSide(color: AppColors.divider)),
         ),
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: SafeArea(
@@ -449,11 +449,11 @@ class _CommentComposerState extends State<CommentComposer> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                           border: OutlineInputBorder(
                             borderRadius: AppRadius.lg,
-                            borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.14)),
+                            borderSide: BorderSide(color: AppColors.divider),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: AppRadius.lg,
-                            borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.14)),
+                            borderSide: BorderSide(color: AppColors.divider),
                           ),
                         ),
                       ),

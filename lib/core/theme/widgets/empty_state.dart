@@ -165,13 +165,13 @@ class _Steps extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.md,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
         boxShadow: AppShadows.subtle,
       ),
       child: Column(
         children: [
           for (final (index, step) in steps.indexed) ...[
-            if (index > 0) Divider(height: 1, color: AppColors.text.withValues(alpha: 0.08)),
+            if (index > 0) Divider(height: 1, color: AppColors.divider),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(

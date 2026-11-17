@@ -64,7 +64,7 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.card,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
         borderRadius: AppRadius.lg,
       ),
       child: Row(
@@ -92,7 +92,7 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
                       Text(
                         has
                             ? [
-                                if (details.accountName case final name?) name,
+                                ?details.accountName,
                                 details.accountNo!,
                               ].join(' · ')
                             : 'Optional · for squad-mates who pay by transfer',
@@ -107,7 +107,7 @@ class _BankDetailsSectionState extends State<BankDetailsSection> {
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.text,
               minimumSize: const Size(0, 40),
-              side: BorderSide(color: AppColors.text.withValues(alpha: 0.2)),
+              side: BorderSide(color: AppColors.divider),
               shape: const StadiumBorder(),
             ),
             child: Text(has ? 'Edit' : 'Add'),
