@@ -36,7 +36,7 @@ enum NotificationKind {
   tripAdded('trip_added'),
   tripClosed('trip_closed'),
 
-  /// "Settle up for <trip>" — a squad reminder about one trip (035/036).
+  /// "Settle up for `<trip>`" — a squad reminder about one trip (035/036).
   tripReminder('trip_reminder'),
   monthlyDue('monthly_due'),
   matchComment('match_comment'),
@@ -55,7 +55,7 @@ enum NotificationKind {
   billMention('bill_mention'),
   expenseMention('expense_mention'),
 
-  /// "You were removed from <group>" (051).
+  /// "You were removed from `<group>`" (051).
   memberRemoved('member_removed'),
 
   /// "Vote MOTM and rate your game" 2 hours after a match, and "Last day
@@ -183,7 +183,8 @@ class AppNotification extends Equatable {
     NotificationKind.tripAdded ||
     NotificationKind.tripClosed ||
     NotificationKind.tripReminder => NotificationTarget.trip,
-    NotificationKind.playerRated || NotificationKind.ratingImproved => NotificationTarget.squad,
+    NotificationKind.playerRated ||
+    NotificationKind.ratingImproved => NotificationTarget.squad,
     NotificationKind.memberRemoved => NotificationTarget.group,
     NotificationKind.groupInvite => NotificationTarget.invitations,
     _ => NotificationTarget.match,

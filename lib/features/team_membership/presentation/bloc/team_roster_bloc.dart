@@ -14,15 +14,11 @@ import 'team_roster_state.dart';
 class TeamRosterBloc extends Bloc<TeamRosterEvent, TeamRosterState> {
   TeamRosterBloc({
     required this.teamId,
-    required GetTeamMembers getTeamMembers,
-    required SetMemberRole setMemberRole,
-    required DeleteTeam deleteTeam,
-    required RemoveTeamMember removeTeamMember,
-  })  : _getTeamMembers = getTeamMembers,
-        _removeTeamMember = removeTeamMember,
-        _setMemberRole = setMemberRole,
-        _deleteTeam = deleteTeam,
-        super(const TeamRosterLoading()) {
+    required this._getTeamMembers,
+    required this._setMemberRole,
+    required this._deleteTeam,
+    required this._removeTeamMember,
+  })  : super(const TeamRosterLoading()) {
     on<TeamRosterStarted>(_onStarted);
     on<TeamRosterPromoteRequested>(_onPromoteRequested);
     on<TeamRosterDemoteRequested>(_onDemoteRequested);

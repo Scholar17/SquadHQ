@@ -14,9 +14,7 @@ abstract interface class AirQualityRemoteDataSource {
 /// (e.g. Thailand's Pollution Control Department). Free, non-commercial,
 /// with a token ([token] null: no air quality at all).
 class WaqiDataSource implements AirQualityRemoteDataSource {
-  WaqiDataSource({required http.Client client, required String? token})
-      : _client = client,
-        _token = token;
+  WaqiDataSource({required this._client, required this._token});
 
   final http.Client _client;
   final String? _token;

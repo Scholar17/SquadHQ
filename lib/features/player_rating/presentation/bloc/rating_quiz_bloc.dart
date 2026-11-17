@@ -110,13 +110,10 @@ final class RatingQuizState extends Equatable {
 /// Fill rating: pick positions → answer this player's questions → reveal.
 class RatingQuizBloc extends Bloc<RatingQuizEvent, RatingQuizState> {
   RatingQuizBloc({
-    required GetRatingPositions getPositions,
-    required GetRatingQuestions getQuestions,
-    required SubmitRating submitRating,
-  }) : _getPositions = getPositions,
-       _getQuestions = getQuestions,
-       _submitRating = submitRating,
-       super(const RatingQuizState(loading: true)) {
+    required this._getPositions,
+    required this._getQuestions,
+    required this._submitRating,
+  }) : super(const RatingQuizState(loading: true)) {
     on<RatingQuizStarted>(_onStarted);
     on<RatingPositionToggled>(_onToggled);
     on<RatingPositionsConfirmed>(_onConfirmed);

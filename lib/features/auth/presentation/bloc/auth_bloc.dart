@@ -18,20 +18,14 @@ import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
-    required SignInWithFacebook signInWithFacebook,
-    required SignInWithGoogle signInWithGoogle,
-    required CompleteOnboarding completeOnboarding,
-    required SignOut signOut,
+    required this._signInWithFacebook,
+    required this._signInWithGoogle,
+    required this._completeOnboarding,
+    required this._signOut,
     required WatchAuthState watchAuthState,
-    required UpdateProfile updateProfile,
-    required DeleteAccount deleteAccount,
-  })  : _signInWithFacebook = signInWithFacebook,
-        _deleteAccount = deleteAccount,
-        _updateProfile = updateProfile,
-        _signInWithGoogle = signInWithGoogle,
-        _completeOnboarding = completeOnboarding,
-        _signOut = signOut,
-        super(const AuthRestoring()) {
+    required this._updateProfile,
+    required this._deleteAccount,
+  })  : super(const AuthRestoring()) {
     on<AuthFacebookSignInRequested>(_onFacebookSignIn);
     on<AuthGoogleSignInRequested>(_onGoogleSignIn);
     on<AuthOnboardingSubmitted>(_onOnboardingSubmitted);

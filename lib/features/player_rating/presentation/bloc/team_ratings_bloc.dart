@@ -71,10 +71,8 @@ final class TeamRatingsState extends Equatable {
 
 /// The Squad tab: the active team's players with their ratings.
 class TeamRatingsBloc extends Bloc<TeamRatingsEvent, TeamRatingsState> {
-  TeamRatingsBloc({required GetTeamRatings getTeamRatings, required ImproveRating improveRating})
-    : _getTeamRatings = getTeamRatings,
-      _improveRating = improveRating,
-      super(const TeamRatingsState()) {
+  TeamRatingsBloc({required this._getTeamRatings, required this._improveRating})
+    : super(const TeamRatingsState()) {
     on<TeamRatingsStarted>(_onStarted);
     on<TeamRatingsRefreshed>(_onRefreshed);
     on<TeamRatingImproveRequested>(_onImprove);

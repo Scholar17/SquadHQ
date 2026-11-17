@@ -16,14 +16,18 @@ enum ShareKind {
 
 /// Where share links live. Firebase Hosting redirects /s/* to the
 /// Cloudflare Worker (cloudflare/share-preview), which serves the preview
-/// card and sends people on to /open/<token> in the app.
+/// card and sends people on to `/open/<token>` in the app.
 const shareLinkBase = 'https://squad-hq.web.app/s/';
 
 String shareUrl(String token) => '$shareLinkBase$token';
 
 /// A share link opened by a member of its team: what to show.
 class OpenedShare extends Equatable {
-  const OpenedShare({required this.kind, required this.matchId, required this.teamId});
+  const OpenedShare({
+    required this.kind,
+    required this.matchId,
+    required this.teamId,
+  });
 
   final ShareKind kind;
   final String matchId;

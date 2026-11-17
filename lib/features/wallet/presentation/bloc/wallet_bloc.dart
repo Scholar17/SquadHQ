@@ -14,16 +14,12 @@ import 'wallet_state.dart';
 /// it, so a bill edited in one place shows everywhere.
 class WalletBloc extends Bloc<WalletEvent, WalletState> {
   WalletBloc({
-    required GetTeamWallet getTeamWallet,
-    required SetMatchBill setMatchBill,
-    required SubmitBillPayment submitBillPayment,
-    required RemindUnpaid remindUnpaid,
+    required this._getTeamWallet,
+    required this._setMatchBill,
+    required this._submitBillPayment,
+    required this._remindUnpaid,
     required TeamChanges teamChanges,
-  })  : _remindUnpaid = remindUnpaid,
-        _getTeamWallet = getTeamWallet,
-        _setMatchBill = setMatchBill,
-        _submitBillPayment = submitBillPayment,
-        super(const WalletLoading()) {
+  })  : super(const WalletLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {

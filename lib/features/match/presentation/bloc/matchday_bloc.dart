@@ -12,12 +12,10 @@ import 'matchday_state.dart';
 class MatchdayBloc extends Bloc<MatchdayEvent, MatchdayState> {
   MatchdayBloc({
     required this.match,
-    required GetMatchdayRoster getMatchdayRoster,
-    required SetMatchRsvp setMatchRsvp,
+    required this._getMatchdayRoster,
+    required this._setMatchRsvp,
     required TeamChanges teamChanges,
-  }) : _getMatchdayRoster = getMatchdayRoster,
-       _setMatchRsvp = setMatchRsvp,
-       super(const MatchdayLoading()) {
+  }) : super(const MatchdayLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {TeamTable.teamMembers, TeamTable.matchRsvps},

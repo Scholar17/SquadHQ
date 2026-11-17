@@ -17,22 +17,15 @@ import 'team_membership_state.dart';
 class TeamMembershipBloc
     extends Bloc<TeamMembershipEvent, TeamMembershipState> {
   TeamMembershipBloc({
-    required CreateTeam createTeam,
-    required JoinTeam joinTeam,
-    required GetMyTeams getMyTeams,
-    required SwitchActiveTeam switchActiveTeam,
-    required SetTeamTimezone setTeamTimezone,
-    required LeaveTeam leaveTeam,
-    required RemoveTeamMember removeTeamMember,
+    required this._createTeam,
+    required this._joinTeam,
+    required this._getMyTeams,
+    required this._switchActiveTeam,
+    required this._setTeamTimezone,
+    required this._leaveTeam,
+    required this._removeTeamMember,
     required TeamChanges teamChanges,
-  })  : _setTeamTimezone = setTeamTimezone,
-        _leaveTeam = leaveTeam,
-        _removeTeamMember = removeTeamMember,
-        _createTeam = createTeam,
-        _joinTeam = joinTeam,
-        _getMyTeams = getMyTeams,
-        _switchActiveTeam = switchActiveTeam,
-        super(const TeamMembershipLoading()) {
+  })  : super(const TeamMembershipLoading()) {
     // Your own role or membership changed elsewhere (made admin, removed
     // from the group): reload, so the app moves on from a group you've
     // left.

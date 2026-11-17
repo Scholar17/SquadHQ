@@ -155,7 +155,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final changes = <String, Object?>{
         if (params.name case final name?) 'name': name.trim(),
         if (params.username case final username?) 'username': username.trim(),
-        if (params.phone case final phone?) 'phone': phone,
+        'phone': ?params.phone,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
       // A new photo: into the public avatars bucket (038), its link on the

@@ -170,73 +170,70 @@ class AppPalette {
 /// root from the viewer's light / dark choice — so they're getters, not
 /// constants; the brand colours that look the same either way stay const.
 abstract final class AppColors {
-  static AppPalette _palette = AppPalette.light;
-
   /// The palette screens are painted with. Changing it doesn't repaint
   /// anything by itself — the app root rebuilds the tree when it does.
-  static AppPalette get palette => _palette;
-  static set palette(AppPalette palette) => _palette = palette;
+  static AppPalette palette = AppPalette.light;
 
-  static bool get isDark => _palette.brightness == Brightness.dark;
+  static bool get isDark => palette.brightness == Brightness.dark;
 
   // ── Adaptive ──────────────────────────────────────────────────────────
-  static Color get bg => _palette.bg;
-  static Color get surface => _palette.surface;
+  static Color get bg => palette.bg;
+  static Color get surface => palette.surface;
 
   /// Raised cards, sheets, inputs: cream by day, charcoal by night.
-  static Color get card => _palette.card;
-  static Color get text => _palette.text;
-  static Color get divider => _palette.divider;
+  static Color get card => palette.card;
+  static Color get text => palette.text;
+  static Color get divider => palette.divider;
 
   // Text that meets WCAG AA (4.5:1) — use these, not faded [text].
   /// Captions and secondary text: 5.5:1 on [bg], 4.9:1 on [surface].
-  static Color get textMuted => _palette.textMuted;
+  static Color get textMuted => palette.textMuted;
 
   /// Secondary text that matters (amounts' context, meta lines): 8.4:1.
-  static Color get textSubtle => _palette.textSubtle;
+  static Color get textSubtle => palette.textSubtle;
 
   /// Kept for older call sites — the same as [card].
-  static Color get neutral100 => _palette.card;
-  static Color get neutral200 => _palette.neutral200;
-  static Color get neutral300 => _palette.neutral300;
-  static Color get neutral400 => _palette.neutral400;
-  static Color get neutral500 => _palette.neutral500;
-  static Color get neutral600 => _palette.neutral600;
-  static Color get neutral700 => _palette.neutral700;
+  static Color get neutral100 => palette.card;
+  static Color get neutral200 => palette.neutral200;
+  static Color get neutral300 => palette.neutral300;
+  static Color get neutral400 => palette.neutral400;
+  static Color get neutral500 => palette.neutral500;
+  static Color get neutral600 => palette.neutral600;
+  static Color get neutral700 => palette.neutral700;
 
   /// The dark surfaces — hero cards, selected chips, snackbars. Dark in
   /// both themes (a lifted charcoal at night), with [onDark] text.
-  static Color get neutral900 => _palette.inverse;
+  static Color get neutral900 => palette.inverse;
 
-  static Color get accent100 => _palette.accent100;
-  static Color get accent200 => _palette.accent200;
-  static Color get accent300 => _palette.accent300;
-  static Color get accent600 => _palette.accent600;
+  static Color get accent100 => palette.accent100;
+  static Color get accent200 => palette.accent200;
+  static Color get accent300 => palette.accent300;
+  static Color get accent600 => palette.accent600;
 
   /// "You owe" text and icons: a deep terra by day, a light one by night.
   /// For a filled button use [accentFill].
-  static Color get accent700 => _palette.accent700;
-  static Color get accent800 => _palette.accent800;
-  static Color get accent900 => _palette.accent900;
+  static Color get accent700 => palette.accent700;
+  static Color get accent800 => palette.accent800;
+  static Color get accent900 => palette.accent900;
 
-  static Color get accent2_100 => _palette.accent2_100;
+  static Color get accent2_100 => palette.accent2_100;
 
   /// "Is owed" / paid text and icons. For a filled button use [successFill].
-  static Color get accent2_700 => _palette.accent2_700;
-  static Color get accent2_900 => _palette.accent2_900;
+  static Color get accent2_700 => palette.accent2_700;
+  static Color get accent2_900 => palette.accent2_900;
 
   // Expense category tints — a wash and an ink of the same hue, the ink
   // at 4.5:1+ on its wash in both themes.
-  static Color get categoryPlumBg => _palette.categoryPlumBg;
-  static Color get categoryPlum => _palette.categoryPlum;
-  static Color get categoryRoseBg => _palette.categoryRoseBg;
-  static Color get categoryRose => _palette.categoryRose;
-  static Color get categoryBlueBg => _palette.categoryBlueBg;
-  static Color get categoryBlue => _palette.categoryBlue;
-  static Color get categoryGoldBg => _palette.categoryGoldBg;
-  static Color get categoryGold => _palette.categoryGold;
-  static Color get categoryTealBg => _palette.categoryTealBg;
-  static Color get categoryTeal => _palette.categoryTeal;
+  static Color get categoryPlumBg => palette.categoryPlumBg;
+  static Color get categoryPlum => palette.categoryPlum;
+  static Color get categoryRoseBg => palette.categoryRoseBg;
+  static Color get categoryRose => palette.categoryRose;
+  static Color get categoryBlueBg => palette.categoryBlueBg;
+  static Color get categoryBlue => palette.categoryBlue;
+  static Color get categoryGoldBg => palette.categoryGoldBg;
+  static Color get categoryGold => palette.categoryGold;
+  static Color get categoryTealBg => palette.categoryTealBg;
+  static Color get categoryTeal => palette.categoryTeal;
 
   // ── Fixed ─────────────────────────────────────────────────────────────
   static const accent = Color(0xFFC67139);

@@ -142,18 +142,13 @@ extension MatchHistoryStateX on MatchHistoryState {
 /// score shows everywhere at once.
 class MatchHistoryBloc extends Bloc<MatchHistoryEvent, MatchHistoryState> {
   MatchHistoryBloc({
-    required GetMatchHistory getMatchHistory,
-    required SaveMatchGame saveMatchGame,
-    required RemoveMatchGame removeMatchGame,
-    required DeleteMatch deleteMatch,
-    required VoteMotm voteMotm,
+    required this._getMatchHistory,
+    required this._saveMatchGame,
+    required this._removeMatchGame,
+    required this._deleteMatch,
+    required this._voteMotm,
     required TeamChanges teamChanges,
-  }) : _getMatchHistory = getMatchHistory,
-       _saveMatchGame = saveMatchGame,
-       _removeMatchGame = removeMatchGame,
-       _deleteMatch = deleteMatch,
-       _voteMotm = voteMotm,
-       super(const MatchHistoryLoading()) {
+  }) : super(const MatchHistoryLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {

@@ -14,18 +14,13 @@ import 'match_state.dart';
 /// create-match sheet, which sits outside AppShellPage's local providers.
 class MatchBloc extends Bloc<MatchEvent, MatchState> {
   MatchBloc({
-    required GetUpcomingMatches getUpcomingMatches,
-    required CreateMatch createMatch,
-    required UpdateMatch updateMatch,
-    required DeleteMatch deleteMatch,
-    required NudgeMatchRsvp nudgeMatchRsvp,
+    required this._getUpcomingMatches,
+    required this._createMatch,
+    required this._updateMatch,
+    required this._deleteMatch,
+    required this._nudgeMatchRsvp,
     required TeamChanges teamChanges,
-  }) : _nudgeMatchRsvp = nudgeMatchRsvp,
-       _getUpcomingMatches = getUpcomingMatches,
-       _createMatch = createMatch,
-       _updateMatch = updateMatch,
-       _deleteMatch = deleteMatch,
-       super(const MatchLoading()) {
+  }) : super(const MatchLoading()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: const {TeamTable.matches},

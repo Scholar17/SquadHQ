@@ -71,11 +71,9 @@ final class WalletQrFailure extends WalletQrState {
 /// The profile page's "Wallet QR" section — one instance per visit.
 class WalletQrBloc extends Bloc<WalletQrEvent, WalletQrState> {
   WalletQrBloc({
-    required GetMyWalletQr getMyWalletQr,
-    required UploadWalletQr uploadWalletQr,
-  })  : _getMyWalletQr = getMyWalletQr,
-        _uploadWalletQr = uploadWalletQr,
-        super(const WalletQrLoading()) {
+    required this._getMyWalletQr,
+    required this._uploadWalletQr,
+  })  : super(const WalletQrLoading()) {
     on<WalletQrStarted>(_onStarted);
     on<WalletQrUploadRequested>(_onUploadRequested);
   }

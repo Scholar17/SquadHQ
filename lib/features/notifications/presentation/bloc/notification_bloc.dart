@@ -81,13 +81,10 @@ final class NotificationState extends Equatable {
 /// and the notification list share it.
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   NotificationBloc({
-    required GetNotifications getNotifications,
-    required MarkNotificationsRead markNotificationsRead,
-    required WatchNotifications watchNotifications,
-  }) : _getNotifications = getNotifications,
-       _markNotificationsRead = markNotificationsRead,
-       _watchNotifications = watchNotifications,
-       super(const NotificationState()) {
+    required this._getNotifications,
+    required this._markNotificationsRead,
+    required this._watchNotifications,
+  }) : super(const NotificationState()) {
     on<NotificationsStarted>(_onStarted);
     on<NotificationsStopped>((event, emit) {
       _stopWatching();

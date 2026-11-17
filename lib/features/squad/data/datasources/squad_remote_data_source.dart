@@ -403,7 +403,7 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
         'p_place': draft.place,
         'p_split_mode': draft.splitMode.name,
         // Only for trips, so plain expenses still save before 032 runs.
-        if (draft.tripId case final tripId?) 'p_trip_id': tripId,
+        'p_trip_id': ?draft.tripId,
         'p_paid_by': draft.payerId,
         'p_payers': [
           for (final MapEntry(:key, :value)
@@ -548,7 +548,7 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
         'p_amount': _units(draft.amountCents),
         'p_method': draft.method.name,
         'p_slip_path': slipPath,
-        if (draft.tripId case final tripId?) 'p_trip_id': tripId,
+        'p_trip_id': ?draft.tripId,
       },
     );
   });

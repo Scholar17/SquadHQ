@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -146,6 +145,35 @@ class _BillSheetState extends State<_BillSheet> {
       child: StickyActionSheet(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
         maxHeightFactor: 0.85,
+        // Each share updates as the total and split change, in view
+        // even with the player list open.
+        summary: _SplitPreview(split: preview, mode: _mode, hasTotal: _total != null),
+        action: BlocBuilder<WalletBloc, WalletState>(
+          builder: (context, state) {
+            final isSubmitting = state is WalletSubmitting;
+            return SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: isSubmitting || !_isValid ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onDark,
+                  disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
+                  shape: const StadiumBorder(),
+                  elevation: 0,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
+                      )
+                    : Text('Save bill', style: AppTextStyles.title(size: 14, color: AppColors.onDark)),
+              ),
+            );
+          },
+        ),
         children: [
           Text(
             _existing == null ? 'Add total cost' : 'Edit bill',
@@ -245,35 +273,6 @@ class _BillSheetState extends State<_BillSheet> {
             style: AppTextStyles.body(size: 11.5, color: AppColors.textMuted, height: 1.5),
           ),
         ],
-        // Each share updates as the total and split change, in view
-        // even with the player list open.
-        summary: _SplitPreview(split: preview, mode: _mode, hasTotal: _total != null),
-        action: BlocBuilder<WalletBloc, WalletState>(
-          builder: (context, state) {
-            final isSubmitting = state is WalletSubmitting;
-            return SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: isSubmitting || !_isValid ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onDark,
-                  disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onDark),
-                      )
-                    : Text('Save bill', style: AppTextStyles.title(size: 14, color: AppColors.onDark)),
-              ),
-            );
-          },
-        ),
       ),
     );
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
@@ -692,6 +691,21 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
           background: AppColors.card,
           // useSafeArea already keeps it below the status bar.
           maxHeightFactor: 1,
+          // The split, live: who pays what as the amount, people and
+          // mode change — in view wherever the form is scrolled.
+          summary: _SplitSummary(
+            text: _footnote(split, amount, ledger, mainPayer),
+            ok: split.isValid || amount == 0,
+          ),
+          action: SquadPrimaryButton(
+            label: widget.editing != null || widget.editingMonthly != null
+                ? 'Save changes'
+                : _monthly
+                ? 'Save monthly expense'
+                : 'Save expense',
+            isLoading: state is SquadLedgerSubmitting,
+            onPressed: () => _save(ledger),
+          ),
           children: [
             Center(
               child: Container(
@@ -1045,21 +1059,6 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             const SizedBox(height: 10),
             _Field(controller: _note, hint: 'Note (optional)'),
           ],
-          // The split, live: who pays what as the amount, people and
-          // mode change — in view wherever the form is scrolled.
-          summary: _SplitSummary(
-            text: _footnote(split, amount, ledger, mainPayer),
-            ok: split.isValid || amount == 0,
-          ),
-          action: SquadPrimaryButton(
-            label: widget.editing != null || widget.editingMonthly != null
-                ? 'Save changes'
-                : _monthly
-                ? 'Save monthly expense'
-                : 'Save expense',
-            isLoading: state is SquadLedgerSubmitting,
-            onPressed: () => _save(ledger),
-          ),
         );
       },
     );

@@ -154,6 +154,21 @@ class _Positions extends StatelessWidget {
     return StickyActionSheet(
       expand: true,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      summary: state.picked.isEmpty
+          ? null
+          : Text(
+              'Main: ${state.picked.first}'
+              '${state.picked.length > 1 ? ' · also ${state.picked.skip(1).join(', ')}' : ''}',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700),
+            ),
+      action: _PrimaryButton(
+        label: 'Next',
+        loading: state.loading,
+        onPressed: state.picked.isEmpty
+            ? null
+            : () => context.read<RatingQuizBloc>().add(const RatingPositionsConfirmed()),
+      ),
       children: [
         Text('Where do you play?', style: AppTextStyles.heading(size: 26)),
         const SizedBox(height: 8),
@@ -177,21 +192,6 @@ class _Positions extends StatelessWidget {
           ),
         ],
       ],
-      summary: state.picked.isEmpty
-          ? null
-          : Text(
-              'Main: ${state.picked.first}'
-              '${state.picked.length > 1 ? ' · also ${state.picked.skip(1).join(', ')}' : ''}',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body(size: 12.5, weight: FontWeight.w700),
-            ),
-      action: _PrimaryButton(
-        label: 'Next',
-        loading: state.loading,
-        onPressed: state.picked.isEmpty
-            ? null
-            : () => context.read<RatingQuizBloc>().add(const RatingPositionsConfirmed()),
-      ),
     );
   }
 }
@@ -296,6 +296,18 @@ class _Questions extends StatelessWidget {
     return StickyActionSheet(
       expand: true,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+      action: isLast || state.allAnswered
+          ? _PrimaryButton(
+              label: 'See my rating',
+              loading: state.loading,
+              onPressed: state.allAnswered
+                  ? () => context.read<RatingQuizBloc>().add(const RatingQuizSubmitted())
+                  : null,
+            )
+          : _PrimaryButton(
+              label: 'Next question',
+              onPressed: chosen == null ? null : () => onJump(index + 1),
+            ),
       children: [
         // Tappable progress: jump back to any answered question.
         Row(
@@ -354,18 +366,6 @@ class _Questions extends StatelessWidget {
           ),
         ),
       ],
-      action: isLast || state.allAnswered
-          ? _PrimaryButton(
-              label: 'See my rating',
-              loading: state.loading,
-              onPressed: state.allAnswered
-                  ? () => context.read<RatingQuizBloc>().add(const RatingQuizSubmitted())
-                  : null,
-            )
-          : _PrimaryButton(
-              label: 'Next question',
-              onPressed: chosen == null ? null : () => onJump(index + 1),
-            ),
     );
   }
 }
@@ -453,6 +453,7 @@ class _Reveal extends StatelessWidget {
     return StickyActionSheet(
       expand: true,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      action: _PrimaryButton(label: 'Done', onPressed: onDone),
       children: [
         Text(
           'Your card is in',
@@ -469,7 +470,6 @@ class _Reveal extends StatelessWidget {
         const SizedBox(height: 20),
         PlayerCardView(name: name, rating: rating, caption: ratingCaption(rating)),
       ],
-      action: _PrimaryButton(label: 'Done', onPressed: onDone),
     );
   }
 }

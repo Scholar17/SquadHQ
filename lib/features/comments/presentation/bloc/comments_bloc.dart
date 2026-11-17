@@ -106,12 +106,11 @@ typedef CommentsSource = ({
 /// [table] changes for the team over Realtime.
 class CommentsBloc extends Bloc<CommentsEvent, CommentsState> {
   CommentsBloc({
-    required CommentsSource source,
+    required this._source,
     required String teamId,
     required TeamTable table,
     required TeamChanges teamChanges,
-  }) : _source = source,
-       super(const CommentsState()) {
+  }) : super(const CommentsState()) {
     _serverChanges = TeamChangeWatcher(
       teamChanges,
       tables: {table},

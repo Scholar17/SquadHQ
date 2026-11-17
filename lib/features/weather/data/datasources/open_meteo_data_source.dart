@@ -16,7 +16,7 @@ abstract interface class ForecastRemoteDataSource {
 /// Open-Meteo's free forecast API (open-meteo.com): no key, called straight
 /// from the app. Asks for the one hour nearest kickoff, in UTC.
 class OpenMeteoDataSource implements ForecastRemoteDataSource {
-  OpenMeteoDataSource({required http.Client client}) : _client = client;
+  OpenMeteoDataSource({required this._client});
 
   final http.Client _client;
 
