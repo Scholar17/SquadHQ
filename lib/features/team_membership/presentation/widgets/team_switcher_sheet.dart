@@ -17,6 +17,8 @@ import '../bloc/team_membership_state.dart';
 Future<void> showTeamSwitcherSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
       borderRadius: AppRadius.sheet,

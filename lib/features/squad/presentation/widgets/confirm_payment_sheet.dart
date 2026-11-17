@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/money_input_formatter.dart';
+import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../../wallet/domain/repositories/wallet_repository.dart';
 import '../../../wallet/presentation/widgets/wallet_image.dart';
@@ -134,9 +134,60 @@ class _ConfirmPaymentSheetState extends State<_ConfirmPaymentSheet> {
         final part = ledger.partOf(settlement);
         if (state is! SquadLedgerSubmitting) _leftAfter = part?.left;
         final validPart = received > 0 && received < settlement.amountCents;
-        return ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        final actionWidget = Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => setState(() {
+                          if (_partial) {
+                            _partial = false;
+                            _received.clear();
+                            return;
+                          }
+                          _rejecting = !_rejecting;
+                          _reason = null;
+                        }),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.text,
+                    side: BorderSide(color: AppColors.text.withValues(alpha: 0.2)),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    _rejecting || _partial ? 'Cancel' : 'Reject',
+                    style: AppTextStyles.body(size: 15, weight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SquadPrimaryButton(
+                label: _rejecting
+                    ? 'Send back'
+                    : _partial
+                    ? (validPart ? 'Confirm ${formatMoney(received, ledger.currency)}' : 'Confirm')
+                    : 'Received',
+                color: _rejecting ? AppColors.accentFill : AppColors.successFill,
+                isLoading: isSubmitting,
+                onPressed: switch ((_rejecting, _partial)) {
+                  (true, _) when _reason == null => null,
+                  (true, _) => () => _answer(accept: false),
+                  (_, true) when !validPart => null,
+                  (_, true) => () => _confirmPartly(received),
+                  _ => () => _answer(accept: true),
+                },
+              ),
+            ),
+          ],
+        );
+        return StickyActionSheet(
+          background: AppColors.card,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          action: actionWidget,
           children: [
             Text(
               part == null ? 'PAYMENT TO CONFIRM' : 'PARTIAL PAYMENT TO CONFIRM',
@@ -309,57 +360,6 @@ class _ConfirmPaymentSheetState extends State<_ConfirmPaymentSheet> {
                 ],
               ),
             ],
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 52,
-                    child: OutlinedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () => setState(() {
-                              if (_partial) {
-                                _partial = false;
-                                _received.clear();
-                                return;
-                              }
-                              _rejecting = !_rejecting;
-                              _reason = null;
-                            }),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.text,
-                        side: BorderSide(color: AppColors.text.withValues(alpha: 0.2)),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        _rejecting || _partial ? 'Cancel' : 'Reject',
-                        style: AppTextStyles.body(size: 15, weight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: SquadPrimaryButton(
-                    label: _rejecting
-                        ? 'Send back'
-                        : _partial
-                        ? (validPart ? 'Confirm ${formatMoney(received, ledger.currency)}' : 'Confirm')
-                        : 'Received',
-                    color: _rejecting ? AppColors.accentFill : AppColors.successFill,
-                    isLoading: isSubmitting,
-                    onPressed: switch ((_rejecting, _partial)) {
-                      (true, _) when _reason == null => null,
-                      (true, _) => () => _answer(accept: false),
-                      (_, true) when !validPart => null,
-                      (_, true) => () => _confirmPartly(received),
-                      _ => () => _answer(accept: true),
-                    },
-                  ),
-                ),
-              ],
-            ),
           ],
         );
       },
