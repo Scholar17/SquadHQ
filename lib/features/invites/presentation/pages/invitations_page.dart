@@ -5,6 +5,8 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../../notifications/domain/entities/app_notification.dart';
 import '../../../notifications/presentation/bloc/notification_bloc.dart';
@@ -111,34 +113,38 @@ class _InvitationsPageState extends State<InvitationsPage> {
           title: Text('Invitations', style: AppTextStyles.title(size: 16)),
         ),
         body: SafeArea(
-          child: RefreshIndicator(
-            color: AppColors.accent,
-            onRefresh: _load,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-              children: [
-                if (invites == null && _error == null)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 48),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (invites == null)
-                  _Message(_error!)
-                else if (invites.isEmpty)
-                  const _Message('No invitations right now.')
-                else
-                  for (final invite in invites) ...[
-                    _InviteCard(
-                      invite: invite,
-                      busy: _busy == invite.id,
-                      onAccept: _busy == null ? () => _respond(invite, accept: true) : null,
-                      onDecline: _busy == null ? () => _respond(invite, accept: false) : null,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-              ],
-            ),
-          ),
+          child: invites == null && _error == null
+              ? const SkeletonList(item: InviteCardSkeleton(), count: 3)
+              : RefreshIndicator(
+                  color: AppColors.accent,
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                    children: [
+                      if (invites == null)
+                        _Message(_error!)
+                      else if (invites.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: EmptyState(
+                            icon: Icons.group_add_outlined,
+                            title: 'No invitations right now.',
+                            body: "When an admin invites you to a team or squad, it'll show up here.",
+                          ),
+                        )
+                      else
+                        for (final invite in invites) ...[
+                          _InviteCard(
+                            invite: invite,
+                            busy: _busy == invite.id,
+                            onAccept: _busy == null ? () => _respond(invite, accept: true) : null,
+                            onDecline: _busy == null ? () => _respond(invite, accept: false) : null,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                    ],
+                  ),
+                ),
         ),
       ),
     );
@@ -184,7 +190,7 @@ class _InviteCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

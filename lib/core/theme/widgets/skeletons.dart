@@ -30,7 +30,7 @@ class _SkeletonCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: radius,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
         boxShadow: AppShadows.subtle,
       ),
       child: Shimmer(child: child),
@@ -175,6 +175,115 @@ class ExpenseRowSkeleton extends StatelessWidget {
               SkeletonBox(width: 60, height: 13),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stands in for a notification row: icon badge, label + timestamp,
+/// title and description lines, trailing action text.
+class NotificationRowSkeleton extends StatelessWidget {
+  const NotificationRowSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      padding: EdgeInsets.all(16),
+      radius: AppRadius.lg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonBox.circle(size: 32),
+              SizedBox(width: 10),
+              SkeletonBox(width: 80, height: 10),
+              Spacer(),
+              SkeletonBox(width: 48, height: 10),
+            ],
+          ),
+          SizedBox(height: 12),
+          SkeletonBox(width: 200, height: 14),
+          SizedBox(height: 6),
+          SkeletonBox(width: 150, height: 11),
+          SizedBox(height: 12),
+          SkeletonBox(width: 72, height: 11),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stands in for a group invite card: group icon, name and size,
+/// inviter credit line, and the Decline / Accept pill buttons.
+class InviteCardSkeleton extends StatelessWidget {
+  const InviteCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      padding: EdgeInsets.all(16),
+      radius: AppRadius.lg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonBox.circle(size: 44),
+              SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 140, height: 15),
+                  SizedBox(height: 5),
+                  SkeletonBox(width: 100, height: 11),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          SkeletonBox(width: 180, height: 11),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 44, radius: AppRadius.pill)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 44, radius: AppRadius.pill)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stands in for a team or squad roster row: avatar circle, name
+/// and role, and optional trailing action badge.
+class MemberRowSkeleton extends StatelessWidget {
+  const MemberRowSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SkeletonCard(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      radius: AppRadius.md,
+      child: Row(
+        children: [
+          SkeletonBox.circle(size: 36),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: 120, height: 13),
+                SizedBox(height: 5),
+                SkeletonBox(width: 80, height: 10),
+              ],
+            ),
+          ),
+          SizedBox(width: 12),
+          SkeletonBox(width: 68, height: 26, radius: AppRadius.pill),
         ],
       ),
     );

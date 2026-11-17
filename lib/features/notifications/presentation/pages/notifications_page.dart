@@ -7,6 +7,9 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/edge_fade.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/entities/app_notification.dart';
 import '../bloc/notification_bloc.dart';
@@ -91,7 +94,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ],
           ),
           body: !state.loaded
-              ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+              ? const SkeletonList(item: NotificationRowSkeleton())
               : RefreshIndicator(
                   color: AppColors.accent,
                   onRefresh: () {
@@ -162,34 +165,34 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          for (final filter in _Filter.values) ...[
-            ChoiceChip(
-              label: Text(filter.label),
-              selected: filter == selected,
-              onSelected: (_) => onSelected(filter),
-              showCheckmark: false,
-              selectedColor: AppColors.neutral900,
-              backgroundColor: AppColors.card,
-              labelStyle: AppTextStyles.body(
-                size: 13,
-                weight: FontWeight.w700,
-                color: filter == selected ? AppColors.onDark : AppColors.text,
+    return EdgeFade(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            for (final filter in _Filter.values) ...[
+              ChoiceChip(
+                label: Text(filter.label),
+                selected: filter == selected,
+                onSelected: (_) => onSelected(filter),
+                showCheckmark: false,
+                selectedColor: AppColors.neutral900,
+                backgroundColor: AppColors.card,
+                labelStyle: AppTextStyles.body(
+                  size: 13,
+                  weight: FontWeight.w700,
+                  color: filter == selected ? AppColors.onDark : AppColors.text,
+                ),
+                side: BorderSide(
+                  color: filter == selected ? AppColors.neutral900 : AppColors.divider,
+                ),
+                shape: const StadiumBorder(),
               ),
-              side: BorderSide(
-                color: filter == selected
-                    ? AppColors.neutral900
-                    : AppColors.text.withValues(alpha: 0.14),
-              ),
-              shape: const StadiumBorder(),
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(width: 8),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -426,24 +429,12 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     // Scrollable, so pull-to-refresh still works on an empty list.
     return ListView(
-      padding: const EdgeInsets.fromLTRB(32, 120, 32, 32),
-      children: [
-        Icon(
-          Icons.notifications_none_rounded,
-          size: 40,
-          color: AppColors.text.withValues(alpha: 0.3),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'No notifications yet',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.title(size: 16),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'New matches, reminders and payments will show up here.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.body(size: 13, color: AppColors.textMuted),
+      padding: const EdgeInsets.fromLTRB(32, 60, 32, 32),
+      children: const [
+        EmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: 'No notifications yet',
+          body: 'New matches, reminders and payments will show up here.',
         ),
       ],
     );

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../auth/domain/entities/app_user.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/squad_ledger.dart';
@@ -72,11 +73,10 @@ class TripPage extends StatelessWidget {
               isAdmin: isAdmin,
               busy: state is SquadLedgerSubmitting,
             ),
-            (_, final _?, null) => Center(
-              child: Text(
-                'This trip no longer exists.',
-                style: AppTextStyles.body(size: 13.5, color: squadMuted),
-              ),
+            (_, final _?, null) => const EmptyState(
+              icon: Icons.luggage_outlined,
+              title: 'Trip not found',
+              body: 'This trip no longer exists or was removed.',
             ),
             _ => SquadLoadingView(state: state),
           },

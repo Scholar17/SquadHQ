@@ -5,6 +5,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../invites/presentation/widgets/group_invite_actions.dart';
 import '../../../invites/presentation/widgets/invite_people_sheet.dart';
 import '../../domain/entities/team.dart';
@@ -114,7 +115,7 @@ class _TeamRosterView extends StatelessWidget {
               final isSubmitting = state is TeamRosterSubmitting;
               final settled = _settle(state);
               if (settled is! TeamRosterLoaded) {
-                return const Center(child: CircularProgressIndicator());
+                return const SkeletonList(item: MemberRowSkeleton(), count: 6);
               }
               return ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -209,7 +210,7 @@ class _MemberRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.md,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [

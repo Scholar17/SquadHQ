@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
 import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../match/presentation/match_formatting.dart';
 import '../../domain/entities/bill_split.dart';
@@ -51,11 +52,10 @@ class WalletBillsPage extends StatelessWidget {
           final bills = [...wallet.bills]
             ..sort((a, b) => b.$1.match.kickoffAt.compareTo(a.$1.match.kickoffAt));
           if (bills.isEmpty) {
-            return Center(
-              child: Text(
-                'No bills yet.',
-                style: AppTextStyles.body(size: 13.5, color: AppColors.textMuted),
-              ),
+            return const EmptyState(
+              icon: Icons.receipt_long_rounded,
+              title: 'No bills yet',
+              body: 'Match bills and payment shares will be listed here.',
             );
           }
           return ListView(
@@ -122,16 +122,15 @@ class _BillRow extends StatelessWidget {
             : ('${split.unpaid.length} unpaid', AppColors.accent700);
     return Material(
       color: AppColors.card,
-      borderRadius: AppRadius.lg,
-      child: InkWell(
+      shape: RoundedRectangleBorder(
         borderRadius: AppRadius.lg,
+        side: BorderSide(color: AppColors.divider),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: onTap,
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.lg,
-            border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-          ),
           child: Row(
             children: [
               Container(

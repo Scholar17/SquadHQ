@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/empty_state.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../domain/entities/match.dart';
 import '../../domain/entities/match_history.dart';
 import '../../domain/entities/match_questions.dart';
@@ -78,22 +80,13 @@ class _MatchHistoryPageState extends State<MatchHistoryPage> {
         builder: (context, state) {
           final history = state.history;
           if (history == null) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+            return const SkeletonList(item: MatchCardSkeleton(), count: 3);
           }
           if (history.matches.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  'No past matches yet. Once a match has kicked off, it shows up here.',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body(
-                    size: 13.5,
-                    color: AppColors.textMuted,
-                    height: 1.5,
-                  ),
-                ),
-              ),
+            return const EmptyState(
+              icon: Icons.sports_soccer_rounded,
+              title: 'No past matches yet',
+              body: 'Once a match has kicked off, it shows up here.',
             );
           }
           return RefreshIndicator(
@@ -185,7 +178,7 @@ class _HistoryRow extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: AppRadius.lg,
-            border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Row(
             children: [

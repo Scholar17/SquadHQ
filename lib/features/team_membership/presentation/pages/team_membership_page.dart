@@ -7,6 +7,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../invites/presentation/widgets/my_invitations.dart';
 import '../../domain/entities/team.dart';
 import '../bloc/team_membership_bloc.dart';
@@ -83,7 +84,7 @@ class _TeamMembershipPageState extends State<TeamMembershipPage> {
                     nameController: _nameController,
                     inviteCodeController: _inviteCodeController,
                   ),
-                _ => const Center(child: CircularProgressIndicator()),
+                _ => const SkeletonList(item: MemberRowSkeleton(), count: 4),
               };
             },
           ),
@@ -267,7 +268,7 @@ class _TeamCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.bg,
                     borderRadius: AppRadius.pill,
-                    border: Border.all(color: AppColors.text.withValues(alpha: 0.16)),
+                    border: Border.all(color: AppColors.divider),
                   ),
                   child: Text(
                     team.inviteCode,
@@ -341,7 +342,7 @@ class _Section extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

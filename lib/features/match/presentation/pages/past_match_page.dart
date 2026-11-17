@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
 import '../../../comments/domain/entities/match_topic.dart';
 import '../../../comments/presentation/widgets/match_comments.dart';
 import '../../../../core/clock/clock_scope.dart';
@@ -95,7 +96,7 @@ class PastMatchPage extends StatelessWidget {
           final history = state.history;
           final pastMatch = history?.forMatch(matchId);
           if (history == null || pastMatch == null) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+            return const SkeletonList(item: MatchCardSkeleton(), count: 2);
           }
           final played = [
             for (final member in history.members)
@@ -289,7 +290,7 @@ class _RateYourGame extends StatelessWidget {
       decoration: BoxDecoration(
         color: answered ? AppColors.card : AppColors.accent100,
         borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
