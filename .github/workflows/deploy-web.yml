@@ -1,0 +1,61 @@
+# Push to main → test, build the Flutter web app and deploy it to
+# Firebase Hosting (target "app", squad-hq.web.app).
+#
+# Repo secrets (Settings → Secrets and variables → Actions):
+#   ENV_FILE                  the whole local .env file (dart defines; without
+#                             it the live app is a white screen)
+#   FIREBASE_SERVICE_ACCOUNT  JSON key of a service account with the
+#                             "Firebase Hosting Admin" role
+name: Deploy web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer push cancels an older run still in progress.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.0
+          cache: true
+
+      - name: Install packages
+        run: flutter pub get
+
+      - name: Test
+        run: flutter test
+
+      - name: Write .env
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: |
+          if [ -z "$ENV_FILE" ]; then
+            echo "::error::ENV_FILE secret is missing"
+            exit 1
+          fi
+          printf '%s\n' "$ENV_FILE" > .env
+          grep -q '^SUPABASE_URL=' .env || { echo "::error::ENV_FILE has no SUPABASE_URL"; exit 1; }
+
+      - name: Build web
+        run: flutter build web --release --dart-define-from-file=.env
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: my-project-1542101276805
+          target: app
+          channelId: live
