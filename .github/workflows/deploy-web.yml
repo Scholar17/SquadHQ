@@ -1,7 +1,14 @@
-# Push to main → test, build the Flutter web app and deploy it to
-# Firebase Hosting (target "app", squad-hq.web.app).
+# Push to main → test, apply new Supabase migrations, then build the
+# Flutter web app and deploy it to Firebase Hosting (target "app",
+# squad-hq.web.app). A failed test or migration stops the deploy, so the
+# app never goes out ahead of its database.
+#
+# Migrations: each new supabase/migrations/*.sql runs once on the live
+# project (.github/scripts/apply-migrations.sh has the rules).
 #
 # Repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN     a Supabase personal access token with
+#                             Database read + write
 #   ENV_FILE                  the whole local .env file (dart defines; without
 #                             it the live app is a white screen)
 #   FIREBASE_SERVICE_ACCOUNT_MY_PROJECT_1542101276805  service account JSON key
@@ -13,10 +20,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# One deploy at a time; a newer push cancels an older run still in progress.
+# One run at a time, never cancelled midway (that could stop a migration
+# halfway): a newer push waits, and only the latest waiting run is kept.
 concurrency:
   group: deploy-web
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -36,6 +44,16 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.2.0
+
+      - name: Apply new Supabase migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: qqcflvbuuxtzoysiawie
+        run: .github/scripts/apply-migrations.sh
 
       - name: Write .env
         env:
