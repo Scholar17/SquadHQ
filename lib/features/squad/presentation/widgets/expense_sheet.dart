@@ -5,7 +5,6 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/theme/widgets/edge_fade.dart';
 import '../../../../core/theme/widgets/money_input_formatter.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../../wallet/domain/usecases/upload_wallet_qr.dart';
@@ -905,24 +904,19 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               ),
             ],
             const SizedBox(height: 14),
-            SizedBox(
-              height: 36,
-              child: EdgeFade(
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final category = _categories[index];
-                    return SquadChoiceChip(
-                      label: category.label,
-                      icon: categoryIcon(category),
-                      selected: category == _category,
-                      onTap: () => _pickCategory(category),
-                    );
-                  },
-                ),
-              ),
+            CategoryGrid<ExpenseCategory>(
+              options: [
+                for (final category in _categories)
+                  (
+                    value: category,
+                    label: category.label,
+                    icon: categoryIcon(category),
+                    background: categoryTone(category).background,
+                    foreground: categoryTone(category).foreground,
+                  ),
+              ],
+              selected: _category,
+              onSelected: _pickCategory,
             ),
             // Other: say what it is.
             if (_isOther) ...[

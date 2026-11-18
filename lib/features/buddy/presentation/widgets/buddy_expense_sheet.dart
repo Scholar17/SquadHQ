@@ -386,24 +386,19 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           const SizedBox(height: 16),
           LabeledField(
             label: 'CATEGORY',
-            child: SizedBox(
-              height: 36,
-              child: EdgeFade(
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: ExpenseCategory.everyday.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final category = ExpenseCategory.everyday[index];
-                    return SquadChoiceChip(
-                      label: category.label,
-                      icon: categoryIcon(category),
-                      selected: category == _category,
-                      onTap: () => setState(() => _category = category),
-                    );
-                  },
-                ),
-              ),
+            child: CategoryGrid<ExpenseCategory>(
+              options: [
+                for (final category in ExpenseCategory.everyday)
+                  (
+                    value: category,
+                    label: category.label,
+                    icon: categoryIcon(category),
+                    background: categoryTone(category).background,
+                    foreground: categoryTone(category).foreground,
+                  ),
+              ],
+              selected: _category,
+              onSelected: (category) => setState(() => _category = category),
             ),
           ),
           if (_category == ExpenseCategory.other) ...[

@@ -218,26 +218,23 @@ class _PersonalExpenseSheetState extends State<_PersonalExpenseSheet> {
             const SizedBox(height: 16),
             LabeledField(
               label: 'CATEGORY',
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final category in PersonalCategory.builtIn)
-                    SquadChoiceChip(
-                      label: category.label,
-                      icon: personalCategoryIcon(category.name),
-                      selected: _categoryKey == category.name,
-                      onTap: () => setState(() => _categoryKey = category.name),
+              child: CategoryGrid<String>(
+                options: [
+                  for (final (key, label) in [
+                    for (final category in PersonalCategory.builtIn) (category.name, category.label),
+                    for (final category in spending.categories) ('custom:${category.id}', category.name),
+                  ])
+                    (
+                      value: key,
+                      label: label,
+                      icon: personalCategoryIcon(key),
+                      background: personalCategoryTone(key).background,
+                      foreground: personalCategoryTone(key).foreground,
                     ),
-                  for (final category in spending.categories)
-                    SquadChoiceChip(
-                      label: category.name,
-                      icon: personalCategoryIcon('custom:${category.id}'),
-                      selected: _categoryKey == 'custom:${category.id}',
-                      onTap: () => setState(() => _categoryKey = 'custom:${category.id}'),
-                    ),
-                  _NewCategoryChip(onTap: _newCategory),
                 ],
+                selected: _categoryKey,
+                onSelected: (key) => setState(() => _categoryKey = key),
+                onAdd: _newCategory,
               ),
             ),
             const SizedBox(height: 16),
@@ -330,45 +327,6 @@ class _AmountField extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// "New category" at the end of the chips: dashed-looking outline, so it
-/// reads as an action rather than one more choice.
-class _NewCategoryChip extends StatelessWidget {
-  const _NewCategoryChip({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: Material(
-        color: Colors.transparent,
-        shape: StadiumBorder(side: BorderSide(color: AppColors.accent700.withValues(alpha: 0.5))),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: onTap,
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.add_rounded, size: 16, color: AppColors.accent700),
-                const SizedBox(width: 6),
-                Text(
-                  'New category',
-                  style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: AppColors.accent700),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

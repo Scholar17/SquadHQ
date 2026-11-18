@@ -477,3 +477,146 @@ class SlipPickerButton extends StatelessWidget {
     );
   }
 }
+
+/// One choice in a [CategoryGrid]: its colour tile and name.
+typedef CategoryOption<T> = ({T value, String label, IconData icon, Color background, Color foreground});
+
+/// Categories as a grid of small colour tiles with the name under each —
+/// the picked one ringed in its colour. [onAdd] adds a dashed "+" tile at
+/// the end (e.g. "New category").
+class CategoryGrid<T> extends StatelessWidget {
+  const CategoryGrid({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+    this.onAdd,
+    this.addLabel = 'New category',
+  });
+
+  final List<CategoryOption<T>> options;
+  final T selected;
+  final ValueChanged<T> onSelected;
+  final VoidCallback? onAdd;
+  final String addLabel;
+
+  static const _spacing = 6.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Five across on a phone, more on a wider sheet; never cramped.
+        final perRow = ((constraints.maxWidth + _spacing) / (64 + _spacing)).floor().clamp(4, 7);
+        final width = (constraints.maxWidth - _spacing * (perRow - 1)) / perRow;
+        final onAdd = this.onAdd;
+        return Wrap(
+          spacing: _spacing,
+          runSpacing: 10,
+          children: [
+            for (final option in options)
+              _CategoryCell(
+                width: width,
+                label: option.label,
+                picked: option.value == selected,
+                onTap: () => onSelected(option.value),
+                tile: Icon(option.icon, size: 22, color: option.foreground),
+                background: option.background,
+                ring: option.foreground,
+              ),
+            if (onAdd != null)
+              _CategoryCell(
+                width: width,
+                label: addLabel,
+                picked: false,
+                onTap: onAdd,
+                tile: Icon(Icons.add_rounded, size: 22, color: AppColors.accent700),
+                background: Colors.transparent,
+                ring: AppColors.accent700,
+                outlined: true,
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CategoryCell extends StatelessWidget {
+  const _CategoryCell({
+    required this.width,
+    required this.label,
+    required this.picked,
+    required this.onTap,
+    required this.tile,
+    required this.background,
+    required this.ring,
+    this.outlined = false,
+  });
+
+  final double width;
+  final String label;
+  final bool picked;
+  final VoidCallback onTap;
+  final Widget tile;
+  final Color background;
+  final Color ring;
+
+  /// The "+" tile: a thin outline in place of a fill.
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      button: true,
+      selected: picked,
+      child: SizedBox(
+        width: width,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.md,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: animate ? const Duration(milliseconds: 160) : Duration.zero,
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: AppRadius.md,
+                    border: Border.all(
+                      color: picked
+                          ? ring
+                          : outlined
+                          ? ring.withValues(alpha: 0.45)
+                          : Colors.transparent,
+                      width: picked ? 2.5 : 1.5,
+                    ),
+                  ),
+                  child: Center(child: tile),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(
+                    size: 11.5,
+                    height: 1.2,
+                    weight: picked ? FontWeight.w800 : FontWeight.w600,
+                    color: picked ? AppColors.text : outlined ? AppColors.accent700 : squadMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
