@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -7,8 +6,6 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/money_input_formatter.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
-import '../../../wallet/domain/repositories/wallet_repository.dart';
-import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/entities/settlement.dart';
 import '../../domain/entities/squad_ledger.dart';
@@ -16,6 +13,7 @@ import '../../domain/entities/squad_member.dart';
 import '../../domain/repositories/squad_repository.dart';
 import '../bloc/squad_ledger_bloc.dart';
 import '../squad_formatting.dart';
+import 'sheet_parts.dart';
 import 'squad_widgets.dart';
 
 /// Pay [toId] back: their QR or bank details, an editable amount (less
@@ -209,7 +207,7 @@ class _PaySheetState extends State<_PaySheet> {
             style: AppTextStyles.body(size: 12, color: squadMuted),
           ),
           children: [
-            const _Grabber(),
+            const SheetGrabber(),
             Row(
               children: [
                 SquadAvatar(
@@ -312,13 +310,13 @@ class _PaySheetState extends State<_PaySheet> {
               style: AppTextStyles.body(size: 12, color: squadMuted),
             ),
             const SizedBox(height: 14),
-            _MethodTabs(method: method, onChanged: (picked) => setState(() => _method = picked)),
+            PaymentMethodTabs(method: method, onChanged: (picked) => setState(() => _method = picked)),
             const SizedBox(height: 14),
             switch (method) {
               SettlementMethod.qr =>
                 receiver?.walletQrPath == null
-                    ? _Missing("$name hasn't added a wallet QR yet. Try bank or cash.")
-                    : _QrPanel(
+                    ? SheetNotice("$name hasn't added a wallet QR yet. Try bank or cash.")
+                    : WalletQrPanel(
                         path: receiver!.walletQrPath!,
                         caption:
                             'Scan in your banking or wallet app, pay '
@@ -326,9 +324,9 @@ class _PaySheetState extends State<_PaySheet> {
                       ),
               SettlementMethod.bank =>
                 receiver?.hasBankDetails != true
-                    ? _Missing("$name hasn't added bank details yet. Try QR or cash.")
-                    : _BankPanel(member: receiver!),
-              SettlementMethod.cash => _Missing(
+                    ? SheetNotice("$name hasn't added bank details yet. Try QR or cash.")
+                    : BankDetailsPanel(member: receiver!),
+              SettlementMethod.cash => SheetNotice(
                 'Hand $name ${formatMoney(amount, currency)} in cash, then tap below. '
                 'No slip needed.',
                 icon: Icons.payments_outlined,
@@ -336,30 +334,11 @@ class _PaySheetState extends State<_PaySheet> {
             },
             if (needsSlip) ...[
               const SizedBox(height: 12),
-              _SlipButton(slip: _slip, onPick: _pickSlip),
+              SlipPickerButton(slip: _slip, onPick: _pickSlip),
             ],
           ],
         );
       },
-    );
-  }
-}
-
-class _Grabber extends StatelessWidget {
-  const _Grabber();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 40,
-        height: 4,
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          color: AppColors.neutral400,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
     );
   }
 }
@@ -421,257 +400,6 @@ class _ScopeOption extends StatelessWidget {
                 Text(amount, style: AppTextStyles.body(size: 14, weight: FontWeight.w800)),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MethodTabs extends StatelessWidget {
-  const _MethodTabs({required this.method, required this.onChanged});
-
-  final SettlementMethod method;
-  final ValueChanged<SettlementMethod> onChanged;
-
-  static IconData _icon(SettlementMethod method) => switch (method) {
-    SettlementMethod.qr => Icons.qr_code_2_rounded,
-    SettlementMethod.bank => Icons.account_balance_outlined,
-    SettlementMethod.cash => Icons.payments_outlined,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
-      child: Row(
-        children: [
-          for (final option in SettlementMethod.values)
-            Expanded(
-              child: Semantics(
-                selected: option == method,
-                button: true,
-                child: Material(
-                  color: option == method ? AppColors.card : Colors.transparent,
-                  shape: const StadiumBorder(),
-                  child: InkWell(
-                    customBorder: const StadiumBorder(),
-                    onTap: () => onChanged(option),
-                    child: SizedBox(
-                      height: 38,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _icon(option),
-                            size: 16,
-                            color: option == method ? AppColors.text : squadMuted,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            option.label,
-                            style: AppTextStyles.body(
-                              size: 13,
-                              weight: FontWeight.w700,
-                              color: option == method ? AppColors.text : squadMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QrPanel extends StatelessWidget {
-  const _QrPanel({required this.path, required this.caption});
-
-  final String path;
-  final String caption;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Semantics(
-          label: 'Their wallet QR code',
-          button: true,
-          child: GestureDetector(
-            onTap: () => showWalletImageViewer(
-              context,
-              kind: WalletImageKind.walletQr,
-              path: path,
-              title: 'Wallet QR',
-            ),
-            child: Container(
-              width: 132,
-              height: 132,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.md,
-                border: Border.all(color: AppColors.text.withValues(alpha: 0.1)),
-              ),
-              child: WalletImage(kind: WalletImageKind.walletQr, path: path),
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(caption, style: AppTextStyles.body(size: 13, color: squadMuted)),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => saveWalletQr(context, path),
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('Save QR'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.text,
-                  minimumSize: const Size(0, 44),
-                  side: BorderSide(color: AppColors.text.withValues(alpha: 0.2)),
-                  shape: const StadiumBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BankPanel extends StatelessWidget {
-  const _BankPanel({required this.member});
-
-  final SquadMember member;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = [
-      ('Bank', member.bankName),
-      ('Name', member.bankAccountName),
-      ('Account', member.bankAccountNo),
-    ];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
-      child: Column(
-        children: [
-          for (final (label, value) in rows)
-            if ((value ?? '').isNotEmpty)
-              Row(
-                children: [
-                  SizedBox(
-                    width: 72,
-                    child: Text(label, style: AppTextStyles.body(size: 12.5, color: squadMuted)),
-                  ),
-                  Expanded(
-                    child: Text(
-                      value!,
-                      style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Copy ${label.toLowerCase()}',
-                    icon: Icon(Icons.copy_rounded, size: 18, color: AppColors.accent700),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: value));
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(SnackBar(content: Text('$label copied')));
-                    },
-                  ),
-                ],
-              ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Missing extends StatelessWidget {
-  const _Missing(this.text, {this.icon = Icons.info_outline_rounded});
-
-  final String text;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
-      child: Row(
-        children: [
-          Icon(icon, color: squadMuted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text, style: AppTextStyles.body(size: 13, color: squadMuted)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SlipButton extends StatelessWidget {
-  const _SlipButton({required this.slip, required this.onPick});
-
-  final PickedImage? slip;
-  final VoidCallback onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final picked = slip;
-    return Material(
-      color: AppColors.bg,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadius.md,
-        side: BorderSide(color: AppColors.neutral500),
-      ),
-      child: InkWell(
-        borderRadius: AppRadius.md,
-        onTap: onPick,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              if (picked != null)
-                ClipRRect(
-                  borderRadius: AppRadius.xs,
-                  child: Image.memory(picked.bytes, width: 44, height: 44, fit: BoxFit.cover),
-                )
-              else
-                SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Icon(Icons.receipt_long_outlined, color: squadMuted),
-                ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  picked == null ? 'Add payment slip' : 'Slip added',
-                  style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
-                ),
-              ),
-              Text(
-                picked == null ? 'Choose' : 'Change',
-                style: AppTextStyles.body(
-                  size: 13,
-                  weight: FontWeight.w700,
-                  color: AppColors.accent700,
-                ),
-              ),
-            ],
           ),
         ),
       ),

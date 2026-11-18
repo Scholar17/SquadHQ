@@ -10,9 +10,8 @@ import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../../squad/domain/entities/settlement.dart' show SettlementMethod;
 import '../../../squad/domain/entities/squad_ledger.dart';
 import '../../../squad/presentation/squad_formatting.dart';
+import '../../../squad/presentation/widgets/sheet_parts.dart';
 import '../../../squad/presentation/widgets/squad_widgets.dart';
-import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
-import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/repositories/buddy_repository.dart';
 import '../cubit/buddy_cubit.dart';
@@ -71,10 +70,22 @@ class _BuddyPaySheet extends StatefulWidget {
 
 class _BuddyPaySheetState extends State<_BuddyPaySheet> {
   late final _amount = TextEditingController(text: moneyInput(widget.owedCents));
-  late SettlementMethod _method = widget.received || !(widget.ledger.member(widget.otherId)?.hasQr ?? false)
-      ? SettlementMethod.cash
-      : SettlementMethod.qr;
+
+  /// Paying them: their QR if they've added one, else bank, else cash.
+  /// Marking it received: cash until you say otherwise.
+  late SettlementMethod _method = switch (widget.ledger.member(widget.otherId)) {
+    _ when widget.received => SettlementMethod.cash,
+    final other? when other.hasQr => SettlementMethod.qr,
+    final other? when other.hasBankDetails => SettlementMethod.bank,
+    _ => SettlementMethod.cash,
+  };
   PickedImage? _slip;
+
+  @override
+  void initState() {
+    super.initState();
+    _amount.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -107,9 +118,12 @@ class _BuddyPaySheetState extends State<_BuddyPaySheet> {
   @override
   Widget build(BuildContext context) {
     final ledger = widget.ledger;
+    final currency = ledger.currency;
     final name = ledger.nameOf(widget.otherId);
     final other = ledger.member(widget.otherId);
     final saving = context.watch<BuddyCubit>().state.saving;
+    final amount = parseMoney(_amount.text) ?? 0;
+    final received = widget.received;
     return BlocListener<BuddyCubit, BuddyState>(
       listenWhen: (previous, current) => current.error != null && previous.error != current.error,
       listener: (context, state) => ScaffoldMessenger.of(context)
@@ -117,128 +131,102 @@ class _BuddyPaySheetState extends State<_BuddyPaySheet> {
         ..showSnackBar(SnackBar(content: Text(state.error!))),
       child: StickyActionSheet(
         background: AppColors.card,
-        summary: Text(
-          widget.received
-              ? 'Settled straight away for both of you.'
-              : '$name confirms it, then your buddy balance updates.',
-          style: AppTextStyles.body(size: 12.5, color: squadMuted),
-        ),
         action: SquadPrimaryButton(
-          label: widget.received ? 'Mark as received' : 'I paid',
+          label: received ? 'Mark as received' : 'I paid',
           isLoading: saving,
           onPressed: saving ? null : _save,
         ),
+        footer: Text(
+          received
+              ? 'Settled straight away for both of you.'
+              : '$name confirms it, then your buddy balance updates.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.body(size: 12, color: squadMuted),
+        ),
         children: [
+          const SheetGrabber(),
+          SheetHeader(
+            title: received ? 'Got money from $name' : 'Pay $name',
+            leading: SquadAvatar(
+              initial: other?.initial ?? '?',
+              photoUrl: other?.avatarUrl,
+              size: 36,
+              color: AppColors.teamGold,
+            ),
+          ),
+          const SizedBox(height: 6),
           Row(
             children: [
+              Text(currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
+              const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  widget.received ? 'Got money from $name' : 'Pay $name',
-                  style: AppTextStyles.heading(size: 20),
+                child: Semantics(
+                  label: received ? 'Amount received' : 'Amount to pay',
+                  child: TextField(
+                    key: const ValueKey('buddy-pay-amount'),
+                    controller: _amount,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: const [MoneyInputFormatter()],
+                    style: AppTextStyles.heading(size: 36),
+                    decoration: const InputDecoration(
+                      hintText: '0',
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-                tooltip: 'Close',
               ),
             ],
           ),
           Text(
-            'Buddy balance ${formatMoney(widget.owedCents, ledger.currency)}',
-            style: AppTextStyles.body(size: 12.5, color: squadMuted),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text(ledger.currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: TextField(
-                  key: const ValueKey('buddy-pay-amount'),
-                  controller: _amount,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: const [MoneyInputFormatter()],
-                  style: AppTextStyles.heading(size: 34),
-                  decoration: const InputDecoration(hintText: '0', isDense: true),
-                ),
-              ),
-            ],
+            [
+              '${received ? '$name owes you' : 'You owe $name'} ${formatMoney(widget.owedCents, currency)}',
+              if (amount > 0 && amount < widget.owedCents)
+                '${formatMoney(widget.owedCents - amount, currency)} left after this'
+              else
+                'or ${received ? 'record' : 'pay'} part of it',
+            ].join(' · '),
+            style: AppTextStyles.body(size: 12, color: squadMuted),
           ),
           const SizedBox(height: 14),
-          Text('HOW', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final method in SettlementMethod.values)
-                SquadChoiceChip(
-                  label: method.label,
-                  selected: method == _method,
-                  onTap: () => setState(() => _method = method),
-                ),
-            ],
+          LabeledField(
+            label: received ? 'HOW THEY PAID' : 'HOW',
+            child: PaymentMethodTabs(method: _method, onChanged: (picked) => setState(() => _method = picked)),
           ),
-          if (!widget.received && _method == SettlementMethod.qr) ...[
-            const SizedBox(height: 12),
-            if (other?.walletQrPath case final qr?)
-              Center(
-                child: ClipRRect(
-                  borderRadius: AppRadius.md,
-                  child: SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: WalletImage(kind: WalletImageKind.walletQr, path: qr),
-                  ),
-                ),
-              )
-            else
-              Text(
-                "$name hasn't added a payment QR yet.",
-                style: AppTextStyles.body(size: 13, color: squadMuted),
+          // Paying them: their QR or bank to pay to, then an optional slip.
+          if (!received) ...[
+            const SizedBox(height: 14),
+            switch (_method) {
+              SettlementMethod.qr => other?.walletQrPath == null
+                  ? SheetNotice("$name hasn't added a wallet QR yet. Try bank or cash.")
+                  : WalletQrPanel(
+                      path: other!.walletQrPath!,
+                      caption:
+                          'Scan in your banking or wallet app, pay '
+                          '${formatMoney(amount, currency)}, then add the slip.',
+                    ),
+              SettlementMethod.bank => other?.hasBankDetails != true
+                  ? SheetNotice("$name hasn't added bank details yet. Try QR or cash.")
+                  : BankDetailsPanel(member: other!),
+              SettlementMethod.cash => SheetNotice(
+                'Hand $name ${formatMoney(amount, currency)} in cash, then tap below.',
+                icon: Icons.payments_outlined,
               ),
-          ],
-          if (!widget.received && _method == SettlementMethod.bank) ...[
-            const SizedBox(height: 12),
-            Text(
-              [
-                ?other?.bankName,
-                ?other?.bankAccountName,
-                ?other?.bankAccountNo,
-              ].join(' · ').ifEmpty("$name hasn't added bank details yet."),
-              style: AppTextStyles.body(size: 13.5, weight: FontWeight.w600),
-            ),
-          ],
-          if (!widget.received && _method != SettlementMethod.cash) ...[
-            const SizedBox(height: 12),
-            if (_slip case final slip?)
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: AppRadius.sm,
-                    child: Image.memory(slip.bytes, width: 52, height: 52, fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(child: Text('Slip attached')),
-                  TextButton(onPressed: () => setState(() => _slip = null), child: const Text('Remove')),
-                ],
-              )
-            else
-              OutlinedButton.icon(
-                onPressed: () async {
+            },
+            if (_method != SettlementMethod.cash) ...[
+              const SizedBox(height: 12),
+              SlipPickerButton(
+                slip: _slip,
+                label: 'Add payment slip (optional)',
+                onPick: () async {
                   final picked = await pickWalletImage(context, slip: true);
                   if (picked != null && mounted) setState(() => _slip = picked);
                 },
-                icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: const Text('Add payment slip (optional)'),
               ),
+            ],
           ],
         ],
       ),
     );
   }
-}
-
-extension on String {
-  String ifEmpty(String fallback) => isEmpty ? fallback : this;
 }

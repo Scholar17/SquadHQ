@@ -12,11 +12,11 @@ import '../../../personal/presentation/personal_formatting.dart' show formatDayL
 import '../../../squad/domain/entities/expense.dart';
 import '../../../squad/domain/entities/expense_split.dart';
 import '../../../squad/domain/entities/squad_ledger.dart';
+import '../../../squad/domain/entities/squad_member.dart';
 import '../../../squad/presentation/bloc/squad_ledger_bloc.dart';
 import '../../../squad/presentation/squad_formatting.dart';
+import '../../../squad/presentation/widgets/sheet_parts.dart';
 import '../../../squad/presentation/widgets/squad_widgets.dart';
-import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
-import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/entities/buddy.dart';
 import '../../domain/repositories/buddy_repository.dart';
@@ -265,7 +265,7 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   Widget build(BuildContext context) {
     final ledger = context.watch<SquadLedgerBloc>().state.ledger ?? SquadLedger.empty;
     final currency = ledger.currency;
-    final buddies = [
+    final squadMates = [
       for (final member in ledger.members)
         if (member.profileId != widget.me) member,
     ];
@@ -279,13 +279,10 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
       child: StickyActionSheet(
         background: AppColors.card,
         maxHeightFactor: 1,
-        summary: Text(
-          _summary(ledger, split),
-          style: AppTextStyles.body(
-            size: 12.5,
-            weight: FontWeight.w600,
-            color: split == null || split.isValid ? squadMuted : AppColors.accent700,
-          ),
+        // Who owes whom, live — in view wherever the form is scrolled.
+        summary: SplitSummaryBox(
+          text: _summary(ledger, split),
+          ok: split == null || split.isValid || (parseMoney(_amount.text) ?? 0) == 0,
         ),
         action: SquadPrimaryButton(
           label: _editing == null ? 'Save buddy expense' : 'Save changes',
@@ -293,172 +290,119 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           onPressed: saving ? null : _save,
         ),
         children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.neutral400,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _editing == null ? 'Add buddy expense' : 'Edit buddy expense',
-                  style: AppTextStyles.heading(size: 20),
-                ),
-              ),
+          const SheetGrabber(),
+          SheetHeader(
+            title: _editing == null ? 'Add buddy expense' : 'Edit buddy expense',
+            actions: [
               if (_editing != null)
                 IconButton(
                   onPressed: saving ? null : _delete,
                   icon: const Icon(Icons.delete_outline_rounded),
                   tooltip: 'Delete',
                 ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-                tooltip: 'Close',
-              ),
             ],
           ),
-          Text('WITH', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          if (widget.buddyId != null)
-            Text(buddyName, style: AppTextStyles.title(size: 16))
-          else if (buddies.isEmpty)
-            Text(
-              'Invite someone to the squad first.',
-              style: AppTextStyles.body(size: 13, color: squadMuted),
-            )
-          else
-            SizedBox(
+          const SizedBox(height: 4),
+          LabeledField(
+            label: 'WITH',
+            child: _BuddyPicker(
+              fixed: widget.buddyId != null,
+              selected: buddy,
+              squadMates: squadMates,
+              ledger: ledger,
+              onPick: (id) => setState(() => _buddyId = id),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AmountField(controller: _amount, symbol: currency.symbol),
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'WHAT FOR',
+            child: _Field(
+              key: const ValueKey('buddy-title'),
+              controller: _title,
+              hint: 'e.g. Taxi home',
+              maxLength: 80,
+            ),
+          ),
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'PAID BY',
+            child: SegmentedTabs<bool>(
+              options: const [true, false],
+              selected: _iPaid,
+              label: (mine) => mine ? 'You' : buddyName,
+              keyOf: (mine) => mine ? null : const ValueKey('paid-by-buddy'),
+              onChanged: (mine) {
+                if (!mine && buddy == null) return;
+                setState(() => _iPaid = mine);
+              },
+              expand: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'SPLIT',
+            child: SegmentedTabs<ExpenseSplitMode>(
+              options: buddySplitModes,
+              selected: _mode,
+              label: (mode) => mode.label,
+              onChanged: _pickMode,
+              expand: true,
+            ),
+          ),
+          if (buddy != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
+              child: Column(
+                children: [
+                  for (final (id, name, amountBox, weightBox) in [
+                    (widget.me, 'You', _myAmount, _myWeight),
+                    (buddy, buddyName, _buddyAmount, _buddyWeight),
+                  ])
+                    _ShareRow(
+                      name: name,
+                      member: ledger.member(id),
+                      paid: id == _payer,
+                      amount: split?.shares[id] == null ? '—' : formatMoney(split!.shares[id]!, currency),
+                      controller: switch (_mode) {
+                        ExpenseSplitMode.custom => amountBox,
+                        ExpenseSplitMode.percent || ExpenseSplitMode.shares => weightBox,
+                        _ => null,
+                      },
+                      suffix: switch (_mode) {
+                        ExpenseSplitMode.percent => '%',
+                        ExpenseSplitMode.shares => '×',
+                        _ => null,
+                      },
+                      fieldKey: ValueKey('buddy-share-${id == widget.me ? 'me' : 'buddy'}'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'CATEGORY',
+            child: SizedBox(
               height: 36,
               child: EdgeFade(
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: buddies.length,
+                  itemCount: ExpenseCategory.everyday.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
-                    final member = buddies[index];
+                    final category = ExpenseCategory.everyday[index];
                     return SquadChoiceChip(
-                      label: ledger.nameOf(member.profileId),
-                      selected: member.profileId == buddy,
-                      onTap: () => setState(() => _buddyId = member.profileId),
+                      label: category.label,
+                      icon: categoryIcon(category),
+                      selected: category == _category,
+                      onTap: () => setState(() => _category = category),
                     );
                   },
                 ),
-              ),
-            ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.text, width: 2)),
-            ),
-            child: Row(
-              children: [
-                Text(currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Semantics(
-                    label: 'Amount',
-                    child: TextField(
-                      key: const ValueKey('buddy-amount'),
-                      controller: _amount,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: const [MoneyInputFormatter()],
-                      style: AppTextStyles.heading(size: 40),
-                      decoration: const InputDecoration(
-                        hintText: '0',
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text('TITLE', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          _Field(key: const ValueKey('buddy-title'), controller: _title, hint: 'e.g. Taxi home', maxLength: 80),
-          const SizedBox(height: 14),
-          Text('PAID BY', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              SquadChoiceChip(label: 'You', selected: _iPaid, onTap: () => setState(() => _iPaid = true)),
-              KeyedSubtree(
-                key: const ValueKey('paid-by-buddy'),
-                child: SquadChoiceChip(
-                  label: buddyName,
-                  selected: !_iPaid,
-                  onTap: buddy == null ? () {} : () => setState(() => _iPaid = false),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text('SPLIT', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final mode in buddySplitModes)
-                SquadChoiceChip(
-                  label: mode.label,
-                  selected: mode == _mode,
-                  onTap: () => _pickMode(mode),
-                ),
-            ],
-          ),
-          if (buddy != null) ...[
-            const SizedBox(height: 6),
-            for (final (id, name, amountBox, weightBox) in [
-              (widget.me, 'You', _myAmount, _myWeight),
-              (buddy, buddyName, _buddyAmount, _buddyWeight),
-            ])
-              _ShareRow(
-                name: name + (id == _payer ? ' (paid)' : ''),
-                amount: split?.shares[id] == null ? '—' : formatMoney(split!.shares[id]!, currency),
-                controller: switch (_mode) {
-                  ExpenseSplitMode.custom => amountBox,
-                  ExpenseSplitMode.percent || ExpenseSplitMode.shares => weightBox,
-                  _ => null,
-                },
-                suffix: switch (_mode) {
-                  ExpenseSplitMode.percent => '%',
-                  ExpenseSplitMode.shares => '×',
-                  _ => null,
-                },
-                fieldKey: ValueKey('buddy-share-${id == widget.me ? 'me' : 'buddy'}'),
-              ),
-          ],
-          const SizedBox(height: 14),
-          Text('CATEGORY', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 36,
-            child: EdgeFade(
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: ExpenseCategory.everyday.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final category = ExpenseCategory.everyday[index];
-                  return SquadChoiceChip(
-                    label: category.label,
-                    icon: categoryIcon(category),
-                    selected: category == _category,
-                    onTap: () => setState(() => _category = category),
-                  );
-                },
               ),
             ),
           ),
@@ -466,29 +410,38 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
             const SizedBox(height: 10),
             _Field(controller: _categoryLabel, hint: 'What for? e.g. Gym', maxLength: 30),
           ],
-          const SizedBox(height: 14),
-          Text('DATE', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_today_outlined, size: 18),
-            label: Text(formatDayLabel(_spentAt), style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
-            style: _outlined,
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'DATE',
+            child: OutlinedButton.icon(
+              onPressed: _pickDate,
+              icon: const Icon(Icons.calendar_today_outlined, size: 18),
+              label: Text(
+                formatDayLabel(_spentAt),
+                style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
+              ),
+              style: _outlined,
+            ),
           ),
-          const SizedBox(height: 14),
-          Text('RECEIPT', style: AppTextStyles.label(color: squadMuted)),
-          const SizedBox(height: 6),
-          _ReceiptRow(
-            picked: _receipt,
-            savedPath: _removeReceipt ? null : _editing?.receiptPath,
-            onPick: _pickReceipt,
-            onRemove: () => setState(() {
-              _receipt = null;
-              _removeReceipt = _editing?.receiptPath != null;
-            }),
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'RECEIPT',
+            child: ReceiptPicker(
+              label: 'Add receipt photo (optional)',
+              picked: _receipt,
+              savedPath: _removeReceipt ? null : _editing?.receiptPath,
+              onPick: _pickReceipt,
+              onRemove: () => setState(() {
+                _receipt = null;
+                _removeReceipt = _editing?.receiptPath != null;
+              }),
+            ),
           ),
-          const SizedBox(height: 14),
-          _Field(controller: _note, hint: 'Note (optional)', maxLength: 500, maxLines: 4),
+          const SizedBox(height: 16),
+          LabeledField(
+            label: 'NOTE',
+            child: _Field(controller: _note, hint: 'Anything to remember (optional)', maxLength: 500, maxLines: 4),
+          ),
         ],
       ),
     );
@@ -503,9 +456,113 @@ final _outlined = OutlinedButton.styleFrom(
   shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
 );
 
+/// Who you shared it with: fixed (opened from your page with them), or a
+/// row of your squad-mates to pick from.
+class _BuddyPicker extends StatelessWidget {
+  const _BuddyPicker({
+    required this.fixed,
+    required this.selected,
+    required this.squadMates,
+    required this.ledger,
+    required this.onPick,
+  });
+
+  final bool fixed;
+  final String? selected;
+  final List<SquadMember> squadMates;
+  final SquadLedger ledger;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = this.selected;
+    if (fixed && selected != null) {
+      final member = ledger.member(selected);
+      return Row(
+        children: [
+          SquadAvatar(
+            initial: member?.initial ?? '?',
+            photoUrl: member?.avatarUrl,
+            size: 30,
+            color: AppColors.teamGold,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(ledger.nameOf(selected), style: AppTextStyles.title(size: 16))),
+        ],
+      );
+    }
+    if (squadMates.isEmpty) {
+      return const SheetNotice('Invite someone to the squad first.', icon: Icons.group_add_outlined);
+    }
+    return SizedBox(
+      height: 36,
+      child: EdgeFade(
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: squadMates.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final member = squadMates[index];
+            return SquadChoiceChip(
+              label: ledger.nameOf(member.profileId),
+              selected: member.profileId == selected,
+              onTap: () => onPick(member.profileId),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// The big amount, underlined, with the currency symbol.
+class _AmountField extends StatelessWidget {
+  const _AmountField({required this.controller, required this.symbol});
+
+  final TextEditingController controller;
+  final String symbol;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.text, width: 2)),
+      ),
+      child: Row(
+        children: [
+          Text(symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Semantics(
+              label: 'Amount',
+              child: TextField(
+                key: const ValueKey('buddy-amount'),
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: const [MoneyInputFormatter()],
+                style: AppTextStyles.heading(size: 40),
+                decoration: const InputDecoration(
+                  hintText: '0',
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of you in the split: avatar, name (and "paid" on the payer), and
+/// either the share or — custom, percent, shares — a box to type it in.
 class _ShareRow extends StatelessWidget {
   const _ShareRow({
     required this.name,
+    required this.member,
+    required this.paid,
     required this.amount,
     required this.controller,
     required this.suffix,
@@ -513,6 +570,8 @@ class _ShareRow extends StatelessWidget {
   });
 
   final String name;
+  final SquadMember? member;
+  final bool paid;
   final String amount;
 
   /// Custom: the amount; percent / shares: the weight; equal: none.
@@ -521,99 +580,67 @@ class _ShareRow extends StatelessWidget {
   final Key fieldKey;
 
   @override
-  Widget build(BuildContext context) => ConstrainedBox(
-    constraints: const BoxConstraints(minHeight: 48),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(name, style: AppTextStyles.body(size: 14, weight: FontWeight.w600)),
-        ),
-        if (controller == null || suffix != null)
-          Text(amount, style: AppTextStyles.body(size: 15, weight: FontWeight.w800)),
-        if (controller case final controller?) ...[
+  Widget build(BuildContext context) {
+    final controller = this.controller;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 52),
+      child: Row(
+        children: [
+          SquadAvatar(
+            initial: member?.initial ?? '?',
+            photoUrl: member?.avatarUrl,
+            size: 28,
+            color: paid ? AppColors.teamGold : null,
+          ),
           const SizedBox(width: 10),
-          SizedBox(
-            width: 96,
-            child: Semantics(
-              label: '$name share',
-              child: TextField(
-                key: fieldKey,
-                controller: controller,
-                textAlign: TextAlign.right,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: const [MoneyInputFormatter()],
-                style: AppTextStyles.body(size: 14, weight: FontWeight.w800),
-                decoration: InputDecoration(
-                  hintText: '0',
-                  suffixText: suffix,
-                  isDense: true,
-                  filled: true,
-                  fillColor: AppColors.bg,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                  border: OutlineInputBorder(
-                    borderRadius: AppRadius.sm,
-                    borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
+                if (paid) Text('paid', style: AppTextStyles.body(size: 11.5, color: squadMuted)),
+              ],
+            ),
+          ),
+          // Percent and shares show what the weight comes to; custom's box
+          // is the amount itself.
+          if (controller == null || suffix != null)
+            Text(amount, style: AppTextStyles.body(size: 15, weight: FontWeight.w800)),
+          if (controller != null) ...[
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 96,
+              child: Semantics(
+                label: '$name share',
+                child: TextField(
+                  key: fieldKey,
+                  controller: controller,
+                  textAlign: TextAlign.right,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [MoneyInputFormatter()],
+                  style: AppTextStyles.body(size: 14, weight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    hintText: '0',
+                    suffixText: suffix,
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.card,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.sm,
+                      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.sm,
+                      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
-      ],
-    ),
-  );
-}
-
-class _ReceiptRow extends StatelessWidget {
-  const _ReceiptRow({
-    required this.picked,
-    required this.savedPath,
-    required this.onPick,
-    required this.onRemove,
-  });
-
-  final PickedImage? picked;
-  final String? savedPath;
-  final VoidCallback onPick;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final picked = this.picked;
-    final savedPath = this.savedPath;
-    if (picked == null && savedPath == null) {
-      return OutlinedButton.icon(
-        onPressed: onPick,
-        icon: const Icon(Icons.receipt_long_outlined, size: 18),
-        label: Text(
-          'Add receipt photo (optional)',
-          style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
-        ),
-        style: _outlined,
-      );
-    }
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: AppRadius.sm,
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: picked != null
-                ? Image.memory(picked.bytes, fit: BoxFit.cover)
-                : WalletImage(kind: WalletImageKind.paymentSlip, path: savedPath!),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            picked != null ? 'New photo — saved with the expense' : 'Attached',
-            style: AppTextStyles.body(size: 13, weight: FontWeight.w600),
-          ),
-        ),
-        TextButton(onPressed: onPick, child: const Text('Change')),
-        TextButton(onPressed: onRemove, child: const Text('Remove')),
-      ],
+      ),
     );
   }
 }
@@ -648,6 +675,10 @@ class _Field extends StatelessWidget {
       fillColor: AppColors.bg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
+        borderRadius: AppRadius.sm,
+        borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+      ),
+      enabledBorder: OutlineInputBorder(
         borderRadius: AppRadius.sm,
         borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
       ),

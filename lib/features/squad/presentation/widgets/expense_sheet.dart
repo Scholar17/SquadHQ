@@ -8,9 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/edge_fade.dart';
 import '../../../../core/theme/widgets/money_input_formatter.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
-import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
 import '../../../wallet/domain/usecases/upload_wallet_qr.dart';
-import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/expense_split.dart';
@@ -20,6 +18,7 @@ import '../../domain/entities/squad_member.dart';
 import '../../domain/repositories/squad_repository.dart';
 import '../bloc/squad_ledger_bloc.dart';
 import '../squad_formatting.dart';
+import 'sheet_parts.dart';
 import 'squad_widgets.dart';
 
 /// Add an expense, or edit [editing]: amount first, then title, who paid,
@@ -755,7 +754,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
           maxHeightFactor: 1,
           // The split, live: who pays what as the amount, people and
           // mode change — in view wherever the form is scrolled.
-          summary: _SplitSummary(
+          summary: SplitSummaryBox(
             text: _footnote(split, amount, ledger, mainPayer),
             ok: split.isValid || amount == 0,
           ),
@@ -850,7 +849,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _Labeled(
+                  child: LabeledField(
                     label: 'TITLE',
                     // Required, and never the category's name.
                     child: _Field(
@@ -862,7 +861,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _Labeled(
+                  child: LabeledField(
                     label: 'PAID BY',
                     child: _PayerButton(
                       name: _payerIds.length == 1
@@ -961,8 +960,10 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            _ModeTabs(
-              mode: _mode,
+            SegmentedTabs<ExpenseSplitMode>(
+              options: ExpenseSplitMode.values,
+              selected: _mode,
+              label: (mode) => mode.label,
               onChanged: (mode) {
                 setState(() {
                   _mode = mode;
@@ -1117,7 +1118,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               const SizedBox(height: 14),
               Text('PROOF OF PAYMENT', style: AppTextStyles.label(color: squadMuted)),
               const SizedBox(height: 6),
-              _ReceiptPicker(
+              ReceiptPicker(
                 picked: _receipt,
                 savedPath: _removeReceipt ? null : widget.editing?.receiptPath,
                 onPick: _pickReceipt,
@@ -1180,38 +1181,6 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
       _ =>
         '$total ÷ ${split.shares.length}, to the last ${ledger.currency.symbol == '฿' ? 'satang' : 'pya'}.',
     };
-  }
-}
-
-/// The live split line pinned above Save: muted while it adds up, in the
-/// owe colour (with a warning icon) when it doesn't.
-class _SplitSummary extends StatelessWidget {
-  const _SplitSummary({required this.text, required this.ok});
-
-  final String text;
-  final bool ok;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = ok ? squadMuted : AppColors.accent700;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: ok ? AppColors.surface : AppColors.accent100,
-        borderRadius: AppRadius.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(ok ? Icons.calculate_outlined : Icons.error_outline_rounded, size: 16, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: AppTextStyles.body(size: 12, color: color, height: 1.35)),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1326,90 +1295,6 @@ class _MonthlyPicker extends StatelessWidget {
   }
 }
 
-/// A receipt or slip photo: add one, or see the one attached with Change
-/// and Remove. Optional; everyone in the squad can open it.
-class _ReceiptPicker extends StatelessWidget {
-  const _ReceiptPicker({
-    required this.picked,
-    required this.savedPath,
-    required this.onPick,
-    required this.onRemove,
-  });
-
-  /// Chosen now, not saved yet.
-  final PickedImage? picked;
-
-  /// Already on the expense.
-  final String? savedPath;
-  final VoidCallback onPick;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final picked = this.picked;
-    final savedPath = this.savedPath;
-    if (picked == null && savedPath == null) {
-      return OutlinedButton.icon(
-        onPressed: onPick,
-        icon: const Icon(Icons.receipt_long_outlined, size: 18),
-        label: Text(
-          'Add receipt or slip (optional)',
-          style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.text,
-          alignment: Alignment.centerLeft,
-          minimumSize: const Size.fromHeight(46),
-          side: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
-        ),
-      );
-    }
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: AppRadius.sm,
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: picked != null
-                ? Image.memory(picked.bytes, fit: BoxFit.cover)
-                : WalletImage(kind: WalletImageKind.paymentSlip, path: savedPath!),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            picked != null ? 'New photo — saved with the expense' : 'Attached',
-            style: AppTextStyles.body(size: 13, weight: FontWeight.w600),
-          ),
-        ),
-        TextButton(onPressed: onPick, child: const Text('Change')),
-        TextButton(onPressed: onRemove, child: const Text('Remove')),
-      ],
-    );
-  }
-}
-
-class _Labeled extends StatelessWidget {
-  const _Labeled({required this.label, required this.child});
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.label(color: squadMuted)),
-        const SizedBox(height: 4),
-        child,
-      ],
-    );
-  }
-}
-
 class _Field extends StatelessWidget {
   const _Field({super.key, required this.controller, required this.hint});
 
@@ -1490,60 +1375,6 @@ class _PayerButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Equal · Chosen · Exact · Custom · Percent · Shares · Treat, as a
-/// segmented control that wraps onto a second line on a narrow phone.
-class _ModeTabs extends StatelessWidget {
-  const _ModeTabs({required this.mode, required this.onChanged});
-
-  final ExpenseSplitMode mode;
-  final ValueChanged<ExpenseSplitMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
-      child: Wrap(
-        spacing: 2,
-        runSpacing: 2,
-        children: [
-          for (final option in ExpenseSplitMode.values)
-            Semantics(
-              selected: option == mode,
-              button: true,
-              child: Material(
-                color: option == mode ? AppColors.card : Colors.transparent,
-                shape: const StadiumBorder(),
-                child: InkWell(
-                  customBorder: const StadiumBorder(),
-                  onTap: () => onChanged(option),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: SizedBox(
-                      height: 36,
-                      child: Center(
-                        widthFactor: 1,
-                        child: Text(
-                          option.label,
-                          style: AppTextStyles.body(
-                            size: 13,
-                            weight: FontWeight.w700,
-                            color: option == mode ? AppColors.text : squadMuted,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

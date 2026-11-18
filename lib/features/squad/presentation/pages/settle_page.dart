@@ -21,7 +21,7 @@ import '../widgets/payment_extras.dart';
 import '../widgets/remind_button.dart';
 import '../widgets/squad_widgets.dart';
 import '../widgets/trip_card.dart';
-import '../../../buddy/presentation/pages/buddy_page.dart' show BuddiesSection;
+import '../../../buddy/presentation/widgets/buddies_section.dart';
 
 /// A squad's Settle tab: everyone you pay and everyone who pays you, each
 /// debt person to person (across every expense between you, less
