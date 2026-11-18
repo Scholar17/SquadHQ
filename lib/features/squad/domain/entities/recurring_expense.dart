@@ -21,6 +21,7 @@ class RecurringExpense extends Equatable {
     this.pausedAt,
     this.lastMonth,
     this.categoryLabel,
+    this.weights = const {},
   });
 
   /// [chargeDay] for "the last day of the month", whatever its length.
@@ -52,6 +53,10 @@ class RecurringExpense extends Equatable {
 
   /// What "Other" is ("Amazon Prime"), if named (040).
   final String? categoryLabel;
+
+  /// For a percent or shares split: each member's % or number of shares in
+  /// hundredths (40% = 4000, 2 shares = 200), as typed (059).
+  final Map<String, int> weights;
 
   bool get isPaused => pausedAt != null;
 
@@ -96,5 +101,6 @@ class RecurringExpense extends Equatable {
     pausedAt,
     lastMonth,
     categoryLabel,
+    weights,
   ];
 }

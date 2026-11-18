@@ -272,6 +272,10 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
               for (final share in (row['shares'] as List<dynamic>).cast<Map<String, dynamic>>())
                 share['profile_id'] as String: _cents(share['amount']),
             },
+            weights: {
+              for (final share in (row['shares'] as List<dynamic>).cast<Map<String, dynamic>>())
+                if (share['weight'] != null) share['profile_id'] as String: _cents(share['weight']),
+            },
             chargeDay: row['charge_day'] as int,
             startsOn: DateTime.parse(row['starts_on'] as String),
             createdBy: row['created_by'] as String,
@@ -293,7 +297,7 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
     try {
       final rows = await _supabase
           .from('expense_guests')
-          .select('expense_id, name, amount, host_id, expenses!inner(team_id)')
+          .select('*, expenses!inner(team_id)')
           .eq('expenses.team_id', teamId);
       final byExpense = <String, List<ExpenseGuest>>{};
       for (final row in rows) {
@@ -304,6 +308,8 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
                 name: row['name'] as String,
                 amountCents: _cents(row['amount']),
                 hostId: row['host_id'] as String?,
+                // Only once 059 runs.
+                weight: row['weight'] == null ? null : _cents(row['weight']),
               ),
             );
       }
@@ -362,6 +368,12 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
       recurringId: row['recurring_id'] as String?,
       guests: guests[row['id']] ?? const [],
       categoryLabel: row['category_label'] as String?,
+      // Only once 059 runs.
+      weights: {
+        for (final MapEntry(:key, :value)
+            in (row['split_weights'] as Map<String, dynamic>? ?? const {}).entries)
+          key: _cents(value),
+      },
     );
   }
 
@@ -423,6 +435,18 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
         params: {'p_expense_id': id, 'p_label': draft.categoryLabel},
       );
     }
+    // Each person's % or shares go on once the expense exists (059).
+    if (draft.weights case final weights?) {
+      await _supabase.rpc(
+        'set_expense_split_weights',
+        params: {
+          'p_expense_id': id,
+          'p_weights': weights.isEmpty
+              ? null
+              : {for (final MapEntry(:key, :value) in weights.entries) key: _units(value)},
+        },
+      );
+    }
     // Guests go on once the expense exists (037).
     if (draft.guests case final guests?) {
       await _supabase.rpc(
@@ -431,7 +455,12 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
           'p_expense_id': id,
           'p_guests': [
             for (final g in guests)
-              {'name': g.name, 'amount': _units(g.amountCents), 'host_id': g.hostId},
+              {
+                'name': g.name,
+                'amount': _units(g.amountCents),
+                'host_id': g.hostId,
+                'weight': ?(g.weight == null ? null : _units(g.weight!)),
+              },
           ],
         },
       );
@@ -498,7 +527,11 @@ class SquadRemoteDataSourceImpl implements SquadRemoteDataSource {
         'p_split_mode': draft.splitMode.name,
         'p_shares': [
           for (final MapEntry(:key, :value) in draft.shares.entries)
-            {'profile_id': key, 'amount': _units(value)},
+            {
+              'profile_id': key,
+              'amount': _units(value),
+              'weight': ?(draft.weights[key] == null ? null : _units(draft.weights[key]!)),
+            },
         ],
         'p_charge_day': draft.chargeDay,
         'p_starts_on':

@@ -414,7 +414,7 @@ class _Empty extends StatelessWidget {
             style: AppTextStyles.body(size: 13, color: squadMuted),
           ),
           const SizedBox(height: 16),
-          SquadPrimaryButton(label: '+ Add expense', onPressed: onAdd),
+          SquadPrimaryButton(label: '+ Add group expense', onPressed: onAdd),
         ],
       ),
     );

@@ -32,6 +32,7 @@ class ExpenseDraft extends Equatable {
     this.guests,
     this.categoryLabel,
     this.setCategoryLabel = false,
+    this.weights,
   });
 
   final String? id;
@@ -40,6 +41,10 @@ class ExpenseDraft extends Equatable {
   final ExpenseCategory category;
   final int amountCents;
   final ExpenseSplitMode splitMode;
+
+  /// Each member's % or number of shares in hundredths, for a percent or
+  /// shares split; [] clears them, null leaves them as they are.
+  final Map<String, int>? weights;
 
   /// Whoever paid the most.
   final String payerId;
@@ -94,6 +99,7 @@ class ExpenseDraft extends Equatable {
     guests,
     categoryLabel,
     setCategoryLabel,
+    weights,
   ];
 }
 
@@ -173,6 +179,7 @@ class RecurringDraft extends Equatable {
     this.note,
     this.categoryLabel,
     this.setCategoryLabel = false,
+    this.weights = const {},
   });
 
   final String? id;
@@ -183,6 +190,10 @@ class RecurringDraft extends Equatable {
   final String payerId;
   final ExpenseSplitMode splitMode;
   final Map<String, int> shares;
+
+  /// Each member's % or number of shares in hundredths, for a percent or
+  /// shares split.
+  final Map<String, int> weights;
 
   /// 1–28, or RecurringExpense.lastDay.
   final int chargeDay;
@@ -210,6 +221,7 @@ class RecurringDraft extends Equatable {
     note,
     categoryLabel,
     setCategoryLabel,
+    weights,
   ];
 }
 

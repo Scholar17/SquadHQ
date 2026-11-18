@@ -238,7 +238,7 @@ class _BalanceHero extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: HeroPillButton(
-                  label: 'Add expense',
+                  label: 'Group expense',
                   icon: Icons.add_rounded,
                   light: false,
                   onPressed: onAdd,
@@ -384,7 +384,7 @@ class _RecentExpenses extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             SquadPrimaryButton(
-              label: '+ Add expense',
+              label: '+ Add group expense',
               onPressed: () => showExpenseSheet(context, teamId: squad.id, me: me),
             ),
           ],

@@ -132,3 +132,13 @@ String formatTripDates(DateTime startsOn, DateTime endsOn) {
   ),
   _ => (background: AppColors.neutral200, foreground: AppColors.neutral700),
 };
+
+/// A percent or shares split's weight (hundredths) as shown: "40%",
+/// "33.33%", "1 share", "2.5 shares".
+String weightLabel(ExpenseSplitMode mode, int hundredths) {
+  final number = moneyInput(hundredths);
+  return switch (mode) {
+    ExpenseSplitMode.percent => '$number%',
+    _ => '$number ${hundredths == 100 ? 'share' : 'shares'}',
+  };
+}

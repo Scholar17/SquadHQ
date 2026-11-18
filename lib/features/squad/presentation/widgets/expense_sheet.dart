@@ -200,6 +200,9 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
 
   final _exact = <String, TextEditingController>{};
 
+  /// Each person's % or number of shares (percent and shares splits).
+  final _weight = <String, TextEditingController>{};
+
   /// Exact or custom with no total typed: the total is the shares' sum,
   /// kept in step as they're typed — until the total's typed over.
   bool _totalFromShares = false;
@@ -321,6 +324,16 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
         _exactFor(key).text = moneyInput(value);
       }
     }
+    if (splitMode != null && splitMode.isWeighted) {
+      final weights = {
+        ...?(editing?.weights ?? widget.editingMonthly?.weights),
+        for (final (index, guest) in (editing?.guests ?? const <ExpenseGuest>[]).indexed)
+          _guests[index].key: ?guest.weight,
+      };
+      for (final MapEntry(:key, :value) in weights.entries) {
+        _weightFor(key).text = moneyInput(value);
+      }
+    }
     if (editing != null && editing.hasSeveralPayers) {
       for (final MapEntry(:key, :value) in editing.payers.entries) {
         _paidFor(key).text = moneyInput(value);
@@ -418,13 +431,44 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
     return controller;
   });
 
+  TextEditingController _weightFor(String key) =>
+      _weight.putIfAbsent(key, () => TextEditingController()..addListener(_rebuild));
+
+  /// Switching to percent or shares with nothing typed yet starts everyone
+  /// on an even split: 1 share each, or 100% shared out (33.34 · 33.33 ·
+  /// 33.33).
+  void _prefillWeights(ExpenseSplitMode mode, List<String> everyone) {
+    if (!mode.isWeighted || everyone.isEmpty) return;
+    if (everyone.any((key) => (parseMoney(_weightFor(key).text) ?? 0) > 0)) return;
+    final base = ExpenseSplit.fullPercent ~/ everyone.length;
+    final extra = ExpenseSplit.fullPercent - base * everyone.length;
+    for (final (index, key) in everyone.indexed) {
+      _weightFor(key).text = mode == ExpenseSplitMode.shares
+          ? '1'
+          : moneyInput(base + (index < extra ? 1 : 0));
+    }
+  }
+
+  /// Everyone who could be in the split: members, then guests.
+  List<String> _everyone(SquadLedger ledger) => [
+    for (final member in _members(ledger)) member.profileId,
+    if (!_monthly)
+      for (final guest in _guests) guest.key,
+  ];
+
+  /// What was typed per person for a percent or shares split.
+  Map<String, int> _weights(List<String> everyone) => {
+    for (final key in everyone)
+      if (parseMoney(_weightFor(key).text) case final weight? when weight > 0) key: weight,
+  };
+
   @override
   void dispose() {
     _amount.dispose();
     _title.dispose();
     _note.dispose();
     _categoryLabel.dispose();
-    for (final controller in [..._exact.values, ..._paid.values]) {
+    for (final controller in [..._exact.values, ..._paid.values, ..._weight.values]) {
       controller.dispose();
     }
     super.dispose();
@@ -452,6 +496,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
         _ => everyone,
       },
       exactCents: {for (final id in everyone) id: ?parseMoney(_exactFor(id).text)},
+      weights: _mode.isWeighted ? _weights(everyone) : const {},
     );
   }
 
@@ -495,6 +540,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             payerId: payers.keys.single,
             splitMode: _mode,
             shares: split.shares,
+            weights: _mode.isWeighted ? _weights(_everyone(ledger)) : const {},
             chargeDay: _chargeDay,
             startsOn: DateTime(now.year, now.month + (_startNextMonth ? 1 : 0)),
             note: _note.text.trim(),
@@ -515,10 +561,25 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
         if (cents == null || cents <= 0) continue;
         final cover = guest.hostId ?? _mainPayer(payers);
         shares[cover] = (shares[cover] ?? 0) + cents;
-        guests.add(ExpenseGuest(name: guest.name, amountCents: cents, hostId: guest.hostId));
+        guests.add(
+          ExpenseGuest(
+            name: guest.name,
+            amountCents: cents,
+            hostId: guest.hostId,
+            weight: _mode.isWeighted ? parseMoney(_weightFor(guest.key).text) : null,
+          ),
+        );
       }
     }
     final hadGuests = widget.editing?.guests.isNotEmpty ?? false;
+    final hadWeights = widget.editing?.weights.isNotEmpty ?? false;
+    final memberIds = {for (final member in _members(ledger)) member.profileId};
+    final weights = _mode.isWeighted
+        ? {
+            for (final MapEntry(:key, :value) in _weights(_everyone(ledger)).entries)
+              if (memberIds.contains(key)) key: value,
+          }
+        : const <String, int>{};
     context.read<SquadLedgerBloc>().add(
       ExpenseSaveRequested(
         ExpenseDraft(
@@ -541,6 +602,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
           removeReceipt: _removeReceipt,
           categoryLabel: _labelToSave.label,
           setCategoryLabel: _labelToSave.set,
+          weights: weights.isNotEmpty || hadWeights ? weights : null,
         ),
       ),
     );
@@ -726,7 +788,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                         : _monthly
                         ? 'Add monthly expense'
                         : switch ((widget.editing == null, _tripId == null)) {
-                            (true, true) => 'Add expense',
+                            (true, true) => 'Add group expense',
                             (true, false) => 'Add trip expense',
                             (false, true) => 'Edit expense',
                             (false, false) => 'Edit trip expense',
@@ -902,7 +964,10 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             _ModeTabs(
               mode: _mode,
               onChanged: (mode) {
-                setState(() => _mode = mode);
+                setState(() {
+                  _mode = mode;
+                  _prefillWeights(mode, _everyone(ledger));
+                });
                 _syncFromShares();
               },
             ),
@@ -947,9 +1012,12 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                       (_chosen ?? {for (final m in _members(ledger)) m.profileId}).contains(
                         member.profileId,
                       ),
-                    ExpenseSplitMode.exact => split.shares.containsKey(member.profileId),
+                    ExpenseSplitMode.exact ||
+                    ExpenseSplitMode.percent ||
+                    ExpenseSplitMode.shares => split.shares.containsKey(member.profileId),
                     _ => true,
                   },
+                  weightController: _mode.isWeighted ? _weightFor(member.profileId) : null,
                   onToggle: _mode == ExpenseSplitMode.chosen || _mode == ExpenseSplitMode.custom
                       ? () => setState(() {
                           final chosen = _chosen ??= {
@@ -992,9 +1060,12 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                   included: switch (_mode) {
                     ExpenseSplitMode.chosen ||
                     ExpenseSplitMode.custom => (_chosen ?? {guest.key}).contains(guest.key),
-                    ExpenseSplitMode.exact => split.shares.containsKey(guest.key),
+                    ExpenseSplitMode.exact ||
+                    ExpenseSplitMode.percent ||
+                    ExpenseSplitMode.shares => split.shares.containsKey(guest.key),
                     _ => true,
                   },
+                  weightController: _mode.isWeighted ? _weightFor(guest.key) : null,
                   onToggle: _mode == ExpenseSplitMode.chosen || _mode == ExpenseSplitMode.custom
                       ? () => setState(() {
                           final chosen = _chosen ??= {
@@ -1069,6 +1140,8 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
     ExpenseSplitMode.chosen => 'Chosen: tick who’s in — they pay the same.',
     ExpenseSplitMode.exact => 'Exact: type what each person pays.',
     ExpenseSplitMode.custom => 'Custom: tick who’s in, then type what each pays.',
+    ExpenseSplitMode.percent => 'Percent: type each person’s %, adding up to 100. Leave 0 for anyone not in it.',
+    ExpenseSplitMode.shares => 'Shares: 2 shares pay twice what 1 share does. Leave 0 for anyone not in it.',
     ExpenseSplitMode.treat => null,
   };
 
@@ -1096,6 +1169,9 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                   '${formatMoney(entered, ledger.currency)} entered, '
                   '${formatMoney((amount - entered).abs(), ledger.currency)} '
                   '${entered > amount ? 'over' : 'left'}.',
+      ExpenseSplitMode.percent || ExpenseSplitMode.shares when split.isValid =>
+        '$total split by ${_mode == ExpenseSplitMode.percent ? '%' : 'shares'} '
+            'between ${split.shares.length} ${split.shares.length == 1 ? 'person' : 'people'}.',
       _ when !split.isValid => split.error!,
       _ when split.roundedCents != null =>
         '$total ÷ ${split.shares.length} = ${formatMoneyExact(split.exactCents!, ledger.currency)}. '
@@ -1419,7 +1495,8 @@ class _PayerButton extends StatelessWidget {
   }
 }
 
-/// Equal · Chosen · Exact · Custom · Treat, as a segmented control.
+/// Equal · Chosen · Exact · Custom · Percent · Shares · Treat, as a
+/// segmented control that wraps onto a second line on a narrow phone.
 class _ModeTabs extends StatelessWidget {
   const _ModeTabs({required this.mode, required this.onChanged});
 
@@ -1429,24 +1506,29 @@ class _ModeTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.lg),
-      child: Row(
+      child: Wrap(
+        spacing: 2,
+        runSpacing: 2,
         children: [
           for (final option in ExpenseSplitMode.values)
-            Expanded(
-              child: Semantics(
-                selected: option == mode,
-                button: true,
-                child: Material(
-                  color: option == mode ? AppColors.card : Colors.transparent,
-                  shape: const StadiumBorder(),
-                  child: InkWell(
-                    customBorder: const StadiumBorder(),
-                    onTap: () => onChanged(option),
+            Semantics(
+              selected: option == mode,
+              button: true,
+              child: Material(
+                color: option == mode ? AppColors.card : Colors.transparent,
+                shape: const StadiumBorder(),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: () => onChanged(option),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: SizedBox(
                       height: 36,
                       child: Center(
+                        widthFactor: 1,
                         child: Text(
                           option.label,
                           style: AppTextStyles.body(
@@ -1480,9 +1562,14 @@ class _ShareRow extends StatelessWidget {
     required this.sub,
     this.fieldKey,
     this.onRemove,
+    this.weightController,
   });
 
   final Key? fieldKey;
+
+  /// Percent or shares: a box for the person's % or shares, with what that
+  /// comes to beside it.
+  final TextEditingController? weightController;
 
   /// Shown as an ✕ (a guest can be taken out).
   final VoidCallback? onRemove;
@@ -1528,7 +1615,36 @@ class _ShareRow extends StatelessWidget {
               ],
             ),
           ),
-          if (exactController != null)
+          if (weightController case final weightController?) ...[
+            Text(amount, style: AppTextStyles.body(size: 14, weight: FontWeight.w700, color: nameColor)),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 84,
+              child: Semantics(
+                label: mode == ExpenseSplitMode.percent ? '$name percent' : '$name shares',
+                child: TextField(
+                  key: fieldKey,
+                  controller: weightController,
+                  textAlign: TextAlign.right,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [MoneyInputFormatter()],
+                  style: AppTextStyles.body(size: 14, weight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    hintText: '0',
+                    suffixText: mode == ExpenseSplitMode.percent ? '%' : '×',
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.bg,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.sm,
+                      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (exactController != null)
             SizedBox(
               width: 96,
               child: Semantics(

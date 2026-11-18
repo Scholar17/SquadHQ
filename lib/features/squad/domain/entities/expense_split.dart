@@ -15,13 +15,16 @@ class ExpenseSplit extends Equatable {
   /// ticked people for [ExpenseSplitMode.chosen] and
   /// [ExpenseSplitMode.custom]. [exactCents] are the typed amounts for
   /// [ExpenseSplitMode.exact], and for [ExpenseSplitMode.custom] where only
-  /// the participants' count.
+  /// the participants' count. [weights] are each person's % or number of
+  /// shares in hundredths (40% = 4000) for [ExpenseSplitMode.percent] and
+  /// [ExpenseSplitMode.shares]; anyone without one isn't in it.
   factory ExpenseSplit.compute({
     required ExpenseSplitMode mode,
     required int totalCents,
     required String payerId,
     required List<String> participants,
     Map<String, int> exactCents = const {},
+    Map<String, int> weights = const {},
     Map<String, int>? payers,
   }) {
     if (totalCents <= 0) return const ExpenseSplit._(shares: {}, error: 'Enter an amount');
@@ -35,7 +38,64 @@ class ExpenseSplit extends Equatable {
             : _exact(totalCents, {for (final id in participants) id: ?exactCents[id]}),
       ExpenseSplitMode.equal ||
       ExpenseSplitMode.chosen => _equal(totalCents, payerId, participants),
+      ExpenseSplitMode.percent => _weighted(totalCents, weights, percent: true),
+      ExpenseSplitMode.shares => _weighted(totalCents, weights, percent: false),
     };
+  }
+
+  /// 100% in hundredths.
+  static const fullPercent = 10000;
+
+  /// Shares the total in proportion to [entered] weights, to the minor
+  /// unit: everyone gets their exact share rounded down, and the units
+  /// left go one each to whoever lost the most in rounding (first listed
+  /// on a tie) — so it always adds up to [total].
+  static ExpenseSplit _weighted(int total, Map<String, int> entered, {required bool percent}) {
+    final weights = {
+      for (final MapEntry(:key, :value) in entered.entries)
+        if (value > 0) key: value,
+    };
+    if (weights.isEmpty) {
+      return ExpenseSplit._(
+        shares: const {},
+        error: percent ? 'Type each person’s %' : 'Type each person’s shares',
+      );
+    }
+    final sum = weights.values.fold(0, (a, b) => a + b);
+    final divisor = percent ? fullPercent : sum;
+    final shares = <String, int>{};
+    final remainders = <String, int>{};
+    for (final MapEntry(:key, :value) in weights.entries) {
+      shares[key] = total * value ~/ divisor;
+      remainders[key] = total * value % divisor;
+    }
+    if (percent && sum != fullPercent) {
+      return ExpenseSplit._(
+        shares: shares,
+        error: 'Percents add up to ${_percentText(sum)}%, not 100%',
+      );
+    }
+    var left = total - shares.values.fold(0, (a, b) => a + b);
+    final ids = weights.keys.toList();
+    final order = [...ids]
+      ..sort((a, b) {
+        final byRemainder = remainders[b]!.compareTo(remainders[a]!);
+        return byRemainder != 0 ? byRemainder : ids.indexOf(a).compareTo(ids.indexOf(b));
+      });
+    for (final id in order) {
+      if (left == 0) break;
+      shares[id] = shares[id]! + 1;
+      left--;
+    }
+    return ExpenseSplit._(shares: shares);
+  }
+
+  /// 3333 → "33.33", 10000 → "100".
+  static String _percentText(int hundredths) {
+    final whole = hundredths ~/ 100;
+    final fraction = hundredths % 100;
+    if (fraction == 0) return '$whole';
+    return '$whole.${fraction.toString().padLeft(2, '0').replaceFirst(RegExp(r'0$'), '')}';
   }
 
   static ExpenseSplit _equal(int total, String payerId, List<String> participants) {

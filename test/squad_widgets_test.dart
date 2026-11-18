@@ -29,7 +29,7 @@ void main() {
                   const SizedBox(width: 10),
                   Expanded(
                     child: HeroPillButton(
-                      label: 'Add expense',
+                      label: 'Group expense',
                       icon: Icons.add_rounded,
                       light: false,
                       onPressed: () {},

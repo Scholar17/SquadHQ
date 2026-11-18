@@ -54,19 +54,28 @@ enum ExpenseSplitMode {
   /// total.
   custom('Custom'),
 
+  /// Each person's % of the total, adding up to 100.
+  percent('Percent'),
+
+  /// Each person's number of shares — 2 shares pay twice what 1 does.
+  shares('Shares'),
+
   /// On the payer — recorded, nobody owes anything.
   treat('Treat');
 
   const ExpenseSplitMode(this.label);
 
   final String label;
+
+  /// Split by a typed weight per person (a % or a number of shares).
+  bool get isWeighted => this == percent || this == shares;
 }
 
 /// Someone outside the squad in a split (037) — information only. Their
 /// share is already inside a member's: their host's, or with no host, the
 /// payer's (who collects it from them outside the app).
 class ExpenseGuest extends Equatable {
-  const ExpenseGuest({required this.name, required this.amountCents, this.hostId});
+  const ExpenseGuest({required this.name, required this.amountCents, this.hostId, this.weight});
 
   final String name;
   final int amountCents;
@@ -74,8 +83,12 @@ class ExpenseGuest extends Equatable {
   /// The member covering them; null = no one (the payer collects it).
   final String? hostId;
 
+  /// Their % or number of shares in hundredths (40% = 4000), for a
+  /// percent or shares split (059).
+  final int? weight;
+
   @override
-  List<Object?> get props => [name, amountCents, hostId];
+  List<Object?> get props => [name, amountCents, hostId, weight];
 }
 
 /// One shared cost. Money is in minor units (satang, or pya for kyat), so
@@ -99,6 +112,7 @@ class Expense extends Equatable {
     this.recurringId,
     this.guests = const [],
     this.categoryLabel,
+    this.weights = const {},
   });
 
   /// Up to this many people can pay for one expense.
@@ -145,6 +159,10 @@ class Expense extends Equatable {
 
   /// What "Other" is ("Gym", "Amazon Prime"), if named (040).
   final String? categoryLabel;
+
+  /// For a percent or shares split: each member's % or number of shares in
+  /// hundredths (40% = 4000, 2 shares = 200), as typed (059).
+  final Map<String, int> weights;
 
   /// The category as shown: its name for "Other", if given.
   String get categoryName => categoryLabel ?? category.label;
@@ -266,5 +284,6 @@ class Expense extends Equatable {
     recurringId,
     guests,
     categoryLabel,
+    weights,
   ];
 }

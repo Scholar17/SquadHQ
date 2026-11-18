@@ -47,6 +47,75 @@ void main() {
       expect(split.roundedCents, isNull);
     });
 
+    test('Percent: 50 · 30 · 20 of ฿1,000', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.percent,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+        weights: {'a': 5000, 'b': 3000, 'c': 2000},
+      );
+      expect(split.isValid, isTrue);
+      expect(split.shares, {'a': 50000, 'b': 30000, 'c': 20000});
+    });
+
+    test('Percent must add up to 100', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.percent,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+        weights: {'a': 5000, 'b': 2500},
+      );
+      expect(split.isValid, isFalse);
+      expect(split.error, 'Percents add up to 75%, not 100%');
+    });
+
+    test('Percent rounding still adds up: ฿100 at 33.34 · 33.33 · 33.33', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.percent,
+        totalCents: 10000,
+        payerId: 'a',
+        participants: const [],
+        weights: {'a': 3334, 'b': 3333, 'c': 3333},
+      );
+      expect(split.shares.values.reduce((a, b) => a + b), 10000);
+      expect(split.shares, {'a': 3334, 'b': 3333, 'c': 3333});
+    });
+
+    test('Shares: 2 · 1 · 1 of ฿1,000 → ฿500 · ฿250 · ฿250; 0 shares is out', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.shares,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+        weights: {'a': 200, 'b': 100, 'c': 100, 'd': 0},
+      );
+      expect(split.isValid, isTrue);
+      expect(split.shares, {'a': 50000, 'b': 25000, 'c': 25000});
+    });
+
+    test('Shares that don\'t divide evenly: leftover satang go to the biggest remainders', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.shares,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+        weights: {'a': 100, 'b': 100, 'c': 100},
+      );
+      expect(split.shares, {'a': 33334, 'b': 33333, 'c': 33333});
+    });
+
+    test('Shares with nobody in it', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.shares,
+        totalCents: 100000,
+        payerId: 'a',
+        participants: const [],
+      );
+      expect(split.isValid, isFalse);
+    });
+
     test('Custom: only the ticked people, each with a typed amount', () {
       ExpenseSplit custom(List<String> ticked) => ExpenseSplit.compute(
         mode: ExpenseSplitMode.custom,

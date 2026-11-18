@@ -2305,7 +2305,7 @@ void main() {
 
   testWidgets('The split types explain themselves', (tester) async {
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     expect(find.text('Tap a type to choose how it’s shared'), findsOneWidget);
     expect(find.text('Equal: everyone pays the same.'), findsOneWidget);
@@ -2315,12 +2315,60 @@ void main() {
     expect(find.text('Equal: everyone pays the same.'), findsNothing);
   });
 
+  testWidgets('Percent: starts even, saves the amounts and each person\'s %', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Group expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add group expense'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
+    await tester.tap(find.text('Percent'));
+    await tester.pumpAndSettle();
+    // Three people, 100% shared out.
+    TextField box(String id) => tester.widget<TextField>(find.byKey(ValueKey('share-$id')));
+    expect(box('test-1').controller!.text, '33.34');
+    expect(box('aung').controller!.text, '33.33');
+
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '50');
+    await tester.enterText(find.byKey(const ValueKey('share-aung')), '30');
+    await tester.pumpAndSettle();
+    expect(find.text('Percents add up to 113.33%, not 100%'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('share-ko')), '20');
+    await tester.pumpAndSettle();
+    expect(find.text('฿1,000 split by % between 3 people.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Pitch');
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    final saved = fakeSquad.expenses.single;
+    expect(saved.splitMode, ExpenseSplitMode.percent);
+    expect(saved.shares, {'test-1': 50000, 'aung': 30000, 'ko': 20000});
+    expect(saved.weights, {'test-1': 5000, 'aung': 3000, 'ko': 2000});
+  });
+
+  testWidgets('Shares: 1 each to start; 2 shares pay twice', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Group expense'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
+    await tester.tap(find.text('Shares'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('share-test-1')), '2');
+    await tester.enterText(find.byKey(const ValueKey('share-ko')), '0');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Balls');
+    await tester.tap(find.text('Save expense'));
+    await tester.pumpAndSettle();
+    final saved = fakeSquad.expenses.single;
+    expect(saved.shares, {'test-1': 66667, 'aung': 33333});
+    expect(saved.weights, {'test-1': 200, 'aung': 100});
+  });
+
   testWidgets('Exact with no total typed: the total adds up the shares as they are typed',
       (tester) async {
     TextField amountBox() =>
         tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Exact'));
     await tester.pumpAndSettle();
@@ -2348,7 +2396,7 @@ void main() {
     TextField amountBox() =>
         tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Exact'));
     await tester.pumpAndSettle();
@@ -2383,7 +2431,7 @@ void main() {
     TextField amountBox() =>
         tester.widget<TextField>(find.byKey(const ValueKey('expense-amount')));
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Custom'));
     await tester.pumpAndSettle();
@@ -2404,7 +2452,7 @@ void main() {
       'Adding ฿1,000 split equally between 3 shows ฿334 (exact ฿333.33) each; the payer covers ฿332',
       (tester) async {
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
 
     // A normal expense: no monthly options.
@@ -2442,7 +2490,7 @@ void main() {
 
   testWidgets('Two people paid: each types what they paid, the rest is split', (tester) async {
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('expense-amount')), '900');
     await tester.pumpAndSettle();
@@ -3039,7 +3087,7 @@ void main() {
 
   testWidgets('Guests from outside the squad join the split, shown for information', (tester) async {
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
     await tester.enterText(find.byKey(const ValueKey('expense-title')), 'Dinner');
@@ -3153,7 +3201,7 @@ void main() {
       role: TeamRole.superAdmin,
     );
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
 
     expect(find.text('Add your payment QR first'), findsOneWidget);
@@ -3240,7 +3288,7 @@ void main() {
 
   testWidgets('Picking Other asks what it is, and cards show that name', (tester) async {
     await pumpSquad(tester);
-    await tester.tap(find.text('Add expense'));
+    await tester.tap(find.text('Group expense'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('category-label')), findsNothing);
     // Other is last in the row of category chips.

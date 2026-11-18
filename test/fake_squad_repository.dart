@@ -133,6 +133,7 @@ class FakeSquadRepository implements SquadRepository {
         tripId: tripId,
         guests: draft.guests ?? previous?.guests ?? const [],
         categoryLabel: draft.setCategoryLabel ? draft.categoryLabel : previous?.categoryLabel,
+        weights: draft.weights ?? previous?.weights ?? const {},
         receiptPath: draft.receiptBytes != null
             ? 'receipts/squad-1/$userId/$id.jpg'
             : (draft.removeReceipt ? null : previousReceipt),
@@ -156,6 +157,7 @@ class FakeSquadRepository implements SquadRepository {
           payerId: draft.payerId,
           splitMode: draft.splitMode,
           shares: draft.shares,
+          weights: draft.weights,
           chargeDay: draft.chargeDay,
           startsOn: existing?.startsOn ?? DateTime(draft.startsOn.year, draft.startsOn.month),
           createdBy: existing?.createdBy ?? userId,

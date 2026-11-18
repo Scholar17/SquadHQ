@@ -273,6 +273,10 @@ class _Body extends StatelessWidget {
       ExpenseSplitMode.exact => 'SPLIT BY AMOUNT',
       ExpenseSplitMode.custom =>
         'SPLIT BY AMOUNT · $equalCount ${equalCount == 1 ? 'PERSON' : 'PEOPLE'}',
+      ExpenseSplitMode.percent =>
+        'SPLIT BY PERCENT · $equalCount ${equalCount == 1 ? 'PERSON' : 'PEOPLE'}',
+      ExpenseSplitMode.shares =>
+        'SPLIT BY SHARES · $equalCount ${equalCount == 1 ? 'PERSON' : 'PEOPLE'}',
       ExpenseSplitMode.treat => 'TREAT',
     };
     return ListView(
@@ -427,6 +431,11 @@ class _Body extends StatelessWidget {
                         formatMoney(cents, currency),
                         style: AppTextStyles.body(size: 15, weight: FontWeight.w800, height: 1.3),
                       ),
+                      if (expense.splitMode.isWeighted && expense.weights[profileId] != null)
+                        Text(
+                          weightLabel(expense.splitMode, expense.weights[profileId]!),
+                          style: AppTextStyles.body(size: 10.5, color: squadMuted, height: 1.3),
+                        ),
                       if (expense.splitMode case ExpenseSplitMode.equal || ExpenseSplitMode.chosen
                           when cents != exact)
                         Text(
