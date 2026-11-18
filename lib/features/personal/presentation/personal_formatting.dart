@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../match/presentation/match_formatting.dart' show monthNames, weekdayNames;
 import '../domain/entities/spending_report.dart';
 
@@ -13,6 +14,20 @@ IconData personalCategoryIcon(String categoryKey) => switch (categoryKey) {
   'other' => Icons.receipt_long_outlined,
   _ => Icons.label_outline_rounded,
 };
+
+/// A category's colour pair for its icon tile, like the squad's: a
+/// [background] wash and the [foreground] icon. Your own categories share
+/// one hue — the name tells them apart.
+({Color background, Color foreground}) personalCategoryTone(String categoryKey) =>
+    switch (categoryKey) {
+      'food' => (background: AppColors.accent100, foreground: AppColors.accent700),
+      'transport' => (background: AppColors.categoryBlueBg, foreground: AppColors.categoryBlue),
+      'sports' => (background: AppColors.accent2_100, foreground: AppColors.accent2_700),
+      'shopping' => (background: AppColors.categoryRoseBg, foreground: AppColors.categoryRose),
+      'bills' => (background: AppColors.categoryGoldBg, foreground: AppColors.categoryGold),
+      'other' => (background: AppColors.neutral200, foreground: AppColors.neutral700),
+      _ => (background: AppColors.categoryPlumBg, foreground: AppColors.categoryPlum),
+    };
 
 /// "Today", "Yesterday", or "Wed 18 Nov 2026".
 String formatDayLabel(DateTime at, {DateTime? now}) {

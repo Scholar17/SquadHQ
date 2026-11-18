@@ -8,9 +8,8 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/widgets/money_input_formatter.dart';
 import '../../../../core/theme/widgets/sticky_action_sheet.dart';
 import '../../../squad/presentation/squad_formatting.dart';
+import '../../../squad/presentation/widgets/sheet_parts.dart';
 import '../../../squad/presentation/widgets/squad_widgets.dart';
-import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
-import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/entities/personal_expense.dart';
 import '../../domain/repositories/personal_repository.dart';
@@ -167,13 +166,20 @@ class _PersonalExpenseSheetState extends State<_PersonalExpenseSheet> {
       builder: (context, state) {
         final spending = state.spending ?? PersonalSpending.empty;
         final currency = spending.currency;
-        final savedReceipt = _removeReceipt ? null : widget.editing?.receiptPath;
         return StickyActionSheet(
           background: AppColors.card,
           maxHeightFactor: 1,
-          summary: Text(
-            'Only you can see this. It never changes a squad balance.',
-            style: AppTextStyles.body(size: 12, color: squadMuted),
+          summary: Row(
+            children: [
+              Icon(Icons.lock_outline_rounded, size: 15, color: squadMuted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Only you can see this. It never changes a squad balance.',
+                  style: AppTextStyles.body(size: 12, color: squadMuted),
+                ),
+              ),
+            ],
           ),
           action: SquadPrimaryButton(
             label: widget.editing == null ? 'Save personal expense' : 'Save changes',
@@ -181,134 +187,69 @@ class _PersonalExpenseSheetState extends State<_PersonalExpenseSheet> {
             onPressed: state.saving ? null : _save,
           ),
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.neutral400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.editing == null ? 'Add personal expense' : 'Edit personal expense',
-                    style: AppTextStyles.heading(size: 20),
-                  ),
-                ),
+            const SheetGrabber(),
+            SheetHeader(
+              title: widget.editing == null ? 'Add personal expense' : 'Edit personal expense',
+              actions: [
                 if (widget.editing != null)
                   IconButton(
                     onPressed: state.saving ? null : _delete,
                     icon: const Icon(Icons.delete_outline_rounded),
                     tooltip: 'Delete',
                   ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                  tooltip: 'Close',
-                ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.text, width: 2)),
+            const SizedBox(height: 4),
+            _AmountField(
+              controller: _amount,
+              symbol: currency.symbol,
+              autofocus: widget.editing == null,
+            ),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'WHAT FOR',
+              child: _Field(
+                key: const ValueKey('personal-title'),
+                controller: _title,
+                hint: 'e.g. Lunch',
+                maxLength: 80,
               ),
-              child: Row(
+            ),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'CATEGORY',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Text(currency.symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Semantics(
-                      label: 'Amount',
-                      child: TextField(
-                        key: const ValueKey('personal-amount'),
-                        controller: _amount,
-                        autofocus: widget.editing == null,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: const [MoneyInputFormatter()],
-                        style: AppTextStyles.heading(size: 40),
-                        decoration: const InputDecoration(
-                          hintText: '0',
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      ),
+                  for (final category in PersonalCategory.builtIn)
+                    SquadChoiceChip(
+                      label: category.label,
+                      icon: personalCategoryIcon(category.name),
+                      selected: _categoryKey == category.name,
+                      onTap: () => setState(() => _categoryKey = category.name),
                     ),
-                  ),
+                  for (final category in spending.categories)
+                    SquadChoiceChip(
+                      label: category.name,
+                      icon: personalCategoryIcon('custom:${category.id}'),
+                      selected: _categoryKey == 'custom:${category.id}',
+                      onTap: () => setState(() => _categoryKey = 'custom:${category.id}'),
+                    ),
+                  _NewCategoryChip(onTap: _newCategory),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-            Text('TITLE', style: AppTextStyles.label(color: squadMuted)),
-            const SizedBox(height: 6),
-            _Field(
-              key: const ValueKey('personal-title'),
-              controller: _title,
-              hint: 'e.g. Lunch',
-              maxLength: 80,
-            ),
-            const SizedBox(height: 14),
-            Text('CATEGORY', style: AppTextStyles.label(color: squadMuted)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final category in PersonalCategory.builtIn)
-                  SquadChoiceChip(
-                    label: category.label,
-                    icon: personalCategoryIcon(category.name),
-                    selected: _categoryKey == category.name,
-                    onTap: () => setState(() => _categoryKey = category.name),
-                  ),
-                for (final category in spending.categories)
-                  SquadChoiceChip(
-                    label: category.name,
-                    icon: personalCategoryIcon('custom:${category.id}'),
-                    selected: _categoryKey == 'custom:${category.id}',
-                    onTap: () => setState(() => _categoryKey = 'custom:${category.id}'),
-                  ),
-                SquadChoiceChip(
-                  label: 'New category',
-                  icon: Icons.add_rounded,
-                  selected: false,
-                  onTap: _newCategory,
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text('DATE', style: AppTextStyles.label(color: squadMuted)),
-            const SizedBox(height: 6),
-            OutlinedButton.icon(
-              key: const ValueKey('personal-date'),
-              onPressed: _pickDate,
-              icon: const Icon(Icons.calendar_today_outlined, size: 18),
-              label: Text(
-                formatDayLabel(_spentAt),
-                style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.text,
-                alignment: Alignment.centerLeft,
-                minimumSize: const Size.fromHeight(46),
-                side: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
-                shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text('RECEIPT', style: AppTextStyles.label(color: squadMuted)),
-            const SizedBox(height: 6),
-            if (_receipt == null && savedReceipt == null)
-              OutlinedButton.icon(
-                onPressed: _pickReceipt,
-                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'DATE',
+              child: OutlinedButton.icon(
+                key: const ValueKey('personal-date'),
+                onPressed: _pickDate,
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
                 label: Text(
-                  'Add receipt photo (optional)',
-                  style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
+                  formatDayLabel(_spentAt),
+                  style: AppTextStyles.body(size: 14, weight: FontWeight.w700),
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.text,
@@ -317,50 +258,118 @@ class _PersonalExpenseSheetState extends State<_PersonalExpenseSheet> {
                   side: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
                   shape: RoundedRectangleBorder(borderRadius: AppRadius.sm),
                 ),
-              )
-            else
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: AppRadius.sm,
-                    child: SizedBox(
-                      width: 52,
-                      height: 52,
-                      child: _receipt != null
-                          ? Image.memory(_receipt!.bytes, fit: BoxFit.cover)
-                          : WalletImage(kind: WalletImageKind.paymentSlip, path: savedReceipt!),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _receipt != null ? 'New photo — saved with the expense' : 'Attached',
-                      style: AppTextStyles.body(size: 13, weight: FontWeight.w600),
-                    ),
-                  ),
-                  TextButton(onPressed: _pickReceipt, child: const Text('Change')),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _receipt = null;
-                      _removeReceipt = widget.editing?.receiptPath != null;
-                    }),
-                    child: const Text('Remove'),
-                  ),
-                ],
               ),
-            const SizedBox(height: 14),
-            Text('NOTES', style: AppTextStyles.label(color: squadMuted)),
-            const SizedBox(height: 6),
-            _Field(
-              key: const ValueKey('personal-note'),
-              controller: _note,
-              hint: 'Anything to remember (optional)',
-              maxLength: 500,
-              maxLines: 4,
+            ),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'RECEIPT',
+              child: ReceiptPicker(
+                label: 'Add receipt photo (optional)',
+                picked: _receipt,
+                savedPath: _removeReceipt ? null : widget.editing?.receiptPath,
+                onPick: _pickReceipt,
+                onRemove: () => setState(() {
+                  _receipt = null;
+                  _removeReceipt = widget.editing?.receiptPath != null;
+                }),
+              ),
+            ),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'NOTES',
+              child: _Field(
+                key: const ValueKey('personal-note'),
+                controller: _note,
+                hint: 'Anything to remember (optional)',
+                maxLength: 500,
+                maxLines: 4,
+              ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// The big amount, underlined, with the currency symbol.
+class _AmountField extends StatelessWidget {
+  const _AmountField({required this.controller, required this.symbol, required this.autofocus});
+
+  final TextEditingController controller;
+  final String symbol;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.text, width: 2)),
+      ),
+      child: Row(
+        children: [
+          Text(symbol, style: AppTextStyles.heading(size: 28, color: squadMuted)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Semantics(
+              label: 'Amount',
+              child: TextField(
+                key: const ValueKey('personal-amount'),
+                controller: controller,
+                autofocus: autofocus,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: const [MoneyInputFormatter()],
+                style: AppTextStyles.heading(size: 40),
+                decoration: const InputDecoration(
+                  hintText: '0',
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "New category" at the end of the chips: dashed-looking outline, so it
+/// reads as an action rather than one more choice.
+class _NewCategoryChip extends StatelessWidget {
+  const _NewCategoryChip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        shape: StadiumBorder(side: BorderSide(color: AppColors.accent700.withValues(alpha: 0.5))),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, size: 16, color: AppColors.accent700),
+                const SizedBox(width: 6),
+                Text(
+                  'New category',
+                  style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: AppColors.accent700),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -395,6 +404,10 @@ class _Field extends StatelessWidget {
       fillColor: AppColors.bg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
+        borderRadius: AppRadius.sm,
+        borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+      ),
+      enabledBorder: OutlineInputBorder(
         borderRadius: AppRadius.sm,
         borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
       ),

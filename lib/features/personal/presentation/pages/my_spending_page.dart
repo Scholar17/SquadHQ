@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../squad/presentation/squad_formatting.dart';
+import '../../../../core/theme/widgets/skeletons.dart';
+import '../../../squad/presentation/widgets/sheet_parts.dart';
 import '../../../squad/presentation/widgets/squad_widgets.dart';
 import '../../../team_membership/domain/entities/team.dart' show GroupCurrency;
 import '../../domain/entities/personal_expense.dart';
@@ -13,6 +13,7 @@ import '../../domain/entities/spending_report.dart';
 import '../cubit/personal_spending_cubit.dart';
 import '../personal_formatting.dart';
 import '../widgets/personal_expense_sheet.dart';
+import '../widgets/spending_widgets.dart';
 
 /// "My spending": your personal expenses across all squads, filtered by a
 /// day, month, year or range of days, with the total, each category's
@@ -74,13 +75,6 @@ class _MySpendingPageState extends State<MySpendingPage> {
     }
   }
 
-  Future<void> _manageCategories(PersonalSpending spending) => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: AppColors.card,
-    shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
-    builder: (_) => BlocProvider.value(value: _cubit, child: const _CategoriesSheet()),
-  );
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -105,7 +99,7 @@ class _MySpendingPageState extends State<MySpendingPage> {
                     color: AppColors.card,
                     onSelected: (choice) {
                       if (choice case final GroupCurrency currency) _cubit.setCurrency(currency);
-                      if (choice == 'categories') _manageCategories(spending);
+                      if (choice == 'categories') showYourCategoriesSheet(context, _cubit);
                     },
                     itemBuilder: (_) => [
                       for (final currency in GroupCurrency.values)
@@ -133,11 +127,9 @@ class _MySpendingPageState extends State<MySpendingPage> {
                     label: const Text('Add'),
                   ),
             body: spending == null
-                ? Center(
-                    child: state.loading || state.error == null
-                        ? const CircularProgressIndicator()
-                        : TextButton(onPressed: _cubit.load, child: const Text('Try again')),
-                  )
+                ? state.loading || state.error == null
+                      ? const SkeletonList(item: ExpenseRowSkeleton(), count: 6, spacing: 8)
+                      : _LoadFailed(onRetry: _cubit.load)
                 : RefreshIndicator(
                     color: AppColors.accent,
                     onRefresh: _cubit.load,
@@ -189,113 +181,63 @@ class _Report extends StatelessWidget {
   Widget build(BuildContext context) {
     final report = SpendingReport.of(spending.expenses, window);
     final currency = spending.currency;
+    final label = formatWindow(period, window);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final option in ReportPeriod.values)
-              SquadChoiceChip(
-                label: option.label,
-                selected: option == period,
-                onTap: () => onPeriod(option),
-              ),
-          ],
+        SegmentedTabs<ReportPeriod>(
+          options: ReportPeriod.values,
+          selected: period,
+          label: (option) => option.label,
+          onChanged: onPeriod,
+          expand: true,
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            if (period != ReportPeriod.range)
-              IconButton(
-                onPressed: () => onStep(-1),
-                icon: const Icon(Icons.chevron_left_rounded),
-                tooltip: 'Previous',
-              ),
-            Expanded(
-              child: period == ReportPeriod.range
-                  ? TextButton.icon(
-                      onPressed: onPickRange,
-                      icon: const Icon(Icons.date_range_outlined, size: 18),
-                      label: Text(
-                        formatWindow(period, window),
-                        style: AppTextStyles.title(size: 16),
-                      ),
-                    )
-                  : Text(
-                      formatWindow(period, window),
-                      key: const ValueKey('report-window'),
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.title(size: 16),
-                    ),
-            ),
-            if (period != ReportPeriod.range)
-              IconButton(
-                onPressed: atNow ? null : () => onStep(1),
-                icon: const Icon(Icons.chevron_right_rounded),
-                tooltip: 'Next',
-              ),
-          ],
+        const SizedBox(height: 6),
+        _WindowStepper(
+          period: period,
+          label: label,
+          atNow: atNow,
+          onStep: onStep,
+          onPickRange: onPickRange,
         ),
-        const SizedBox(height: 8),
-        SquadCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('YOU SPENT', style: AppTextStyles.label(color: squadMuted)),
-              const SizedBox(height: 4),
-              Text(
-                formatMoney(report.totalCents, currency),
-                key: const ValueKey('report-total'),
-                style: AppTextStyles.heading(size: 34),
-              ),
-              Text(
-                switch (report.expenses.length) {
-                  0 => 'Nothing yet',
-                  1 => '1 expense',
-                  final n => '$n expenses',
-                },
-                style: AppTextStyles.body(size: 12.5, color: squadMuted),
-              ),
-            ],
-          ),
+        const SizedBox(height: 6),
+        SpendingTotalHero(
+          totalCents: report.totalCents,
+          count: report.expenses.length,
+          currency: currency,
         ),
         if (report.expenses.isEmpty) ...[
-          const SizedBox(height: 24),
-          Text(
-            spending.expenses.isEmpty
-                ? 'Track what you spend on yourself. Only you can see it.'
+          const SizedBox(height: 16),
+          SpendingEmpty(
+            text: spending.expenses.isEmpty
+                ? 'Track what you spend on yourself — tap Add. Only you can see it.'
                 : 'No personal expenses in this ${period == ReportPeriod.range ? 'range' : period.label.toLowerCase()}.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.body(size: 13, color: squadMuted),
           ),
         ],
         if (period == ReportPeriod.year && report.byMonth.isNotEmpty) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           const SquadSectionLabel('BY MONTH'),
-          const SizedBox(height: 6),
-          _Bars(
+          const SizedBox(height: 8),
+          SpendingBars(
             rows: [
               for (final month in report.byMonth)
-                (label: monthShort(month.month), sub: null, cents: month.cents, icon: null),
+                (label: monthShort(month.month), sub: null, cents: month.cents, categoryKey: null),
             ],
             currency: currency,
           ),
         ],
         if (report.byCategory.isNotEmpty) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           const SquadSectionLabel('BY CATEGORY'),
-          const SizedBox(height: 6),
-          _Bars(
+          const SizedBox(height: 8),
+          SpendingBars(
             rows: [
               for (final category in report.byCategory)
                 (
                   label: spending.labelOf(category.key),
                   sub: category.count == 1 ? '1 expense' : '${category.count} expenses',
                   cents: category.cents,
-                  icon: personalCategoryIcon(category.key),
+                  categoryKey: category.key,
                 ),
             ],
             currency: currency,
@@ -303,170 +245,110 @@ class _Report extends StatelessWidget {
           ),
         ],
         if (report.expenses.isNotEmpty) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           SquadSectionLabel('EXPENSES', trailing: '${report.expenses.length}'),
-          const SizedBox(height: 6),
-          for (final expense in report.expenses) ...[
-            SquadCard(
-              onTap: () => showPersonalExpenseSheet(context, editing: expense),
-              child: Row(
-                children: [
-                  Icon(personalCategoryIcon(expense.categoryKey), color: squadMuted),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          expense.title,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body(size: 14.5, weight: FontWeight.w700),
-                        ),
-                        Text(
-                          [
-                            spending.labelOf(expense.categoryKey),
-                            formatDayLabel(expense.spentAt),
-                            if (expense.receiptPath != null) 'receipt',
-                          ].join(' · '),
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body(size: 12, color: squadMuted),
-                        ),
-                        if (expense.note case final note?)
-                          Text(
-                            note,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.body(size: 12, color: squadMuted),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    formatMoney(expense.amountCents, currency),
-                    style: AppTextStyles.body(size: 15, weight: FontWeight.w800),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
+          const SizedBox(height: 8),
+          SeeMoreList(
+            previewCount: 10,
+            children: [
+              for (final expense in report.expenses)
+                PersonalExpenseTile(expense: expense, spending: spending),
+            ],
+          ),
         ],
       ],
     );
   }
 }
 
-/// Amounts as rows with a bar against the biggest; with [total], each
-/// row's % of it too.
-class _Bars extends StatelessWidget {
-  const _Bars({required this.rows, required this.currency, this.total});
+/// ‹ November 2026 › — or, for a range, the days picked (tap to change).
+class _WindowStepper extends StatelessWidget {
+  const _WindowStepper({
+    required this.period,
+    required this.label,
+    required this.atNow,
+    required this.onStep,
+    required this.onPickRange,
+  });
 
-  final List<({String label, String? sub, int cents, IconData? icon})> rows;
-  final GroupCurrency currency;
-  final int? total;
+  final ReportPeriod period;
+  final String label;
+  final bool atNow;
+  final ValueChanged<int> onStep;
+  final VoidCallback onPickRange;
 
   @override
   Widget build(BuildContext context) {
-    final biggest = rows.fold(0, (a, row) => row.cents > a ? row.cents : a);
-    return SquadCard(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
-      child: Column(
-        children: [
-          for (final row in rows)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      if (row.icon case final icon?) ...[
-                        Icon(icon, size: 18, color: squadMuted),
-                        const SizedBox(width: 8),
-                      ],
-                      Expanded(
-                        child: Text(
-                          row.label,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.body(size: 13.5, weight: FontWeight.w700),
-                        ),
-                      ),
-                      if (row.sub case final sub?)
-                        Text(sub, style: AppTextStyles.body(size: 11.5, color: squadMuted)),
-                      const SizedBox(width: 10),
-                      Text(
-                        switch (total) {
-                          final total? when total > 0 =>
-                            '${formatMoney(row.cents, currency)}  ${(row.cents * 100 / total).round()}%',
-                          _ => formatMoney(row.cents, currency),
-                        },
-                        style: AppTextStyles.body(size: 13.5, weight: FontWeight.w800),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: biggest == 0 ? 0 : row.cents / biggest,
-                      minHeight: 6,
-                      backgroundColor: AppColors.surface,
-                      color: AppColors.accentFill,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
+    if (period == ReportPeriod.range) {
+      return Center(
+        child: TextButton.icon(
+          onPressed: onPickRange,
+          icon: const Icon(Icons.date_range_outlined, size: 18),
+          label: Text(label, style: AppTextStyles.title(size: 16)),
+          style: TextButton.styleFrom(foregroundColor: AppColors.text, minimumSize: const Size(0, 48)),
+        ),
+      );
+    }
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => onStep(-1),
+          icon: const Icon(Icons.chevron_left_rounded),
+          tooltip: 'Previous',
+        ),
+        Expanded(
+          child: Text(
+            label,
+            key: const ValueKey('report-window'),
+            textAlign: TextAlign.center,
+            style: AppTextStyles.title(size: 16),
+          ),
+        ),
+        IconButton(
+          onPressed: atNow ? null : () => onStep(1),
+          icon: const Icon(Icons.chevron_right_rounded),
+          tooltip: 'Next',
+        ),
+      ],
     );
   }
 }
 
-/// "Your categories": delete one (its expenses move to Other).
-class _CategoriesSheet extends StatelessWidget {
-  const _CategoriesSheet();
+/// Spending didn't load: the reason and Retry.
+class _LoadFailed extends StatelessWidget {
+  const _LoadFailed({required this.onRetry});
+
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<PersonalSpendingCubit, PersonalSpendingState>(
-      builder: (context, state) {
-        final categories = state.spending?.categories ?? const <CustomCategory>[];
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            children: [
-              Text('Your categories', style: AppTextStyles.title(size: 18)),
-              const SizedBox(height: 4),
-              Text(
-                'Add one from “New category” when you add an expense. '
-                'Deleting one moves its expenses to Other.',
-                style: AppTextStyles.body(size: 12.5, color: squadMuted),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 40, color: squadMuted),
+            const SizedBox(height: 12),
+            Text(
+              "Couldn't load your spending",
+              textAlign: TextAlign.center,
+              style: AppTextStyles.title(size: 18),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.text,
+                minimumSize: const Size(0, 44),
+                shape: const StadiumBorder(),
               ),
-              const SizedBox(height: 8),
-              if (categories.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('None yet.', style: AppTextStyles.body(size: 13)),
-                ),
-              for (final category in categories)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.label_outline_rounded),
-                  title: Text(category.name),
-                  trailing: IconButton(
-                    onPressed: state.saving
-                        ? null
-                        : () => context.read<PersonalSpendingCubit>().deleteCategory(category.id),
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    tooltip: 'Delete ${category.name}',
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
