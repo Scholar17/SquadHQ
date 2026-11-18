@@ -38,6 +38,7 @@ import '../../features/team_membership/presentation/pages/team_membership_page.d
 import '../../features/team_membership/presentation/pages/team_roster_page.dart';
 import '../../features/wallet/presentation/pages/wallet_bills_page.dart';
 import '../../features/personal/presentation/pages/my_spending_page.dart';
+import '../../features/buddy/presentation/pages/buddy_page.dart';
 import '../notifications/notification_routing.dart';
 import '../splash/startup_splash.dart';
 
@@ -74,6 +75,9 @@ abstract final class AppRoutes {
 
   /// Your personal expenses across all squads, with reports.
   static const mySpending = '/my-spending';
+
+  /// You and one squad-mate on buddy expenses.
+  static String buddy(String profileId) => '/buddy/$profileId';
 }
 
 /// [WalletBillsPage]'s args, bundled for `extra:`.
@@ -325,6 +329,15 @@ GoRouter createAppRouter(AuthBloc authBloc) {
       GoRoute(
         path: AppRoutes.invitations,
         builder: (context, state) => const InvitationsPage(),
+      ),
+      GoRoute(
+        path: '/buddy/:id',
+        builder: (context, state) {
+          final user = _authedUser(context);
+          return user == null
+              ? const _SettlingPage()
+              : BuddyPage(buddyId: state.pathParameters['id']!, user: user);
+        },
       ),
       GoRoute(
         path: AppRoutes.mySpending,

@@ -46,6 +46,11 @@ import 'package:squad_hq/features/notifications/presentation/pages/notifications
 import 'package:squad_hq/features/squad/domain/entities/expense.dart';
 import 'package:squad_hq/features/personal/presentation/pages/my_spending_page.dart';
 import 'fake_personal_repository.dart';
+import 'fake_buddy_repository.dart';
+import 'package:squad_hq/features/squad/domain/entities/settlement.dart' show SettlementMethod, SettlementStatus;
+import 'package:squad_hq/features/buddy/domain/repositories/buddy_repository.dart';
+import 'package:squad_hq/features/buddy/domain/entities/buddy.dart';
+import 'package:squad_hq/features/buddy/presentation/pages/buddy_page.dart';
 import 'package:squad_hq/features/personal/domain/entities/personal_expense.dart';
 import 'package:squad_hq/features/personal/domain/repositories/personal_repository.dart';
 import 'package:squad_hq/features/squad/domain/entities/payment_promise.dart';
@@ -155,6 +160,7 @@ void main() {
   final fakeShares = FakeShareRepository();
   final fakeInvites = FakeInviteRepository();
   final fakePersonal = FakePersonalRepository();
+  final fakeBuddies = FakeBuddyRepository(userId: 'test-1');
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -188,6 +194,8 @@ void main() {
       ..registerLazySingleton<ShareRepository>(() => fakeShares)
       ..unregister<InviteRepository>()
       ..registerLazySingleton<InviteRepository>(() => fakeInvites)
+      ..unregister<BuddyRepository>()
+      ..registerLazySingleton<BuddyRepository>(() => fakeBuddies)
       ..unregister<PersonalRepository>()
       ..registerLazySingleton<PersonalRepository>(() => fakePersonal)
       ..unregister<TeamChanges>()
@@ -200,6 +208,7 @@ void main() {
     fakeNotifications.reset();
     fakeSquad.reset();
     fakePersonal.reset();
+    fakeBuddies.reset();
     fakeMatchComments.reset();
     fakeMentionMembers.reset();
     fakeRatings.reset();
@@ -423,6 +432,10 @@ void main() {
         builder: (context, state) => TripPage(tripId: state.pathParameters['id']!, user: user),
       ),
       GoRoute(path: AppRoutes.mySpending, builder: (context, state) => const MySpendingPage()),
+      GoRoute(
+        path: '/buddy/:id',
+        builder: (context, state) => BuddyPage(buddyId: state.pathParameters['id']!, user: user),
+      ),
       GoRoute(
         path: AppRoutes.walletBills,
         builder: (context, state) {
@@ -2322,6 +2335,106 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Custom: tick who’s in, then type what each pays.'), findsOneWidget);
     expect(find.text('Equal: everyone pays the same.'), findsNothing);
+  });
+
+  testWidgets('Buddy expense: split with one squad-mate, shown apart under Buddies, then received',
+      (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Buddy expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add buddy expense'), findsOneWidget);
+    await tester.tap(find.text('Aung'));
+    await tester.enterText(find.byKey(const ValueKey('buddy-amount')), '300');
+    await tester.enterText(find.byKey(const ValueKey('buddy-title')), 'Taxi home');
+    await tester.pumpAndSettle();
+    expect(find.text('Aung owes you ฿150 · only you two see it'), findsOneWidget);
+    await tester.tap(find.text('Save buddy expense'));
+    await tester.pumpAndSettle();
+
+    final saved = fakeBuddies.expenses.single;
+    expect(saved.buddyId, 'aung');
+    expect(saved.payerId, 'test-1');
+    expect((saved.myShareCents, saved.buddyShareCents), (15000, 15000));
+    // Never in the squad's own expenses or balance.
+    expect(fakeSquad.expenses, isEmpty);
+
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    expect(find.text('BUDDIES'), findsOneWidget);
+    expect(find.text('Owes you ฿150'), findsOneWidget);
+
+    await tester.tap(find.text('Owes you ฿150'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const ValueKey('buddy-balance'))).data, '฿150');
+    await tester.tap(find.text('Mark as received').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mark as received').last);
+    await tester.pumpAndSettle();
+    expect(fakeBuddies.settlements.single.fromId, 'aung');
+    expect(tester.widget<Text>(find.byKey(const ValueKey('buddy-balance'))).data, '฿0');
+    expect(find.textContaining('ALL SQUARE'), findsOneWidget);
+  });
+
+  testWidgets('Buddy expense: they paid, split by %, and you confirm their payment', (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Buddy expense'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ko'));
+    await tester.enterText(find.byKey(const ValueKey('buddy-amount')), '1000');
+    await tester.enterText(find.byKey(const ValueKey('buddy-title')), 'Boots');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('paid-by-buddy')));
+    await tester.tap(find.text('Percent'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('buddy-share-me')), '70');
+    await tester.enterText(find.byKey(const ValueKey('buddy-share-buddy')), '30');
+    await tester.pumpAndSettle();
+    expect(find.text('You owe Ko ฿700 · only you two see it'), findsOneWidget);
+    await tester.tap(find.text('Save buddy expense'));
+    await tester.pumpAndSettle();
+    final saved = fakeBuddies.expenses.single;
+    expect(saved.payerId, 'ko');
+    expect((saved.myShareCents, saved.buddyShareCents), (70000, 30000));
+    expect((saved.myWeight, saved.buddyWeight), (7000, 3000));
+
+    // Ko paid you back on something else, waiting for you.
+    await fakeBuddies.saveExpense(
+      BuddyExpenseDraft(
+        teamId: 'squad-1',
+        buddyId: 'ko',
+        payerId: 'test-1',
+        title: 'Lunch',
+        category: ExpenseCategory.food,
+        amountCents: 20000,
+        splitMode: ExpenseSplitMode.equal,
+        myShareCents: 10000,
+        buddyShareCents: 10000,
+        spentAt: DateTime.now(),
+      ),
+    );
+    fakeBuddies.settlements.add(
+      BuddySettlement(
+        id: 'pay-ko',
+        fromId: 'ko',
+        toId: 'test-1',
+        amountCents: 5000,
+        method: SettlementMethod.cash,
+        status: SettlementStatus.pending,
+        recordedBy: 'ko',
+        createdAt: DateTime.now(),
+      ),
+    );
+    await tester.tap(find.text('Settle').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('1 to confirm'));
+    await tester.pumpAndSettle();
+    // ฿700 owed less the ฿100 Ko owes you for lunch.
+    expect(tester.widget<Text>(find.byKey(const ValueKey('buddy-balance'))).data, '฿600');
+    expect(find.text('Ko says they paid you ฿50'), findsOneWidget);
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    expect(fakeBuddies.settlements.single.status, SettlementStatus.confirmed);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('buddy-balance'))).data, '฿650');
   });
 
   testWidgets('Personal expense: add one with your own category, then see it in My spending',

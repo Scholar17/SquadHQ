@@ -69,6 +69,14 @@ enum NotificationKind {
 
   /// "Aung Ko invited you to Sunday FC" (056).
   groupInvite('group_invite'),
+
+  /// Buddy expenses (061): one added or changed, an "I paid" to confirm,
+  /// and yours received, confirmed or sent back.
+  buddyExpense('buddy_expense'),
+  buddyPayment('buddy_payment'),
+  buddyReceived('buddy_received'),
+  buddyConfirmed('buddy_confirmed'),
+  buddyRejected('buddy_rejected'),
   other('');
 
   const NotificationKind(this.dbName);
@@ -175,7 +183,12 @@ class AppNotification extends Equatable {
     NotificationKind.monthlyDue ||
     NotificationKind.settleRecorded ||
     NotificationKind.promiseMade ||
-    NotificationKind.promiseDue => NotificationTarget.settle,
+    NotificationKind.promiseDue ||
+    NotificationKind.buddyExpense ||
+    NotificationKind.buddyPayment ||
+    NotificationKind.buddyReceived ||
+    NotificationKind.buddyConfirmed ||
+    NotificationKind.buddyRejected => NotificationTarget.settle,
     NotificationKind.expenseAdded ||
     NotificationKind.expenseComment ||
     NotificationKind.commentReply ||

@@ -21,6 +21,7 @@ import '../widgets/payment_extras.dart';
 import '../widgets/remind_button.dart';
 import '../widgets/squad_widgets.dart';
 import '../widgets/trip_card.dart';
+import '../../../buddy/presentation/pages/buddy_page.dart' show BuddiesSection;
 
 /// A squad's Settle tab: everyone you pay and everyone who pays you, each
 /// debt person to person (across every expense between you, less
@@ -274,6 +275,8 @@ class _SettlePageState extends State<SettlePage> with SingleTickerProviderStateM
                     const SizedBox(height: 8),
                     SeeMoreList(children: [for (final debt in others) debtRow(debt)]),
                   ],
+                  // 1-on-1 buddy expenses: settled apart, listed here.
+                  BuddiesSection(teamId: squad.id, me: me, ledger: ledger),
                   ..._settledSection(context, ledger, me, settled, trips: false),
                 ],
               ),

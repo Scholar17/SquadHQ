@@ -115,6 +115,9 @@ import '../../features/share/data/repositories/share_repository_impl.dart';
 import '../../features/share/domain/repositories/share_repository.dart';
 import '../../features/share/domain/usecases/share_usecases.dart';
 import '../../features/personal/data/personal_repository_impl.dart';
+import '../../features/buddy/data/buddy_repository_impl.dart';
+import '../../features/buddy/domain/repositories/buddy_repository.dart';
+import '../../features/buddy/presentation/cubit/buddy_cubit.dart';
 import '../../features/personal/domain/repositories/personal_repository.dart';
 import '../../features/personal/presentation/cubit/personal_spending_cubit.dart';
 import '../env.dart';
@@ -362,6 +365,13 @@ Future<void> initDependencies() async {
       () => PersonalRepositoryImpl(supabaseClient: Supabase.instance.client),
     )
     ..registerLazySingleton(() => PersonalSpendingCubit(sl()));
+
+  // Features - Buddy expenses (1-on-1 within a squad, apart from its balance)
+  sl
+    ..registerLazySingleton<BuddyRepository>(
+      () => BuddyRepositoryImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton(() => BuddyCubit(sl()));
 
   // Features - Venues (a team's saved venues, picked on a new match)
   sl

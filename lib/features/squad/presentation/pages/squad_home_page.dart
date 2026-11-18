@@ -15,6 +15,7 @@ import '../../../team/presentation/widgets/team_header.dart';
 import '../../../team_membership/domain/entities/team.dart';
 import '../../../team_membership/presentation/widgets/team_switcher_sheet.dart';
 import '../../../personal/presentation/widgets/personal_expense_sheet.dart';
+import '../../../buddy/presentation/widgets/buddy_expense_sheet.dart';
 import '../../domain/entities/squad_ledger.dart';
 import '../active_group.dart';
 import '../bloc/squad_ledger_bloc.dart';
@@ -94,6 +95,7 @@ class SquadHomePage extends StatelessWidget {
                           onAddMonthly: () =>
                               showExpenseSheet(context, teamId: squad.id, me: me, monthly: true),
                           onAddPersonal: () => showPersonalExpenseSheet(context),
+                          onAddBuddy: () => showBuddyExpenseSheet(context, teamId: squad.id, me: me),
                         ),
                         const SizedBox(height: 8),
                         // Your own spending, across every squad.
@@ -199,6 +201,7 @@ class _BalanceHero extends StatelessWidget {
     required this.onAddTrip,
     required this.onAddMonthly,
     required this.onAddPersonal,
+    required this.onAddBuddy,
   });
 
   final SquadLedger ledger;
@@ -215,6 +218,9 @@ class _BalanceHero extends StatelessWidget {
 
   /// "Personal expense": your own, private spending.
   final VoidCallback onAddPersonal;
+
+  /// "Buddy expense": just you and one squad-mate, apart from the balance.
+  final VoidCallback onAddBuddy;
 
   @override
   Widget build(BuildContext context) {
@@ -305,11 +311,26 @@ class _BalanceHero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          HeroPillButton(
-            label: 'Personal expense',
-            icon: Icons.person_outline_rounded,
-            light: false,
-            onPressed: onAddPersonal,
+          Row(
+            children: [
+              Expanded(
+                child: HeroPillButton(
+                  label: 'Buddy expense',
+                  icon: Icons.people_outline_rounded,
+                  light: false,
+                  onPressed: onAddBuddy,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: HeroPillButton(
+                  label: 'Personal expense',
+                  icon: Icons.person_outline_rounded,
+                  light: false,
+                  onPressed: onAddPersonal,
+                ),
+              ),
+            ],
           ),
         ],
       ),
