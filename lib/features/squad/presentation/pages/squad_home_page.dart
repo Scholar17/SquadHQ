@@ -14,6 +14,7 @@ import '../../../team/domain/entities/team_snapshot.dart' show TeamInfo;
 import '../../../team/presentation/widgets/team_header.dart';
 import '../../../team_membership/domain/entities/team.dart';
 import '../../../team_membership/presentation/widgets/team_switcher_sheet.dart';
+import '../../../personal/presentation/widgets/personal_expense_sheet.dart';
 import '../../domain/entities/squad_ledger.dart';
 import '../active_group.dart';
 import '../bloc/squad_ledger_bloc.dart';
@@ -92,6 +93,34 @@ class SquadHomePage extends StatelessWidget {
                               : null,
                           onAddMonthly: () =>
                               showExpenseSheet(context, teamId: squad.id, me: me, monthly: true),
+                          onAddPersonal: () => showPersonalExpenseSheet(context),
+                        ),
+                        const SizedBox(height: 8),
+                        // Your own spending, across every squad.
+                        SquadCard(
+                          onTap: () => context.push(AppRoutes.mySpending),
+                          child: Row(
+                            children: [
+                              Icon(Icons.insights_outlined, color: AppColors.accent700),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'My spending',
+                                      style: AppTextStyles.body(size: 14.5, weight: FontWeight.w700),
+                                    ),
+                                    Text(
+                                      'Your personal expenses and reports · only you see them',
+                                      style: AppTextStyles.body(size: 12, color: squadMuted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: squadMuted),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 12),
                         // At most two of each up front; the rest fold away.
@@ -169,6 +198,7 @@ class _BalanceHero extends StatelessWidget {
     required this.onAdd,
     required this.onAddTrip,
     required this.onAddMonthly,
+    required this.onAddPersonal,
   });
 
   final SquadLedger ledger;
@@ -182,6 +212,9 @@ class _BalanceHero extends StatelessWidget {
 
   /// "Add monthly expense": a subscription charged each month.
   final VoidCallback onAddMonthly;
+
+  /// "Personal expense": your own, private spending.
+  final VoidCallback onAddPersonal;
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +303,13 @@ class _BalanceHero extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          HeroPillButton(
+            label: 'Personal expense',
+            icon: Icons.person_outline_rounded,
+            light: false,
+            onPressed: onAddPersonal,
           ),
         ],
       ),

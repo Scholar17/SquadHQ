@@ -114,6 +114,9 @@ import '../../features/share/data/datasources/share_remote_data_source.dart';
 import '../../features/share/data/repositories/share_repository_impl.dart';
 import '../../features/share/domain/repositories/share_repository.dart';
 import '../../features/share/domain/usecases/share_usecases.dart';
+import '../../features/personal/data/personal_repository_impl.dart';
+import '../../features/personal/domain/repositories/personal_repository.dart';
+import '../../features/personal/presentation/cubit/personal_spending_cubit.dart';
 import '../env.dart';
 import '../theme/theme_controller.dart';
 
@@ -352,6 +355,13 @@ Future<void> initDependencies() async {
         watchNotifications: sl(),
       ),
     );
+
+  // Features - Personal spending (a private tracker across all squads)
+  sl
+    ..registerLazySingleton<PersonalRepository>(
+      () => PersonalRepositoryImpl(supabaseClient: Supabase.instance.client),
+    )
+    ..registerLazySingleton(() => PersonalSpendingCubit(sl()));
 
   // Features - Venues (a team's saved venues, picked on a new match)
   sl

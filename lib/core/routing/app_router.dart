@@ -37,6 +37,7 @@ import '../../features/team_membership/presentation/bloc/team_membership_state.d
 import '../../features/team_membership/presentation/pages/team_membership_page.dart';
 import '../../features/team_membership/presentation/pages/team_roster_page.dart';
 import '../../features/wallet/presentation/pages/wallet_bills_page.dart';
+import '../../features/personal/presentation/pages/my_spending_page.dart';
 import '../notifications/notification_routing.dart';
 import '../splash/startup_splash.dart';
 
@@ -70,6 +71,9 @@ abstract final class AppRoutes {
   /// A squad trip: its expenses, who paid what, and settling up.
   static String trip(String tripId) => '/trip/$tripId';
   static const walletBills = '/wallet-bills';
+
+  /// Your personal expenses across all squads, with reports.
+  static const mySpending = '/my-spending';
 }
 
 /// [WalletBillsPage]'s args, bundled for `extra:`.
@@ -321,6 +325,10 @@ GoRouter createAppRouter(AuthBloc authBloc) {
       GoRoute(
         path: AppRoutes.invitations,
         builder: (context, state) => const InvitationsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.mySpending,
+        builder: (context, state) => const MySpendingPage(),
       ),
       GoRoute(
         path: '/expense/:id',

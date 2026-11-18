@@ -44,6 +44,10 @@ import 'package:squad_hq/features/notifications/domain/repositories/notification
 import 'package:squad_hq/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:squad_hq/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:squad_hq/features/squad/domain/entities/expense.dart';
+import 'package:squad_hq/features/personal/presentation/pages/my_spending_page.dart';
+import 'fake_personal_repository.dart';
+import 'package:squad_hq/features/personal/domain/entities/personal_expense.dart';
+import 'package:squad_hq/features/personal/domain/repositories/personal_repository.dart';
 import 'package:squad_hq/features/squad/domain/entities/payment_promise.dart';
 import 'package:squad_hq/features/squad/domain/repositories/squad_repository.dart';
 import 'package:squad_hq/features/squad/presentation/bloc/squad_ledger_bloc.dart';
@@ -150,6 +154,7 @@ void main() {
   final fakeAir = FakeAirQualityRepository();
   final fakeShares = FakeShareRepository();
   final fakeInvites = FakeInviteRepository();
+  final fakePersonal = FakePersonalRepository();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -183,6 +188,8 @@ void main() {
       ..registerLazySingleton<ShareRepository>(() => fakeShares)
       ..unregister<InviteRepository>()
       ..registerLazySingleton<InviteRepository>(() => fakeInvites)
+      ..unregister<PersonalRepository>()
+      ..registerLazySingleton<PersonalRepository>(() => fakePersonal)
       ..unregister<TeamChanges>()
       ..registerLazySingleton<TeamChanges>(FakeTeamChanges.new);
   });
@@ -192,6 +199,7 @@ void main() {
     fakeWallet.reset();
     fakeNotifications.reset();
     fakeSquad.reset();
+    fakePersonal.reset();
     fakeMatchComments.reset();
     fakeMentionMembers.reset();
     fakeRatings.reset();
@@ -414,6 +422,7 @@ void main() {
         path: '/trip/:id',
         builder: (context, state) => TripPage(tripId: state.pathParameters['id']!, user: user),
       ),
+      GoRoute(path: AppRoutes.mySpending, builder: (context, state) => const MySpendingPage()),
       GoRoute(
         path: AppRoutes.walletBills,
         builder: (context, state) {
@@ -2313,6 +2322,111 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Custom: tick who’s in, then type what each pays.'), findsOneWidget);
     expect(find.text('Equal: everyone pays the same.'), findsNothing);
+  });
+
+  testWidgets('Personal expense: add one with your own category, then see it in My spending',
+      (tester) async {
+    await pumpSquad(tester);
+    await tester.tap(find.text('Personal expense'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add personal expense'), findsOneWidget);
+    expect(find.text('Only you can see this. It never changes a squad balance.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('personal-amount')), '120');
+    await tester.enterText(find.byKey(const ValueKey('personal-title')), 'Flat white');
+    await tester.tap(find.text('New category'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('category-name')), 'Coffee');
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('personal-note')), 'Before training');
+    await tester.tap(find.text('Save personal expense'));
+    await tester.pumpAndSettle();
+
+    final saved = fakePersonal.expenses.single;
+    expect(saved.amountCents, 12000);
+    expect(saved.category, PersonalCategory.custom);
+    expect(saved.customCategoryId, fakePersonal.categories.single.id);
+    expect(saved.note, 'Before training');
+    // Never in the squad's expenses.
+    expect(fakeSquad.expenses, isEmpty);
+
+    await tester.tap(find.text('My spending'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const ValueKey('report-total'))).data, '฿120');
+    expect(find.text('Flat white'), findsOneWidget);
+    expect(find.text('Coffee'), findsOneWidget);
+  });
+
+  testWidgets('My spending: filter by day, month and year', (tester) async {
+    final now = DateTime.now();
+    final lastYear = DateTime(now.year - 1, 6, 1);
+    await fakePersonal.saveExpense(
+      PersonalExpenseDraft(
+        title: 'Lunch',
+        amountCents: 15000,
+        spentAt: now,
+        category: PersonalCategory.food,
+      ),
+    );
+    await fakePersonal.saveExpense(
+      PersonalExpenseDraft(
+        title: 'Old boots',
+        amountCents: 90000,
+        spentAt: lastYear,
+        category: PersonalCategory.sports,
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('My spending'));
+    await tester.pumpAndSettle();
+    String total() => tester.widget<Text>(find.byKey(const ValueKey('report-total'))).data!;
+
+    expect(total(), '฿150');
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    expect(total(), '฿150');
+    await tester.tap(find.text('Year'));
+    await tester.pumpAndSettle();
+    expect(total(), '฿150');
+    expect(find.text('BY MONTH'), findsOneWidget);
+    // A year back: only last year's.
+    await tester.tap(find.byTooltip('Previous'));
+    await tester.pumpAndSettle();
+    expect(total(), '฿900');
+    expect(find.text('Old boots'), findsOneWidget);
+    expect(find.text('Lunch'), findsNothing);
+  });
+
+  testWidgets('A personal expense can be edited and deleted', (tester) async {
+    await fakePersonal.saveExpense(
+      PersonalExpenseDraft(
+        title: 'Taxi',
+        amountCents: 8000,
+        spentAt: DateTime.now(),
+        category: PersonalCategory.transport,
+      ),
+    );
+    await pumpSquad(tester);
+    await tester.tap(find.text('My spending'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Taxi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit personal expense'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('personal-amount')), '95');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(fakePersonal.expenses.single.amountCents, 9500);
+
+    await tester.tap(find.text('Taxi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(fakePersonal.expenses, isEmpty);
+    expect(find.text('Taxi'), findsNothing);
   });
 
   testWidgets('Percent: starts even, saves the amounts and each person\'s %', (tester) async {
