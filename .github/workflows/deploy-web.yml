@@ -4,8 +4,8 @@
 # Repo secrets (Settings → Secrets and variables → Actions):
 #   ENV_FILE                  the whole local .env file (dart defines; without
 #                             it the live app is a white screen)
-#   FIREBASE_SERVICE_ACCOUNT  JSON key of a service account with the
-#                             "Firebase Hosting Admin" role
+#   FIREBASE_SERVICE_ACCOUNT_MY_PROJECT_1542101276805  service account JSON key
+#                             (uploaded by `firebase init hosting:github`)
 name: Deploy web
 
 on:
@@ -55,7 +55,7 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MY_PROJECT_1542101276805 }}
           projectId: my-project-1542101276805
           target: app
           channelId: live
