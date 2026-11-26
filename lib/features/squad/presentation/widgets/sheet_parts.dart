@@ -4,12 +4,14 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/widgets/money_input_formatter.dart';
 import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
 import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
 import '../../domain/entities/expense.dart' show ExpenseSplitMode;
 import '../../domain/entities/settlement.dart' show SettlementMethod;
 import '../../domain/entities/squad_member.dart';
+import '../squad_formatting.dart' show moneyInput, parseMoney;
 import 'squad_widgets.dart';
 
 // The building blocks the expense and pay sheets share — squad, trip and
@@ -477,6 +479,122 @@ class SlipPickerButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A percent or shares box with − and + either side: 10% a tap for
+/// [percent] (up to 100%), 1 share a tap otherwise — never below 0. The
+/// box still takes a typed value (e.g. 33.33).
+class WeightStepper extends StatelessWidget {
+  const WeightStepper({
+    super.key,
+    required this.controller,
+    required this.percent,
+    required this.name,
+    this.fieldKey,
+    this.fill,
+  });
+
+  final TextEditingController controller;
+  final bool percent;
+
+  /// Whose it is, for screen readers: "Ko percent", "Increase Ko".
+  final String name;
+  final Key? fieldKey;
+  final Color? fill;
+
+  /// A tap's worth, in hundredths: 10% or 1 share.
+  int get _step => percent ? 1000 : 100;
+
+  void _nudge(int direction) {
+    final now = parseMoney(controller.text) ?? 0;
+    var next = now + direction * _step;
+    if (next < 0) next = 0;
+    if (percent && next > 10000) next = 10000;
+    if (next == now) return;
+    controller.text = next == 0 ? '0' : moneyInput(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: AppRadius.sm,
+      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+    );
+    final unit = percent ? '10%' : '1 share';
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final now = parseMoney(value.text) ?? 0;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _StepButton(
+              icon: Icons.remove_rounded,
+              tooltip: 'Decrease $name by $unit',
+              onPressed: now > 0 ? () => _nudge(-1) : null,
+            ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 64,
+              child: Semantics(
+                label: percent ? '$name percent' : '$name shares',
+                child: TextField(
+                  key: fieldKey,
+                  controller: controller,
+                  textAlign: TextAlign.center,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [MoneyInputFormatter()],
+                  style: AppTextStyles.body(size: 14, weight: FontWeight.w800),
+                  decoration: InputDecoration(
+                    hintText: '0',
+                    suffixText: percent ? '%' : '×',
+                    isDense: true,
+                    filled: true,
+                    fillColor: fill ?? AppColors.bg,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+                    border: border,
+                    enabledBorder: border,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            _StepButton(
+              icon: Icons.add_rounded,
+              tooltip: 'Increase $name by $unit',
+              onPressed: percent && now >= 10000 ? null : () => _nudge(1),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// A small round − or + by a [WeightStepper]; greyed out at its limit.
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, required this.tooltip, required this.onPressed});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    onPressed: onPressed,
+    tooltip: tooltip,
+    icon: Icon(icon, size: 18),
+    style: IconButton.styleFrom(
+      backgroundColor: AppColors.surface,
+      foregroundColor: AppColors.text,
+      disabledBackgroundColor: AppColors.surface.withValues(alpha: 0.5),
+      disabledForegroundColor: squadMuted.withValues(alpha: 0.5),
+      minimumSize: const Size(32, 32),
+      fixedSize: const Size(32, 32),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+  );
 }
 
 /// A split type's icon in [SplitTypeGrid]. Exact is "123": you type each

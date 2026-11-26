@@ -1443,31 +1443,12 @@ class _ShareRow extends StatelessWidget {
           if (weightController case final weightController?) ...[
             Text(amount, style: AppTextStyles.body(size: 14, weight: FontWeight.w700, color: nameColor)),
             const SizedBox(width: 10),
-            SizedBox(
-              width: 84,
-              child: Semantics(
-                label: mode == ExpenseSplitMode.percent ? '$name percent' : '$name shares',
-                child: TextField(
-                  key: fieldKey,
-                  controller: weightController,
-                  textAlign: TextAlign.right,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: const [MoneyInputFormatter()],
-                  style: AppTextStyles.body(size: 14, weight: FontWeight.w800),
-                  decoration: InputDecoration(
-                    hintText: '0',
-                    suffixText: mode == ExpenseSplitMode.percent ? '%' : '×',
-                    isDense: true,
-                    filled: true,
-                    fillColor: AppColors.bg,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                    border: OutlineInputBorder(
-                      borderRadius: AppRadius.sm,
-                      borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
-                    ),
-                  ),
-                ),
-              ),
+            // − / + steps 10% (or 1 share); the box still takes a typed value.
+            WeightStepper(
+              controller: weightController,
+              percent: mode == ExpenseSplitMode.percent,
+              name: name,
+              fieldKey: fieldKey,
             ),
           ] else if (exactController != null)
             SizedBox(

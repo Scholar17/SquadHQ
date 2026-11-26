@@ -738,7 +738,17 @@ class _ShareRow extends StatelessWidget {
           // custom's box is the amount itself.
           if (controller == null || suffix != null)
             Text(amount, style: AppTextStyles.body(size: 15, weight: FontWeight.w800)),
-          if (controller != null) ...[
+          if (controller != null && suffix != null) ...[
+            const SizedBox(width: 10),
+            // Percent / shares: − and + step 10% (or 1 share).
+            WeightStepper(
+              controller: controller,
+              percent: suffix == '%',
+              name: name,
+              fieldKey: fieldKey,
+              fill: AppColors.card,
+            ),
+          ] else if (controller != null) ...[
             const SizedBox(width: 10),
             SizedBox(
               width: 96,
