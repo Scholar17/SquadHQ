@@ -423,6 +423,29 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           ),
           const SizedBox(height: 16),
           LabeledField(
+            label: 'CATEGORY',
+            child: CategoryGrid<ExpenseCategory>(
+              icons: false,
+              options: [
+                for (final category in ExpenseCategory.everyday)
+                  (
+                    value: category,
+                    label: category.label,
+                    icon: categoryIcon(category),
+                    background: categoryTone(category).background,
+                    foreground: categoryTone(category).foreground,
+                  ),
+              ],
+              selected: _category,
+              onSelected: (category) => setState(() => _category = category),
+            ),
+          ),
+          if (_category == ExpenseCategory.other) ...[
+            const SizedBox(height: 10),
+            _Field(controller: _categoryLabel, hint: 'What for? e.g. Gym', maxLength: 30),
+          ],
+          const SizedBox(height: 16),
+          LabeledField(
             label: 'SPLIT',
             child: SplitTypeGrid(
               options: buddySplitModes,
@@ -476,29 +499,6 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
                 ],
               ),
             ),
-          ],
-          const SizedBox(height: 16),
-          LabeledField(
-            label: 'CATEGORY',
-            child: CategoryGrid<ExpenseCategory>(
-              icons: false,
-              options: [
-                for (final category in ExpenseCategory.everyday)
-                  (
-                    value: category,
-                    label: category.label,
-                    icon: categoryIcon(category),
-                    background: categoryTone(category).background,
-                    foreground: categoryTone(category).foreground,
-                  ),
-              ],
-              selected: _category,
-              onSelected: (category) => setState(() => _category = category),
-            ),
-          ),
-          if (_category == ExpenseCategory.other) ...[
-            const SizedBox(height: 10),
-            _Field(controller: _categoryLabel, hint: 'What for? e.g. Gym', maxLength: 30),
           ],
           const SizedBox(height: 16),
           LabeledField(
