@@ -61,7 +61,14 @@ enum ExpenseSplitMode {
   shares('Shares'),
 
   /// On the payer — recorded, nobody owes anything.
-  treat('Treat');
+  treat('Treat'),
+
+  /// Buddy expenses only: the payer lent it, so the other one borrowed it
+  /// and owes all of it back.
+  borrow('Borrow');
+
+  /// The types a squad expense offers (Borrow is for buddy expenses).
+  static const forSquad = [equal, chosen, exact, custom, percent, shares, treat];
 
   const ExpenseSplitMode(this.label);
 

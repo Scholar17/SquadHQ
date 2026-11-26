@@ -35,6 +35,24 @@ void main() {
       expect(split.exactCents, 28750);
     });
 
+    test('Borrow: whoever didn’t pay owes all of it', () {
+      final split = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.borrow,
+        totalCents: 50000,
+        payerId: 'me',
+        participants: ['me', 'ko'],
+      );
+      expect(split.isValid, isTrue);
+      expect(split.shares, {'ko': 50000});
+      final alone = ExpenseSplit.compute(
+        mode: ExpenseSplitMode.borrow,
+        totalCents: 50000,
+        payerId: 'me',
+        participants: ['me'],
+      );
+      expect(alone.isValid, isFalse);
+    });
+
     test('A payer outside the split only fronted it: split to the satang', () {
       final split = ExpenseSplit.compute(
         mode: ExpenseSplitMode.chosen,

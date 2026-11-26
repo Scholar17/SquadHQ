@@ -29,6 +29,7 @@ const buddySplitModes = [
   ExpenseSplitMode.custom,
   ExpenseSplitMode.percent,
   ExpenseSplitMode.shares,
+  ExpenseSplitMode.borrow,
 ];
 
 /// "Add buddy expense" with one squad-mate ([buddyId] fixed when opened
@@ -328,6 +329,11 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
     final name = ledger.nameOf(buddy);
     final owed = _iPaid ? split.shares[buddy] ?? 0 : split.shares[widget.me] ?? 0;
     final money = formatMoney(owed, currency);
+    if (_mode == ExpenseSplitMode.borrow) {
+      return _iPaid
+          ? '$name borrowed it · owes you all $money · only you two see it'
+          : 'You borrowed it · you owe $name all $money · only you two see it';
+    }
     final added = _byAmount && _totalFromShares ? ' · total added up from the shares' : '';
     if (owed == 0) return 'Nobody owes anything for it$added.';
     return _iPaid
@@ -401,7 +407,8 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           ),
           const SizedBox(height: 16),
           LabeledField(
-            label: 'PAID BY',
+            // A loan: whoever paid lent it.
+            label: _mode == ExpenseSplitMode.borrow ? 'LENT BY' : 'PAID BY',
             child: SegmentedTabs<bool>(
               options: const [true, false],
               selected: _iPaid,
@@ -443,7 +450,13 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
                       name: name,
                       member: ledger.member(id),
                       paid: id == _payer,
-                      amount: split?.shares[id] == null ? '—' : formatMoney(split!.shares[id]!, currency),
+                      amount: switch (split?.shares[id]) {
+                        final int share => formatMoney(share, currency),
+                        // Borrow: the lender owes nothing.
+                        _ when _mode == ExpenseSplitMode.borrow && split!.isValid => formatMoney(0, currency),
+                        _ => '—',
+                      },
+                      borrow: _mode == ExpenseSplitMode.borrow,
                       // Custom: a tick to put each of you in or out.
                       included: _mode != ExpenseSplitMode.custom || included,
                       onToggle: _mode == ExpenseSplitMode.custom
@@ -533,6 +546,7 @@ String _modeHint(ExpenseSplitMode mode) => switch (mode) {
   ExpenseSplitMode.custom => 'Custom: tick who’s in, then type what each pays. Only one of you in it pays it all.',
   ExpenseSplitMode.percent => 'Percent: type each person’s %, adding up to 100.',
   ExpenseSplitMode.shares => 'Shares: 2 shares pay twice what 1 share does.',
+  ExpenseSplitMode.borrow => 'Borrow: whoever didn’t pay borrowed it and owes all of it back.',
   _ => 'Equal: split down the middle.',
 };
 
@@ -657,6 +671,7 @@ class _ShareRow extends StatelessWidget {
     required this.fieldKey,
     this.included = true,
     this.onToggle,
+    this.borrow = false,
   });
 
   final String name;
@@ -667,6 +682,9 @@ class _ShareRow extends StatelessWidget {
   /// Custom: whether they're in it, and the tick that changes it.
   final bool included;
   final VoidCallback? onToggle;
+
+  /// Borrow: "lent it" on the payer, "borrowed it" on the other one.
+  final bool borrow;
 
   /// Exact / custom: the amount; percent / shares: the weight; equal
   /// (or alone in a custom split): none.
@@ -706,9 +724,13 @@ class _ShareRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
-                if (paid || !included)
+                if (paid || !included || borrow)
                   Text(
-                    [if (paid) 'paid', if (!included) 'not in it'].join(' · '),
+                    [
+                      if (paid) borrow ? 'lent it' : 'paid',
+                      if (borrow && !paid) 'borrowed it',
+                      if (!included) 'not in it',
+                    ].join(' · '),
                     style: AppTextStyles.body(size: 11.5, color: squadMuted),
                   ),
               ],

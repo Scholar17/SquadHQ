@@ -955,7 +955,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             ),
             const SizedBox(height: 6),
             SegmentedTabs<ExpenseSplitMode>(
-              options: ExpenseSplitMode.values,
+              options: ExpenseSplitMode.forSquad,
               selected: _mode,
               label: (mode) => mode.label,
               onChanged: (mode) {
@@ -1137,7 +1137,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
     ExpenseSplitMode.custom => 'Custom: tick who’s in, then type what each pays.',
     ExpenseSplitMode.percent => 'Percent: type each person’s %, adding up to 100. Leave 0 for anyone not in it.',
     ExpenseSplitMode.shares => 'Shares: 2 shares pay twice what 1 share does. Leave 0 for anyone not in it.',
-    ExpenseSplitMode.treat => null,
+    ExpenseSplitMode.treat || ExpenseSplitMode.borrow => null,
   };
 
   String _footnote(ExpenseSplit split, int amount, SquadLedger ledger, String mainPayer) {

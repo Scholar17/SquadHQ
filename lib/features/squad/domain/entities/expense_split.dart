@@ -31,6 +31,8 @@ class ExpenseSplit extends Equatable {
     return switch (mode) {
       // A treat: each payer covers what they paid, so nobody owes.
       ExpenseSplitMode.treat => ExpenseSplit._(shares: payers ?? {payerId: totalCents}),
+      // A loan: whoever didn't pay borrowed it and owes all of it.
+      ExpenseSplitMode.borrow => _borrow(totalCents, payerId, participants),
       ExpenseSplitMode.exact => _exact(totalCents, exactCents),
       ExpenseSplitMode.custom =>
         participants.isEmpty
@@ -41,6 +43,14 @@ class ExpenseSplit extends Equatable {
       ExpenseSplitMode.percent => _weighted(totalCents, weights, percent: true),
       ExpenseSplitMode.shares => _weighted(totalCents, weights, percent: false),
     };
+  }
+
+  static ExpenseSplit _borrow(int total, String payerId, List<String> participants) {
+    final borrowers = participants.where((id) => id != payerId).toSet();
+    if (borrowers.length != 1) {
+      return const ExpenseSplit._(shares: {}, error: 'Pick who borrowed it');
+    }
+    return ExpenseSplit._(shares: {borrowers.single: total});
   }
 
   /// 100% in hundredths.

@@ -278,6 +278,7 @@ class _Body extends StatelessWidget {
       ExpenseSplitMode.shares =>
         'SPLIT BY SHARES · $equalCount ${equalCount == 1 ? 'PERSON' : 'PEOPLE'}',
       ExpenseSplitMode.treat => 'TREAT',
+      ExpenseSplitMode.borrow => 'BORROWED',
     };
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
