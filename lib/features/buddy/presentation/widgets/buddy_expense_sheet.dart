@@ -126,10 +126,18 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   PickedImage? _receipt;
   bool _removeReceipt = false;
 
+  /// Save was tapped with something missing: missing fields show in red.
+  bool _triedSave = false;
+
+  String? get _buddyError => _triedSave && _buddyId == null ? 'Pick who you shared it with' : null;
+  String? get _amountError =>
+      _triedSave && (parseMoney(_amount.text) ?? 0) <= 0 ? 'Enter how much it was' : null;
+  String? get _titleError => _triedSave && _title.text.trim().isEmpty ? 'Say what it was for' : null;
+
   @override
   void initState() {
     super.initState();
-    for (final controller in [_myWeight, _buddyWeight]) {
+    for (final controller in [_myWeight, _buddyWeight, _title]) {
       controller.addListener(() => setState(() {}));
     }
     _amount.addListener(() {
@@ -261,9 +269,17 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
     final split = _split();
     final amount = parseMoney(_amount.text) ?? 0;
     final title = _title.text.trim();
-    if (buddy == null || split == null) return _snack('Pick who you shared it with');
-    if (amount <= 0) return _snack('Enter an amount');
-    if (title.isEmpty) return _snack('Add a title');
+    if (buddy == null || split == null || amount <= 0 || title.isEmpty) {
+      // Show every missing field in red, not just the first.
+      setState(() => _triedSave = true);
+      return _snack(
+        buddy == null
+            ? 'Pick who you shared it with'
+            : amount <= 0
+            ? 'Enter how much it was'
+            : 'Say what it was for',
+      );
+    }
     if (!split.isValid) return _snack(split.error!);
     final isOther = _category == ExpenseCategory.other;
     final saved = await context.read<BuddyCubit>().save(
@@ -349,6 +365,8 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
       for (final member in ledger.members)
         if (member.profileId != widget.me) member,
     ];
+    // Only one squad-mate: they're your buddy, no picking needed.
+    if (_buddyId == null && squadMates.length == 1) _buddyId = squadMates.single.profileId;
     final split = _split();
     final saving = context.watch<BuddyCubit>().state.saving;
     final buddy = _buddyId;
@@ -385,7 +403,10 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           const SizedBox(height: 4),
           LabeledField(
             label: 'WITH',
+            required: widget.buddyId == null,
+            error: _buddyError,
             child: _BuddyPicker(
+              error: _buddyError != null,
               fixed: widget.buddyId != null,
               selected: buddy,
               squadMates: squadMates,
@@ -394,15 +415,23 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          _AmountField(controller: _amount, symbol: currency.symbol),
+          LabeledField(
+            label: 'AMOUNT',
+            required: true,
+            error: _amountError,
+            child: _AmountField(controller: _amount, symbol: currency.symbol, error: _amountError != null),
+          ),
           const SizedBox(height: 16),
           LabeledField(
             label: 'WHAT FOR',
+            required: true,
+            error: _titleError,
             child: _Field(
               key: const ValueKey('buddy-title'),
               controller: _title,
               hint: 'e.g. Taxi home',
               maxLength: 80,
+              error: _titleError != null,
             ),
           ),
           const SizedBox(height: 16),
@@ -561,6 +590,7 @@ final _outlined = OutlinedButton.styleFrom(
 class _BuddyPicker extends StatelessWidget {
   const _BuddyPicker({
     required this.fixed,
+    required this.error,
     required this.selected,
     required this.squadMates,
     required this.ledger,
@@ -568,6 +598,9 @@ class _BuddyPicker extends StatelessWidget {
   });
 
   final bool fixed;
+
+  /// Save was tapped with nobody picked.
+  final bool error;
   final String? selected;
   final List<SquadMember> squadMates;
   final SquadLedger ledger;
@@ -594,21 +627,134 @@ class _BuddyPicker extends StatelessWidget {
     if (squadMates.isEmpty) {
       return const SheetNotice('Invite someone to the squad first.', icon: Icons.group_add_outlined);
     }
-    return SizedBox(
-      height: 36,
-      child: EdgeFade(
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: squadMates.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final member = squadMates[index];
-            return SquadChoiceChip(
-              label: ledger.nameOf(member.profileId),
-              selected: member.profileId == selected,
-              onTap: () => onPick(member.profileId),
-            );
-          },
+    // Nobody picked yet: a tinted box asking for it, red after a save
+    // attempt; then a ring and a tick on whoever you picked.
+    final none = selected == null;
+    return AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 160),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      decoration: BoxDecoration(
+        color: none ? AppColors.accent100 : AppColors.bg,
+        borderRadius: AppRadius.md,
+        border: Border.all(
+          color: error
+              ? AppColors.accent700
+              : none
+              ? AppColors.accent700.withValues(alpha: 0.35)
+              : Colors.transparent,
+          width: error ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (none) ...[
+            Row(
+              children: [
+                Icon(Icons.touch_app_outlined, size: 16, color: AppColors.accent700),
+                const SizedBox(width: 6),
+                Text(
+                  'Tap who you shared it with',
+                  style: AppTextStyles.body(size: 13, weight: FontWeight.w700, color: AppColors.accent700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            height: 74,
+            child: EdgeFade(
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: squadMates.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final member = squadMates[index];
+                  return _MateTile(
+                    member: member,
+                    name: ledger.nameOf(member.profileId),
+                    picked: member.profileId == selected,
+                    onTap: () => onPick(member.profileId),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A squad-mate to pick: their avatar and name; picked, a ring and a tick.
+class _MateTile extends StatelessWidget {
+  const _MateTile({required this.member, required this.name, required this.picked, required this.onTap});
+
+  final SquadMember member;
+  final String name;
+  final bool picked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: picked,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.md,
+        child: SizedBox(
+          width: 64,
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: picked ? AppColors.accent700 : Colors.transparent,
+                        width: 2.5,
+                      ),
+                    ),
+                    child: SquadAvatar(
+                      initial: member.initial,
+                      photoUrl: member.avatarUrl,
+                      size: 40,
+                      color: picked ? AppColors.teamGold : null,
+                    ),
+                  ),
+                  if (picked)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent700,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.card, width: 2),
+                        ),
+                        child: Icon(Icons.check_rounded, size: 12, color: AppColors.card),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body(
+                  size: 12,
+                  weight: picked ? FontWeight.w800 : FontWeight.w600,
+                  color: picked ? AppColors.text : squadMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -617,17 +763,18 @@ class _BuddyPicker extends StatelessWidget {
 
 /// The big amount, underlined, with the currency symbol.
 class _AmountField extends StatelessWidget {
-  const _AmountField({required this.controller, required this.symbol});
+  const _AmountField({required this.controller, required this.symbol, this.error = false});
 
   final TextEditingController controller;
   final String symbol;
+  final bool error;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.text, width: 2)),
+        border: Border(bottom: BorderSide(color: error ? AppColors.accent700 : AppColors.text, width: 2)),
       ),
       child: Row(
         children: [
@@ -794,7 +941,11 @@ class _Field extends StatelessWidget {
     required this.hint,
     required this.maxLength,
     this.maxLines = 1,
+    this.error = false,
   });
+
+  /// Missing after a save attempt: a red outline.
+  final bool error;
 
   final TextEditingController controller;
   final String hint;
@@ -822,7 +973,9 @@ class _Field extends StatelessWidget {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: AppRadius.sm,
-        borderSide: BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
+        borderSide: error
+            ? BorderSide(color: AppColors.accent700, width: 1.5)
+            : BorderSide(color: AppColors.text.withValues(alpha: 0.18)),
       ),
     ),
   );

@@ -66,19 +66,66 @@ class SheetHeader extends StatelessWidget {
 
 /// A small caps label over its field.
 class LabeledField extends StatelessWidget {
-  const LabeledField({super.key, required this.label, required this.child});
+  const LabeledField({
+    super.key,
+    required this.label,
+    required this.child,
+    this.required = false,
+    this.error,
+  });
 
   final String label;
   final Widget child;
 
+  /// Shows a small "Required" tag by the label, so it isn't forgotten.
+  final bool required;
+
+  /// What's missing (after a save attempt): the label and this line turn red.
+  final String? error;
+
   @override
   Widget build(BuildContext context) {
+    final error = this.error;
+    final color = error == null ? squadMuted : AppColors.accent700;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.label(color: squadMuted)),
+        Row(
+          children: [
+            Text(label, style: AppTextStyles.label(color: color)),
+            if (required) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: error == null ? AppColors.surface : AppColors.accent100,
+                  borderRadius: AppRadius.pill,
+                ),
+                child: Text(
+                  'Required',
+                  style: AppTextStyles.body(size: 10.5, weight: FontWeight.w700, color: color),
+                ),
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 4),
         child,
+        if (error != null) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.error_outline_rounded, size: 14, color: AppColors.accent700),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  error,
+                  style: AppTextStyles.body(size: 12, weight: FontWeight.w600, color: AppColors.accent700),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
