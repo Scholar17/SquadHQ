@@ -25,6 +25,7 @@ import '../cubit/buddy_cubit.dart';
 /// The splits a buddy expense offers.
 const buddySplitModes = [
   ExpenseSplitMode.equal,
+  ExpenseSplitMode.exact,
   ExpenseSplitMode.custom,
   ExpenseSplitMode.percent,
   ExpenseSplitMode.shares,
@@ -85,13 +86,10 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   late final _note = TextEditingController(text: _editing?.note ?? '');
   late final _categoryLabel = TextEditingController(text: _editing?.categoryLabel ?? '');
 
-  /// Custom amounts, then % or shares, per person: [_mine] for you.
-  late final _myAmount = TextEditingController(
-    text: _editing?.splitMode == ExpenseSplitMode.custom ? moneyInput(_editing!.myShareCents) : '',
-  );
-  late final _buddyAmount = TextEditingController(
-    text: _editing?.splitMode == ExpenseSplitMode.custom ? moneyInput(_editing!.buddyShareCents) : '',
-  );
+  /// Exact or custom amounts, then % or shares, per person: [_myAmount]
+  /// and [_myWeight] for you.
+  late final _myAmount = TextEditingController(text: _typedShare(_editing?.myShareCents));
+  late final _buddyAmount = TextEditingController(text: _typedShare(_editing?.buddyShareCents));
   late final _myWeight = TextEditingController(
     text: _editing?.myWeight == null ? '' : moneyInput(_editing!.myWeight!),
   );
@@ -105,15 +103,69 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   late ExpenseCategory _category = _editing?.category ?? ExpenseCategory.food;
   late DateTime _spentAt = _editing?.spentAt.toLocal() ?? DateTime.now();
 
+  /// Custom: who's in it. Both to start; editing, whoever has a share.
+  late bool _meIn = !_editingByAmount || _editing!.myShareCents > 0;
+  late bool _buddyIn = !_editingByAmount || _editing!.buddyShareCents > 0;
+
+  /// The total was added up from the typed shares (exact or custom) — it
+  /// keeps following them until you type a total yourself.
+  bool _totalFromShares = false;
+  String _autoTotal = '';
+
+  bool get _editingByAmount => switch (_editing?.splitMode) {
+    ExpenseSplitMode.exact || ExpenseSplitMode.custom => true,
+    _ => false,
+  };
+
+  /// A saved exact / custom share for its box ('' for none or 0).
+  String _typedShare(int? cents) => _editingByAmount && (cents ?? 0) > 0 ? moneyInput(cents!) : '';
+
+  bool get _byAmount => _mode == ExpenseSplitMode.exact || _mode == ExpenseSplitMode.custom;
+
   PickedImage? _receipt;
   bool _removeReceipt = false;
 
   @override
   void initState() {
     super.initState();
-    for (final controller in [_amount, _myAmount, _buddyAmount, _myWeight, _buddyWeight]) {
+    for (final controller in [_myWeight, _buddyWeight]) {
       controller.addListener(() => setState(() {}));
     }
+    _amount.addListener(() {
+      // Typing over a total filled in from the shares makes it yours.
+      if (_totalFromShares && _amount.text != _autoTotal) _totalFromShares = false;
+      setState(() {});
+    });
+    for (final controller in [_myAmount, _buddyAmount]) {
+      controller.addListener(_syncFromShares);
+    }
+  }
+
+  /// Exact / custom: fills the total in from the typed shares while it's
+  /// empty or was filled in this way, like the squad's expenses.
+  void _syncFromShares() {
+    setState(() {});
+    if (!_byAmount) return;
+    if (!_totalFromShares && _amount.text.isNotEmpty) return;
+    // One of you alone in a custom split owes the lot: nothing to add up.
+    if (_mode == ExpenseSplitMode.custom && !(_meIn && _buddyIn)) return;
+    final sum = (parseMoney(_myAmount.text) ?? 0) + (parseMoney(_buddyAmount.text) ?? 0);
+    final text = sum > 0 ? moneyInput(sum) : '';
+    _totalFromShares = sum > 0;
+    _autoTotal = text;
+    if (_amount.text != text) _amount.text = text;
+  }
+
+  /// Custom: ticks you or your buddy in or out — one of you stays in.
+  void _toggleIn({required bool mine}) {
+    final meIn = mine ? !_meIn : _meIn;
+    final buddyIn = mine ? _buddyIn : !_buddyIn;
+    if (!meIn && !buddyIn) return _snack('One of you has to be in it');
+    setState(() {
+      _meIn = meIn;
+      _buddyIn = buddyIn;
+    });
+    _syncFromShares();
   }
 
   @override
@@ -139,16 +191,21 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
     final buddy = _buddyId;
     if (buddy == null) return null;
     final total = parseMoney(_amount.text) ?? 0;
+    final custom = _mode == ExpenseSplitMode.custom;
+    final alone = custom && !(_meIn && _buddyIn);
     return ExpenseSplit.compute(
-      // Custom here is "type both amounts" — the squad's Exact.
-      mode: _mode == ExpenseSplitMode.custom ? ExpenseSplitMode.exact : _mode,
+      mode: _mode,
       totalCents: total,
       payerId: _payer,
-      participants: [widget.me, buddy],
-      exactCents: {
-        widget.me: ?parseMoney(_myAmount.text),
-        buddy: ?parseMoney(_buddyAmount.text),
-      },
+      // Custom: only who's ticked; the rest: both of you.
+      participants: [if (!custom || _meIn) widget.me, if (!custom || _buddyIn) buddy],
+      exactCents: alone
+          // Only one of you in it: they take the whole amount.
+          ? {(_meIn ? widget.me : buddy): total}
+          : {
+              widget.me: ?parseMoney(_myAmount.text),
+              buddy: ?parseMoney(_buddyAmount.text),
+            },
       weights: {
         widget.me: ?parseMoney(_myWeight.text),
         buddy: ?parseMoney(_buddyWeight.text),
@@ -157,14 +214,18 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   }
 
   /// Switching to percent or shares with nothing typed starts at 50/50.
-  void _pickMode(ExpenseSplitMode mode) => setState(() {
-    _mode = mode;
-    if (!mode.isWeighted) return;
-    if ((parseMoney(_myWeight.text) ?? 0) > 0 || (parseMoney(_buddyWeight.text) ?? 0) > 0) return;
-    final even = mode == ExpenseSplitMode.percent ? '50' : '1';
-    _myWeight.text = even;
-    _buddyWeight.text = even;
-  });
+  /// Exact and custom keep the amounts typed so far.
+  void _pickMode(ExpenseSplitMode mode) {
+    setState(() {
+      _mode = mode;
+      if (!mode.isWeighted) return;
+      if ((parseMoney(_myWeight.text) ?? 0) > 0 || (parseMoney(_buddyWeight.text) ?? 0) > 0) return;
+      final even = mode == ExpenseSplitMode.percent ? '50' : '1';
+      _myWeight.text = even;
+      _buddyWeight.text = even;
+    });
+    _syncFromShares();
+  }
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -252,13 +313,26 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
   String _summary(SquadLedger ledger, ExpenseSplit? split) {
     final buddy = _buddyId;
     if (buddy == null) return 'Pick who you shared it with.';
-    if (split == null || (parseMoney(_amount.text) ?? 0) == 0) return 'Enter the amount first.';
-    if (!split.isValid) return split.error!;
+    final total = parseMoney(_amount.text) ?? 0;
+    if (split == null || total == 0) {
+      return _byAmount ? 'Enter the amount, or type each share to add it up.' : 'Enter the amount first.';
+    }
+    final currency = ledger.currency;
+    if (!split.isValid) {
+      final entered = split.shares.values.fold(0, (a, b) => a + b);
+      if (!_byAmount || entered == 0) return split.error!;
+      return 'Shares must add up to ${formatMoney(total, currency)} · '
+          '${formatMoney(entered, currency)} entered, '
+          '${formatMoney((total - entered).abs(), currency)} ${entered > total ? 'over' : 'left'}.';
+    }
     final name = ledger.nameOf(buddy);
     final owed = _iPaid ? split.shares[buddy] ?? 0 : split.shares[widget.me] ?? 0;
-    final money = formatMoney(owed, ledger.currency);
-    if (owed == 0) return 'Nobody owes anything for it.';
-    return _iPaid ? '$name owes you $money · only you two see it' : 'You owe $name $money · only you two see it';
+    final money = formatMoney(owed, currency);
+    final added = _byAmount && _totalFromShares ? ' · total added up from the shares' : '';
+    if (owed == 0) return 'Nobody owes anything for it$added.';
+    return _iPaid
+        ? '$name owes you $money$added · only you two see it'
+        : 'You owe $name $money$added · only you two see it';
   }
 
   @override
@@ -343,14 +417,17 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           const SizedBox(height: 16),
           LabeledField(
             label: 'SPLIT',
+            // Five types: they wrap rather than squeeze, like the squad's.
             child: SegmentedTabs<ExpenseSplitMode>(
               options: buddySplitModes,
               selected: _mode,
               label: (mode) => mode.label,
+              keyOf: (mode) => ValueKey('buddy-split-${mode.name}'),
               onChanged: _pickMode,
-              expand: true,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(_modeHint(_mode), style: AppTextStyles.body(size: 12, color: squadMuted)),
           if (buddy != null) ...[
             const SizedBox(height: 8),
             Container(
@@ -358,17 +435,24 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
               decoration: BoxDecoration(color: AppColors.bg, borderRadius: AppRadius.md),
               child: Column(
                 children: [
-                  for (final (id, name, amountBox, weightBox) in [
-                    (widget.me, 'You', _myAmount, _myWeight),
-                    (buddy, buddyName, _buddyAmount, _buddyWeight),
+                  for (final (id, name, amountBox, weightBox, included) in [
+                    (widget.me, 'You', _myAmount, _myWeight, _meIn),
+                    (buddy, buddyName, _buddyAmount, _buddyWeight, _buddyIn),
                   ])
                     _ShareRow(
                       name: name,
                       member: ledger.member(id),
                       paid: id == _payer,
                       amount: split?.shares[id] == null ? '—' : formatMoney(split!.shares[id]!, currency),
+                      // Custom: a tick to put each of you in or out.
+                      included: _mode != ExpenseSplitMode.custom || included,
+                      onToggle: _mode == ExpenseSplitMode.custom
+                          ? () => _toggleIn(mine: id == widget.me)
+                          : null,
                       controller: switch (_mode) {
-                        ExpenseSplitMode.custom => amountBox,
+                        ExpenseSplitMode.exact => amountBox,
+                        // Alone in it, they owe the lot: no box to type.
+                        ExpenseSplitMode.custom => _meIn && _buddyIn ? amountBox : null,
                         ExpenseSplitMode.percent || ExpenseSplitMode.shares => weightBox,
                         _ => null,
                       },
@@ -442,6 +526,15 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
     );
   }
 }
+
+/// What the picked split type does, under the tabs.
+String _modeHint(ExpenseSplitMode mode) => switch (mode) {
+  ExpenseSplitMode.exact => 'Exact: type what each of you pays.',
+  ExpenseSplitMode.custom => 'Custom: tick who’s in, then type what each pays. Only one of you in it pays it all.',
+  ExpenseSplitMode.percent => 'Percent: type each person’s %, adding up to 100.',
+  ExpenseSplitMode.shares => 'Shares: 2 shares pay twice what 1 share does.',
+  _ => 'Equal: split down the middle.',
+};
 
 final _outlined = OutlinedButton.styleFrom(
   foregroundColor: AppColors.text,
@@ -562,6 +655,8 @@ class _ShareRow extends StatelessWidget {
     required this.controller,
     required this.suffix,
     required this.fieldKey,
+    this.included = true,
+    this.onToggle,
   });
 
   final String name;
@@ -569,7 +664,12 @@ class _ShareRow extends StatelessWidget {
   final bool paid;
   final String amount;
 
-  /// Custom: the amount; percent / shares: the weight; equal: none.
+  /// Custom: whether they're in it, and the tick that changes it.
+  final bool included;
+  final VoidCallback? onToggle;
+
+  /// Exact / custom: the amount; percent / shares: the weight; equal
+  /// (or alone in a custom split): none.
   final TextEditingController? controller;
   final String? suffix;
   final Key fieldKey;
@@ -581,6 +681,19 @@ class _ShareRow extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 52),
       child: Row(
         children: [
+          if (onToggle != null) ...[
+            SizedBox(
+              width: 28,
+              child: Checkbox(
+                value: included,
+                onChanged: (_) => onToggle!(),
+                semanticLabel: '$name is in it',
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
           SquadAvatar(
             initial: member?.initial ?? '?',
             photoUrl: member?.avatarUrl,
@@ -593,12 +706,16 @@ class _ShareRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: AppTextStyles.body(size: 14, weight: FontWeight.w700)),
-                if (paid) Text('paid', style: AppTextStyles.body(size: 11.5, color: squadMuted)),
+                if (paid || !included)
+                  Text(
+                    [if (paid) 'paid', if (!included) 'not in it'].join(' · '),
+                    style: AppTextStyles.body(size: 11.5, color: squadMuted),
+                  ),
               ],
             ),
           ),
-          // Percent and shares show what the weight comes to; custom's box
-          // is the amount itself.
+          // Percent and shares show what the weight comes to; exact and
+          // custom's box is the amount itself.
           if (controller == null || suffix != null)
             Text(amount, style: AppTextStyles.body(size: 15, weight: FontWeight.w800)),
           if (controller != null) ...[

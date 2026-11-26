@@ -36,7 +36,7 @@ class BuddyExpense extends Equatable {
   final String? categoryLabel;
   final int amountCents;
 
-  /// Equal, custom, percent or shares.
+  /// Equal, exact, custom, percent or shares.
   final ExpenseSplitMode splitMode;
   final int myShareCents;
   final int buddyShareCents;
