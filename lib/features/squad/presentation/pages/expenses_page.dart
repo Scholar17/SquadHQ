@@ -12,7 +12,10 @@ import '../../domain/entities/expense.dart';
 import '../active_group.dart';
 import '../bloc/squad_ledger_bloc.dart';
 import '../squad_formatting.dart';
+import '../../../buddy/presentation/widgets/buddy_expense_sheet.dart';
+import '../../../personal/presentation/widgets/personal_expense_sheet.dart';
 import '../widgets/expense_sheet.dart';
+import '../widgets/expense_type_picker.dart';
 import '../../domain/entities/squad_ledger.dart';
 import '../widgets/squad_widgets.dart';
 import '../widgets/trip_actions.dart';
@@ -88,6 +91,27 @@ class _ExpensesPageState extends State<ExpensesPage> with SingleTickerProviderSt
                 );
             }
 
+            // "+ Add": pick the kind of expense first, then its sheet.
+            Future<void> add() async {
+              final type = await pickExpenseType(
+                context,
+                tripAvailable: canAddTripExpense(ledger, me),
+              );
+              if (type == null || !context.mounted) return;
+              switch (type) {
+                case AddExpenseType.group:
+                  addExpense();
+                case AddExpenseType.trip:
+                  addTrip();
+                case AddExpenseType.monthly:
+                  addMonthly();
+                case AddExpenseType.buddy:
+                  showBuddyExpenseSheet(context, teamId: squad.id, me: me);
+                case AddExpenseType.personal:
+                  showPersonalExpenseSheet(context);
+              }
+            }
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -110,13 +134,9 @@ class _ExpensesPageState extends State<ExpensesPage> with SingleTickerProviderSt
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Adds to whichever list is showing.
                       FilledButton(
-                        onPressed: () => switch (_tabs.index) {
-                          0 => addExpense(),
-                          1 => addTrip(),
-                          _ => addMonthly(),
-                        },
+                        key: const ValueKey('expenses-add'),
+                        onPressed: add,
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.accentFill,
                           minimumSize: const Size(0, 40),
