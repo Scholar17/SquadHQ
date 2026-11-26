@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../wallet/domain/repositories/wallet_repository.dart' show WalletImageKind;
 import '../../../wallet/presentation/widgets/wallet_image.dart';
 import '../../../wallet/presentation/widgets/wallet_image_actions.dart';
+import '../../domain/entities/expense.dart' show ExpenseSplitMode;
 import '../../domain/entities/settlement.dart' show SettlementMethod;
 import '../../domain/entities/squad_member.dart';
 import 'squad_widgets.dart';
@@ -478,6 +479,50 @@ class SlipPickerButton extends StatelessWidget {
   }
 }
 
+/// A split type's icon in [SplitTypeGrid]. Exact is "123": you type each
+/// amount (no currency sign, so it fits any squad's currency).
+IconData splitModeIcon(ExpenseSplitMode mode) => switch (mode) {
+  ExpenseSplitMode.equal => Icons.balance_rounded,
+  ExpenseSplitMode.chosen => Icons.group_outlined,
+  ExpenseSplitMode.exact => Icons.onetwothree_rounded,
+  ExpenseSplitMode.custom => Icons.tune_rounded,
+  ExpenseSplitMode.percent => Icons.percent_rounded,
+  ExpenseSplitMode.shares => Icons.pie_chart_outline_rounded,
+  ExpenseSplitMode.treat => Icons.card_giftcard_rounded,
+  ExpenseSplitMode.borrow => Icons.handshake_outlined,
+};
+
+/// How an expense is split, as icon tiles like [CategoryGrid] — all in
+/// one calm tone, the picked one ringed.
+class SplitTypeGrid extends StatelessWidget {
+  const SplitTypeGrid({
+    super.key,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<ExpenseSplitMode> options;
+  final ExpenseSplitMode selected;
+  final ValueChanged<ExpenseSplitMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) => CategoryGrid<ExpenseSplitMode>(
+    options: [
+      for (final mode in options)
+        (
+          value: mode,
+          label: mode.label,
+          icon: splitModeIcon(mode),
+          background: AppColors.surface,
+          foreground: AppColors.accent700,
+        ),
+    ],
+    selected: selected,
+    onSelected: onSelected,
+  );
+}
+
 /// One choice in a [CategoryGrid]: its colour tile and name.
 typedef CategoryOption<T> = ({T value, String label, IconData icon, Color background, Color foreground});
 
@@ -492,6 +537,7 @@ class CategoryGrid<T> extends StatelessWidget {
     required this.onSelected,
     this.onAdd,
     this.addLabel = 'New category',
+    this.icons = true,
   });
 
   final List<CategoryOption<T>> options;
@@ -500,16 +546,44 @@ class CategoryGrid<T> extends StatelessWidget {
   final VoidCallback? onAdd;
   final String addLabel;
 
+  /// False: text-only colour pills (categories) in place of icon tiles.
+  final bool icons;
+
   static const _spacing = 6.0;
 
   @override
   Widget build(BuildContext context) {
+    final onAdd = this.onAdd;
+    if (!icons) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final option in options)
+            _CategoryPill(
+              label: option.label,
+              picked: option.value == selected,
+              onTap: () => onSelected(option.value),
+              background: option.background,
+              foreground: option.foreground,
+            ),
+          if (onAdd != null)
+            _CategoryPill(
+              label: addLabel,
+              picked: false,
+              onTap: onAdd,
+              background: Colors.transparent,
+              foreground: AppColors.accent700,
+              outlined: true,
+            ),
+        ],
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         // Five across on a phone, more on a wider sheet; never cramped.
         final perRow = ((constraints.maxWidth + _spacing) / (64 + _spacing)).floor().clamp(4, 7);
         final width = (constraints.maxWidth - _spacing * (perRow - 1)) / perRow;
-        final onAdd = this.onAdd;
         return Wrap(
           spacing: _spacing,
           runSpacing: 10,
@@ -538,6 +612,72 @@ class CategoryGrid<T> extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// A category as a colour pill with just its name — the picked one ringed
+/// in its colour.
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({
+    required this.label,
+    required this.picked,
+    required this.onTap,
+    required this.background,
+    required this.foreground,
+    this.outlined = false,
+  });
+
+  final String label;
+  final bool picked;
+  final VoidCallback onTap;
+  final Color background;
+  final Color foreground;
+
+  /// The "+ New category" pill: a thin outline in place of a fill.
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      button: true,
+      selected: picked,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: AnimatedContainer(
+          duration: animate ? const Duration(milliseconds: 160) : Duration.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: ShapeDecoration(
+            color: background,
+            shape: StadiumBorder(
+              side: BorderSide(
+                color: picked
+                    ? foreground
+                    : outlined
+                    ? foreground.withValues(alpha: 0.45)
+                    : Colors.transparent,
+                width: picked ? 2 : 1.5,
+              ),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (outlined) ...[Icon(Icons.add_rounded, size: 16, color: foreground), const SizedBox(width: 4)],
+              Text(
+                label,
+                style: AppTextStyles.body(
+                  size: 13,
+                  weight: picked ? FontWeight.w800 : FontWeight.w600,
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -424,13 +424,10 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           const SizedBox(height: 16),
           LabeledField(
             label: 'SPLIT',
-            // Five types: they wrap rather than squeeze, like the squad's.
-            child: SegmentedTabs<ExpenseSplitMode>(
+            child: SplitTypeGrid(
               options: buddySplitModes,
               selected: _mode,
-              label: (mode) => mode.label,
-              keyOf: (mode) => ValueKey('buddy-split-${mode.name}'),
-              onChanged: _pickMode,
+              onSelected: _pickMode,
             ),
           ),
           const SizedBox(height: 6),
@@ -484,6 +481,7 @@ class _BuddyExpenseSheetState extends State<_BuddyExpenseSheet> {
           LabeledField(
             label: 'CATEGORY',
             child: CategoryGrid<ExpenseCategory>(
+              icons: false,
               options: [
                 for (final category in ExpenseCategory.everyday)
                   (

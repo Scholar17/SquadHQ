@@ -219,6 +219,7 @@ class _PersonalExpenseSheetState extends State<_PersonalExpenseSheet> {
             LabeledField(
               label: 'CATEGORY',
               child: CategoryGrid<String>(
+                icons: false,
                 options: [
                   for (final (key, label) in [
                     for (final category in PersonalCategory.builtIn) (category.name, category.label),

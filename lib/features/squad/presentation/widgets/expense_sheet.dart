@@ -905,6 +905,7 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             ],
             const SizedBox(height: 14),
             CategoryGrid<ExpenseCategory>(
+              icons: false,
               options: [
                 for (final category in _categories)
                   (
@@ -954,11 +955,10 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            SegmentedTabs<ExpenseSplitMode>(
+            SplitTypeGrid(
               options: ExpenseSplitMode.forSquad,
               selected: _mode,
-              label: (mode) => mode.label,
-              onChanged: (mode) {
+              onSelected: (mode) {
                 setState(() {
                   _mode = mode;
                   _prefillWeights(mode, _everyone(ledger));
